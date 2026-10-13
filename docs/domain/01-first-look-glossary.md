@@ -6,11 +6,11 @@
 
 | 팀원 | 이 도메인에서 떠오르는 장면 1개 | 궁금한 점 1개 |
 | --- | --- | --- |
-|김지은|운동을 자발적으로 하게되는 장면|사용자가 자발적으로 운동을 할 수 있게 만들어주는 동기가 무엇일까?|
-|성민규|사용자의 운동자세는 고치는 장면 |사용자가 운동자세를 실제로 고쳐 나갈까? |
-|이시은|워치로는 심박수, 폰 앱으로는 러닝 거리, 다른 앱으로는 식단을 보느라 앱 3개를 왔다 갔다 하는 장면|앱마다 같은 러닝 기록인데 거리나 칼로리가 다르게 나오는 이유는 뭘까?|
-|손범수|사용자가 자신만의 운동 루틴을 짜는 장면|운동을 평소 하지 않는 사용자는 어떻게 해야 이 서비스를 지속적으로 사용할 수 있을까?|
-|강준석|운동열심히 하는 장면|사용자는 무슨 재미로 운동을 하려고 할까?|
+| 김지은 | 아무도 시키지 않았는데 퇴근 후 스스로 운동화를 신고 나가는 장면 | 사용자가 자발적으로 운동을 하게 만들어 주는 동기는 무엇일까? |
+| 성민규 | 사용자가 운동 자세를 고치는 장면 | 사용자가 운동 자세를 실제로 고쳐 나갈까? |
+| 이시은 | 워치로는 심박수, 폰 앱으로는 러닝 거리, 다른 앱으로는 식단을 보느라 앱 3개를 왔다 갔다 하는 장면 | 앱마다 같은 러닝 기록인데 거리나 칼로리가 다르게 나오는 이유는 뭘까? |
+| 손범수 | 사용자가 자신만의 운동 루틴을 짜는 장면 | 평소 운동을 하지 않는 사용자는 어떻게 해야 이 서비스를 꾸준히 사용할 수 있을까? |
+| 강준석 | 헬스장에서 땀을 흘리며 세트를 반복하는 장면 | 사용자는 무슨 재미로 운동을 할까? |
 
 ## 1-2. 도메인 용어 사전 (최소 10개, 계속 추가하기)
 
@@ -28,9 +28,14 @@
 | PB | 특정 거리에서의 개인 최고 기록 (Personal Best) | 시즌 베스트 (올해 최고 기록), 세그먼트 기록 (특정 구간 기록) | 러닝·게임 | AI(검증 필요) |
 | 오토 퍼즈 | 신호등 등에서 멈추면 기록이 자동 일시정지되는 기능 | 경과 시간 vs 이동 시간 (오토 퍼즈 여부에 따라 페이스가 달라짐) | 데이터 | AI(검증 필요) |
 | GPS 튐 | 건물·터널 근처에서 위치가 순간이동하듯 찍히는 현상 | 치팅 (의도적 조작. 서버에서 둘을 구분해야 함) | 데이터·게임 | AI(검증 필요) |
-| 기초대사량 | 가만히 있어도 하루에 쓰는 에너지 (BMR) | 총 소비 에너지 (TDEE, 활동량 포함) | 식단 | AI(검증 필요) |
-| 탄단지 | 탄수화물·단백질·지방 비율 (매크로) | 칼로리 (총량만 보고 구성은 안 봄) | 식단 | AI(검증 필요) |
-| 식단 기록 | 먹은 것을 남기는 행위 | 식단 관리 (기록을 보고 목표에 맞게 조정하는 것) | 식단 | AI(검증 필요) |
+| 만보 걷기 | 하루 10,000보를 목표로 걷는 것. 걷기 운동의 대표 목표치로 쓰임 | 이동 거리 (같은 걸음 수라도 보폭에 따라 거리가 다름. 워치는 걸음 수, 러닝 앱은 거리로 보여 줌) | 걷기·데이터 | AI(검증 필요) |
+| 수동 입력 | 건강 앱에 사용자가 직접 운동 시간·거리를 적어 넣은 기록 | 자동 기록 (워치·앱이 측정해 저장한 기록. 수동 입력은 실제 측정이 아님) | 데이터 | AI(검증 필요) |
+| 렙 | 한 동작을 1번 반복한 것 (스쿼트 1회 = 1렙) | 세트 (렙을 묶은 단위. "15렙 3세트" = 15회씩, 쉬었다가 3번) | 근력 | AI(검증 필요) |
+| 템포 | 한 렙을 내려가고 올라오는 속도 (예: 3초 내리고 1초 올리기) | 휴식 시간 (세트와 세트 사이에 쉬는 시간. 템포는 한 렙 안의 속도) | 근력·훈련 | AI(검증 필요) |
+| 맨몸운동 | 기구 없이 자기 체중으로 하는 운동 (스쿼트·푸시업·플랭크) | 웨이트 (덤벨·바벨 등 무게를 들고 하는 운동) | 근력·홈트 | AI(검증 필요) |
+| 폼 | 운동 동작의 자세. "폼이 무너졌다" = 자세가 흐트러짐 | 가동범위 (동작을 얼마나 깊게 했는지. 스쿼트를 반만 앉는 건 폼이 아니라 가동범위 문제) | 근력·부상 | AI(검증 필요) |
+| AI 자세 인식 | 카메라가 몸의 관절 위치를 찾아 어떤 동작인지, 몇 번 했는지 판단하는 기능. 홈트 앱에서 흔히 쓰는 말 | 자세 교정 (틀린 자세를 알려 주고 고치게 하는 것. 인식은 판단까지, 교정은 피드백까지) | 홈트·데이터 | AI(검증 필요) |
+| 오운완 | '오늘 운동 완료'의 줄임말. SNS·단톡방에 운동을 인증할 때 쓰는 말 | 인증샷 (오운완을 증명하려고 올리는 사진·캡처 자체) | 사람·커뮤니티 | AI(검증 필요) |
 | 연동 | 다른 앱의 데이터를 가져오도록 권한·연결을 설정하는 것 | 동기화 (연결된 뒤 데이터를 최신 상태로 맞추는 동작) | 데이터 | AI(검증 필요) |
 | 오버트레이닝 | 회복보다 훈련이 많아 기록과 컨디션이 계속 떨어지는 상태 | 근육통 (DOMS, 며칠 지나면 회복되는 정상 반응) | 러닝·건강 | AI(검증 필요) |
 | 런태기 | 러닝 + 권태기. 뛰기 싫어지는 시기 (커뮤니티 은어) | 부상으로 인한 휴식 (의지 문제가 아님) | 사람·커뮤니티 | AI(검증 필요) |
@@ -44,8 +49,8 @@
 
 | 관점 | 한국어 검색어 (2개 이상) | 영어 검색어 (2개 이상) | 먼저 찾아볼 곳 |
 | --- | --- | --- | --- |
-| ① 사람·이용 흐름 | 러닝 앱 이탈 이유 / 초보 러너 운동 지속 / 런태기 극복 | running app user retention / exercise adherence beginner runners / social running motivation | RISS, KCI, Google Scholar / 기존 서비스 도움말·앱스토어 리뷰(스트라바, 런데이, NRC), 러닝 크루 커뮤니티 |
-| ② 규칙·예외 | 위치기반서비스사업자 신고 / 건강정보 민감정보 개인정보보호법 / 미성년자 위치정보 동의 | location-based service regulation Korea / fitness app health data privacy / GPS spoofing detection running | 국가법령정보센터(law.go.kr) / 개인정보보호위원회·방송통신위원회 가이드라인(정부 보고서) |
-| ③ 데이터·외부 연동 | 헬스 커넥트 연동 / 삼성헬스 데이터 SDK / 애플 건강 HealthKit 러닝 기록 | Health Connect API exercise session / HealthKit workout route / Strava API rate limit | 기존 서비스 도움말 문서(Android·Apple 개발자 문서, Strava Developers), 기업 기술 블로그 |
-| ④ 기존 서비스·벤치마크 | 운동 게이미피케이션 효과 / 포켓몬고 신체활동 / 러닝 앱 비교 | gamification physical activity meta-analysis / Pokémon GO physical activity / exergame competition social | Google Scholar, RISS, DBpia (해외 저널 JMIR·PubMed는 Google Scholar로 검색) |
-| ⑤ 문제와 손해 | 스트라바 히트맵 군사기지 노출 / 운동 앱 개인정보 유출 / 칼로리 앱 섭식장애 | Strava heatmap military base 2018 / fitness tracker data breach / calorie tracking app eating disorder | Google Scholar, KCI / 기업 기술·보안 블로그, 정부·연구기관 보고서 (뉴스 아카이브 보조) |
+| ① 사람·이용 흐름 | 런태기 극복 / 초보 운동 지속 이탈 / 홈트 맨몸운동 지속 | exercise adherence beginners / fitness app dropout / home workout adherence | RISS, KCI, Google Scholar / 기존 서비스 도움말·앱스토어 리뷰(런데이, 나이키 런 클럽, 챌린저스) |
+| ② 규칙·예외 | 건강정보 민감정보 개인정보보호법 / 카메라 영상 생체정보 개인정보 / 14세 미만 법정대리인 동의 | health data sensitive information Korea / pose estimation biometric privacy / children data consent fitness app | 국가법령정보센터(law.go.kr) / 개인정보보호위원회 가이드라인(정부 보고서) |
+| ③ 데이터·외부 연동 | 헬스 커넥트 걸음 수 연동 / 헬스 커넥트 수동 입력 기록 / 자세 추정 스쿼트 횟수 측정 | Health Connect steps record / Health Connect recording method manual entry / MediaPipe pose repetition counting | 기존 서비스 도움말 문서(Android 개발자 문서, MediaPipe 문서), 기업 기술 블로그, Google Scholar |
+| ④ 기존 서비스·벤치마크 | 운동 게이미피케이션 효과 / 링 피트 어드벤처 신체활동 / 포켓몬고 걸음 수 | gamification physical activity meta-analysis / Ring Fit Adventure exergame / Pokémon GO step count | Google Scholar, RISS, DBpia (해외 저널 JMIR·PubMed는 Google Scholar로 검색) / 서비스 공식 사이트 |
+| ⑤ 문제와 손해 | 초보 러너 부상률 / 신체활동 실천율 통계 / 오버트레이닝 부상 | running injury incidence novice runners / physical inactivity prevalence / exercise dropout reasons | KOSIS(국민생활체육조사, 국민건강영양조사), Google Scholar, KCI / 정부·연구기관 보고서 |
