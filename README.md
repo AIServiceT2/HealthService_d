@@ -1,49 +1,52 @@
-# 전운시
+# 표백제 — 전운시
 
-**전**지적 **운**동 **시**점
-
-> 스쿼트로 하체가 강해지고, 걸은 만큼 회복하는 현실 운동 기반 픽셀 RPG
-
-> 이 파일은 저장소의 첫 화면입니다. 처음 온 사람(교사, 클라이언트, 다른 팀)이 1분 안에 "누가 무엇을 만들고, 기록은 어디 있는지" 알 수 있게 **요약과 링크만** 둡니다.
-> 조사 내용은 아래 문서 지도의 각 파일에 씁니다. README에 조사 내용을 옮겨 적지 않습니다.
-> `>`로 시작하는 안내 문장은 내용을 채운 뒤 지워도 됩니다.
+**전**지적 **운**동 **시**점: 현실 운동 기반 픽셀 RPG
 
 ## 팀
 
+**표백제**
+
+| 이름 | GitHub |
+| --- | --- |
+| 김지은 | [@jieun0903](https://github.com/jieun0903) |
+| 성민규 | [@rhtnddd](https://github.com/rhtnddd) |
+| 이시은 | [@Sieun0225](https://github.com/Sieun0225) |
+| 손범수 | [@sonbumsu](https://github.com/sonbumsu) |
+| 강준석 | [@Kangjunseok09](https://github.com/Kangjunseok09) |
+
+역할, 교대 계획, 블록별 정리 담당은 [팀 구성](docs/team/roles.md)에 있습니다.
+
+## 세부 주제
+
+> 상태: 선정안 작성 완료, 팀 확정 전 ([4단계 결정 기록](docs/decisions/topic-selection.md))
+
 | 항목 | 내용 |
 | --- | --- |
-| 팀명 | 표백제 |
-| 배정받은 큰 도메인 | |
-| 세부 주제 (한 줄) | `___(누가)가 ___(무엇)을 할 수 있게 하는 서비스` — 4단계에서 확정한 뒤 씁니다 |
-| 팀원과 역할 | [docs/team/roles.md](docs/team/roles.md) |
+| 도메인 | 개인 운동·건강관리 지원 서비스 |
+| 세부 주제 | 전운시: 운동이 전투가 되는 인증형 RPG |
+| 주 사용자 | 혼자서는 운동을 꾸준히 하기 어려운 초보 운동인 |
+| 해결할 문제 | 운동 결과가 숫자와 달성 여부로만 남고 인증 판정도 일관되지 않아, 성취감을 느끼며 운동을 지속하기 어렵다 |
+| 한 줄 정의 | 카메라로 인식한 운동이 캐릭터의 능력치와 공격이 되고, 걸은 걸음 수가 체력을 채우며, 다른 길드의 검토를 거쳐 보상이 반영되는 서비스 |
 
-## 세부 주제 필수 조건
+## 필수 조건
 
-| 조건 | 우리 주제에서는 | 자세히 |
+| 조건 | 우리 서비스에서 | 자세히 |
 | --- | --- | --- |
-| LLM이 서비스 기능 안에서 쓰인다 | (예: 고객 문의를 읽고 답변 초안을 만들어 CS 담당이 고쳐 보낸다) | [03-rules-states-llm.md](docs/domain/03-rules-states-llm.md#3-4-llm이-들어갈-자리) |
-| 핵심 대상에 상태 전이가 있다 | (예: 결제완료 → 상품준비중 → 배송지시 → 배송중 → 배송완료, 취소·반품 분기) | [03-rules-states-llm.md](docs/domain/03-rules-states-llm.md#3-2-핵심-대상과-상태-전이) |
+| 상태 전이 | 운동 제출건: `SUBMITTED → PREPARED → PENDING_REVIEW → APPROVED → REWARDED`. 반려(`REJECTED`), 재제출, 종료(`CLOSED`), 승인 전 취소(`CANCELED`), 신고 후 회수(`REVOKED`) 경로 포함 | [3-2 상태 전이](docs/domain/03-rules-states-llm.md) |
+| LLM | 기록 요약, 이상치 설명, 전투 서사. 검토자가 확인하고 승인·반려를 결정하며, LLM은 보상 수치와 상태를 바꾸지 않음 | [3-4 LLM이 들어갈 자리](docs/domain/03-rules-states-llm.md) |
 
 ## 문서 지도
 
-| 단계 | 파일 | 하는 일 | 상태 |
-| --- | --- | --- | --- |
-| 0 | [docs/team/roles.md](docs/team/roles.md) | 팀 구성, 역할, 교대 계획 | ☑ |
-| 0 | [docs/domain/README.md](docs/domain/README.md) | 조사 관점, 태그 규칙, 파일 규칙, 찾아볼 곳 | 읽기만 |
-| 1 | [docs/domain/01-first-look-glossary.md](docs/domain/01-first-look-glossary.md) | 첫인상, 용어 사전, 검색어 | ☑ |
-| 2 | [docs/domain/02-people-flow-benchmark.md](docs/domain/02-people-flow-benchmark.md) | 사람, 현재 흐름, 데이터, 기존 서비스, 논문 | ☑ |
-| 3 | [docs/domain/03-rules-states-llm.md](docs/domain/03-rules-states-llm.md) | 규칙, 상태 전이, LLM 자리, 법령·통계 | ☑ |
-| - | [docs/domain/cards/](docs/domain/cards/) | 논문·자료 근거 카드 (카드마다 파일 하나) | ☑ |
-| - | [docs/domain/ai-check-log.md](docs/domain/ai-check-log.md) | AI에게 물어본 것과 확인 결과 | ☑ |
-| 4 | [docs/decisions/topic-selection.md](docs/decisions/topic-selection.md) | 필수 조건 확인, 후보 평가, 주제 확정 | ☑ |
-| 5 | [docs/interview/mvp-assumptions-questions.md](docs/interview/mvp-assumptions-questions.md) | MVP 가설, 기능 목록, 가정·위험, 질문지, 미팅 준비 | ☑ |
-| 6 | [docs/proposal/README.md](docs/proposal/README.md) | **클라이언트에게 보내는 프로젝트 제안서** (Claude 초안 → 팀 확인 → Word 양식, 완성본 docx·PDF) | ☑ |
-| - | `logs/pre-[GitHub 아이디].md` | 개인 회고 (사람마다 파일 하나) | ☑ |
-
-> 단계가 끝나면 상태 칸을 ☑로 바꾸고 PR로 올립니다.
-
-## 작업 규칙
-
-- 첫 커밋 이후에는 main에 바로 커밋하지 않습니다. 모든 변경은 브랜치를 만들고 PR로 올린 뒤, 팀원 1명 이상이 승인하면 병합합니다.
-- 표가 있는 단계 파일(01~03, topic-selection 등)은 **블록마다 정리 담당 1명**이 고칩니다. 다른 사람은 근거 카드를 쓰거나 PR에 댓글을 남깁니다. 여러 명이 같은 파일을 동시에 고치면 충돌이 납니다.
-- 근거 카드와 개인 회고는 사람마다 파일이 달라 동시에 써도 충돌하지 않습니다.
+| 단계 | 문서 | 내용 |
+| --- | --- | --- |
+| 0 | [docs/team/roles.md](docs/team/roles.md) | 팀 구성, 역할, 교대 계획, 블록별 정리 담당 |
+| 0 | [docs/domain/README.md](docs/domain/README.md) | 조사 관점, 태그 규칙, 파일 규칙, 찾아볼 곳 |
+| 1 | [docs/domain/01-first-look-glossary.md](docs/domain/01-first-look-glossary.md) | 첫인상, 용어 사전, 검색어 |
+| 2 | [docs/domain/02-people-flow-benchmark.md](docs/domain/02-people-flow-benchmark.md) | 사람, As-Is, 데이터, 벤치마크, 논문 |
+| 3 | [docs/domain/03-rules-states-llm.md](docs/domain/03-rules-states-llm.md) | 규칙, 상태 전이, LLM 자리, 시간 규칙, 법령·통계 |
+| — | [docs/domain/cards/](docs/domain/cards/) | 근거 카드 (카드마다 파일 하나) |
+| — | [docs/domain/ai-check-log.md](docs/domain/ai-check-log.md) | AI 확인 기록 |
+| 4 | [docs/decisions/topic-selection.md](docs/decisions/topic-selection.md) | 필수 조건 확인, 후보 평가, 주제 확정, 결정 기록 |
+| 5 | [docs/interview/mvp-assumptions-questions.md](docs/interview/mvp-assumptions-questions.md) | MVP 가설, 기능 목록, 가정·위험, 질문지, 미팅 준비 |
+| 6 | [docs/proposal/](docs/proposal/) | 제안서 절차, 양식(docx), 초안(draft.md), 완성본(docx·PDF) |
+| — | [logs/](logs/) | 개인 회고 (`pre-[GitHub 아이디].md`) |
