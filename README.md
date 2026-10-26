@@ -51,7 +51,7 @@
 | 2-1 | [docs/requirements/backlog.md](docs/requirements/backlog.md) | 스토리와 인수 조건, 필수/선택 | ☑ |
 | 2-1 | [docs/decisions/mvp-scope.md](docs/decisions/mvp-scope.md) | MVP 포함·제외(이유), 제안서(v2)와 다른 점 | ☑ |
 | 2-1 | [docs/decisions/stack-inputs.md](docs/decisions/stack-inputs.md) | 기술 스택을 정하기 전 우리 팀 경험·조건 정리 | ☑ |
-| 2-1 | [docs/team/working-agreement.md](docs/team/working-agreement.md) | 팀 작업 규칙 | ☑ |
+| 2-1 | [docs/team/working-agreement.md](docs/team/working-agreement.md) | 팀 작업 규칙 | ☑ (리뷰 대기 시간만 미정) |
 | 2-1 | [.github/ISSUE_TEMPLATE/](.github/ISSUE_TEMPLATE/) | 스토리·버그 이슈 양식 | ☑ |
 | 2-1 | [.github/pull_request_template.md](.github/pull_request_template.md) | PR 본문 양식, 리뷰 체크리스트 | ☑ |
 
