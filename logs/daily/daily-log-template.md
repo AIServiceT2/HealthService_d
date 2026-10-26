@@ -1,9 +1,9 @@
 # YYYY-MM-DD 작업 기록
 
-> **저장 위치:** `logs/daily/YYYY-MM-DD-<내 이름>.md` (이 파일 이름 `daily-log-template.md`는 저장할 때 바꿉니다)
+> **저장 위치:** `logs/daily/YYYY-MM-DD-<GitHub 아이디>.md` (이 파일 이름 `daily-log-template.md`는 저장할 때 바꿉니다)
 
 > **사용 방법**
-> 1. 이 파일을 복사해 `logs/daily/YYYY-MM-DD-<내 이름>.md`로 저장합니다. 예) `2026-10-22-김하늘.md` (GitHub 아이디가 아니라 **이름**)
+> 1. 이 파일을 복사해 `logs/daily/YYYY-MM-DD-<GitHub 아이디>.md`로 저장합니다. 예) `2026-10-22-jieun0903.md`
 > 2. 제목의 날짜도 오늘 날짜로 바꿉니다.
 > 3. 네 칸, 각 1~3줄. `>`로 시작하는 안내 문장은 지워도 됩니다.
 > 4. 사람마다 파일이 달라 동시에 써도 충돌하지 않습니다. 블록 3 마지막에 팀이 한 PR로 묶어 올려도 됩니다.
