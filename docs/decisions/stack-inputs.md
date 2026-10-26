@@ -17,7 +17,7 @@
 | 이름 | 직접 써 본 언어·도구                                               | 그걸로 만들어 본 것 (한 줄)                                   | 써 봤지만 어려웠던 것 | 배워 보고 싶은 것 |
 | --- |------------------------------------------------------------|-----------------------------------------------------| --- | --- |
 | 강준석 | Java, Spring Boot, Python, FastAPI, MySQL, PostgreSql, AWS | 회원 정보·기록 CRUD API, FastAPI 기반 데이터 조회·처리 API, 백엔드 배포 | 로그인 인증 처리, 테이블 관계 설계, FastAPI 비동기 처리와 요청 데이터 검증, 테스트 코드 작성 | 운동 기록 제출·승인·반려 API, 중복 보상 방지와 상태 전이 테스트, Python·FastAPI 기반 운동 기록 분석 및 LLM 요약 API 연동 |
-| |                                                            |                                                     | | |
+| 성민규 | Java, Spring Boot, Pytion, FastAPI, MySQL, PostgreSql, AWS, Kotlin, Typescript, react, Node.js, Vue.js, StyleComponent | CRUD, JWT, 배포 환경, CICD, 공공API연결, DB관리 | JWT, DB관리 | 모델링                                                                                 |
 | 김지은 | Python, FastAPI, SQLAlchemy, SQLite, Redis, Docker Compose, pytest, (React·TypeScript?) | 로그인·문서 업로드·RAG 질의응답 API(Gemini, ChromaDB, Redis 캐시), 판결 플랫폼 CRUD API | 로그인 처리, 테이블 관계 설계 | 운동 제출건 상태 전이(SUBMITTED → PREPARED → APPROVED → REWARDED)를 API와 테스트로 구현, MediaPipe 등 온디바이스 자세 인식 모델 비교, LLM 출력 규칙 검사(숫자·스킬명 거르기)와 장애 시 기본 문구 처리 |
 | |                                                            |                                                     | | |
 | |                                                            |                                                     | | |
