@@ -7,7 +7,7 @@
 
 - 합의일: 10/26
 - 출처: 사전활동 README 작업 규칙에서 이관하고 수정
-- 점검 근거: GitHub PR #1~#47 기록과 main 커밋 기록
+- 점검 근거: GitHub PR #1~#66 기록과 main 커밋 기록
 
 ## 사전활동에서 가져온 규칙과 점검
 
@@ -28,7 +28,7 @@
 
 ## 의견이 갈릴 때
 - 결정 방법: 해당 스프린트 리더가 선택지를 정리하고 짧게 이야기한 뒤 다수결, 동점이면 리더가 정함.
-- 결정 기록 위치: `docs/decisions/` (범위는 [mvp-scope.md](../decisions/mvp-scope.md)). 고객 미팅에서 나온 결정은 지금처럼 `client-meeting-N.md`에 D번호로 적는다
+- 결정 기록 위치: `docs/decisions/` (범위는 [mvp-scope.md](../decisions/mvp-scope.md)). 고객 미팅에서 나온 결정은 `client-meeting-N.md`의 '받은 피드백과 처리' 표와 '확정된 것'에 적는다
 
 ## 결석·지각
 - 인수인계 방법: 결석,지각이 예정되면 전날까지 팀 채팅에 알리고, 하던 작업은 브랜치에 푸시한 뒤 `logs/daily/YYYY-MM-DD-GitHub아이디.md`에 진행 상황과 남은 일을 적는다. 맡은 정리 블록은 그 스프린트 리더가 다른 사람에게 넘긴다

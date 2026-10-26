@@ -36,6 +36,6 @@
 | 1 | `docs/domain/01-first-look-glossary.md` |김지은 |전원|
 | 2 | `docs/domain/02-people-flow-benchmark.md` |김지은 |전원|
 | 3 | `docs/domain/03-rules-states-llm.md` |김지은|전원|
-| 4 | `docs/decisions/topic-selection.md` | | |
-| 5 | `docs/interview/mvp-assumptions-questions.md` | | |
-| 6 | `docs/proposal/` (제안서 docx·PDF) | | 전원 |
+| 4 | `docs/decisions/topic-selection.md` |강준석|전원|
+| 5 | `docs/interview/mvp-assumptions-questions.md` |김지은 (5-1~5-4), 손범수 (5-5~5-7)|전원|
+| 6 | `docs/proposal/` (제안서 docx·PDF) |손범수| 전원 |

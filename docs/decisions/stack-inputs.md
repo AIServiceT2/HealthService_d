@@ -10,14 +10,14 @@
 > 5. 정리 담당이 PR로 올립니다. 이 파일은 다음 차시에 `docs/STACK.md`의 "우리 팀 상황"으로 이어집니다.
 > 6. `>`로 시작하는 안내 문장은 지워도 됩니다.
 
-- 작성일:
+- 작성일: 2026-10-26
 
 ## 팀원별 경험
 
 | 이름 | 직접 써 본 언어·도구                                               | 그걸로 만들어 본 것 (한 줄)                                   | 써 봤지만 어려웠던 것 | 배워 보고 싶은 것 |
 | --- |------------------------------------------------------------|-----------------------------------------------------| --- | --- |
 | 강준석 | Java, Spring Boot, Python, FastAPI, MySQL, PostgreSql, AWS | 회원 정보·기록 CRUD API, FastAPI 기반 데이터 조회·처리 API, 백엔드 배포 | 로그인 인증 처리, 테이블 관계 설계, FastAPI 비동기 처리와 요청 데이터 검증, 테스트 코드 작성 | 운동 기록 제출·승인·반려 API, 중복 보상 방지와 상태 전이 테스트, Python·FastAPI 기반 운동 기록 분석 및 LLM 요약 API 연동 |
-| 성민규 | Java, Spring Boot, Pytion, FastAPI, MySQL, PostgreSql, AWS, Kotlin, Typescript, react, Node.js, Vue.js, StyleComponent | CRUD, JWT, 배포 환경, CICD, 공공API연결, DB관리 | JWT, DB관리 | 모델링                                                                                 |
+| 성민규 | Java, Spring Boot, Python, FastAPI, MySQL, PostgreSql, AWS, Kotlin, Typescript, react, Node.js, Vue.js, StyleComponent | CRUD, JWT, 배포 환경, CICD, 공공API연결, DB관리 | JWT, DB관리 | 모델링                                                                                 |
 | 김지은 | Python, FastAPI, SQLAlchemy, SQLite, Redis, Docker Compose, pytest, (React·TypeScript?) | 로그인·문서 업로드·RAG 질의응답 API(Gemini, ChromaDB, Redis 캐시), 판결 플랫폼 CRUD API | 로그인 처리, 테이블 관계 설계 | 운동 제출건 상태 전이(SUBMITTED → PREPARED → APPROVED → REWARDED)를 API와 테스트로 구현, MediaPipe 등 온디바이스 자세 인식 모델 비교, LLM 출력 규칙 검사(숫자·스킬명 거르기)와 장애 시 기본 문구 처리 |
 | 손범수 | HTML, CSS, JavaScript, TypeScript, React, Vite, Tailwind CSS, Axios, (Node.js·Express, Spring Boot) | React 기반 반응형 웹 화면(로그인·목록·상세 페이지)과 REST API 연동, Express로 간단한 CRUD API | 전역 상태 관리, 로그인 토큰 저장·갱신 처리, 백엔드 API 응답 형식에 맞춘 에러 처리 | 운동 기록 제출·결과 확인 화면과 길드 화면 구현, 모바일 우선 반응형 UI, 백엔드 API 명세를 함께 정하고 일부 API 직접 구현 |
 | 이시은 | React, Next.js, Vue.js, TypeScript, styled-components, Figma, Java, Spring, Python, MySQL | 게시판, 로그인 API, 앱 화면, 웹 페이지, 공공 API 연결 | Java | 자세 인식 결과(인정 렙·즉시 피드백)를 보여 주는 운동 화면과 전투 리플레이·결과 카드 화면 구현, 모바일 앱 화면 개발 |

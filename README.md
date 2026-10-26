@@ -28,7 +28,7 @@
 | 조건 | 우리 주제에서는 | 자세히 |
 | --- | --- | --- |
 | LLM이 서비스 기능 안에서 쓰인다 | 기록 요약(L1)과 이상치 설명(L2)을 만들어 애매한 건을 확인하는 지인·길드장이 관절 선·실루엣과 함께 보고, 전투 서사(L3)·자세 교정 코멘트(L4)·성장 리포트(L5)는 규칙 검사로 숫자·다른 스킬명 등을 거른 뒤 보여 준다. 운동 종류·횟수·보상·상태는 LLM이 바꾸지 않는다 | [제안서 v2 Ⅳ-13](docs/proposal/draft.md#13-llm-활용-방안-필수) |
-| 핵심 대상에 상태 전이가 있다 | 운동 제출건 정상 경로: `SUBMITTED → PREPARED → APPROVED`(AI 판정) `→ REWARDED`. 확신도 기준 미만이면 `PREPARED → PENDING_REVIEW → APPROVED / REJECTED`. 반려 `REJECTED → SUBMITTED`(연동 세션만, 최대 2회) / `CLOSED`, 승인 전 `CANCELED`, 신고 확정 시 `REVOKED` | [제안서 v2 Ⅳ-12](docs/proposal/draft.md#12-핵심-대상과-상태-흐름-필수) (03 3-2는 아직 미팅 전 기준) |
+| 핵심 대상에 상태 전이가 있다 | 운동 제출건 정상 경로: `SUBMITTED → PREPARED → APPROVED`(AI 판정) `→ REWARDED`. 확신도 기준 미만이면 `PREPARED → PENDING_REVIEW → APPROVED / REJECTED`. 반려 `REJECTED → SUBMITTED`(연동 세션만, 최대 2회) / `CLOSED`, 승인 전 `CANCELED`, 신고 확정 시 `REVOKED` | [제안서 v2 Ⅳ-12](docs/proposal/draft.md#12-핵심-대상과-상태-흐름-필수), [03 3-2](docs/domain/03-rules-states-llm.md#3-2-핵심-대상과-상태-전이) |
 
 ## 문서 지도
 
@@ -38,13 +38,13 @@
 | 0 | [docs/domain/README.md](docs/domain/README.md) | 조사 관점, 태그 규칙, 파일 규칙, 찾아볼 곳 | 읽기만 |
 | 1 | [docs/domain/01-first-look-glossary.md](docs/domain/01-first-look-glossary.md) | 첫인상, 용어 사전, 검색어 | ☑ |
 | 2 | [docs/domain/02-people-flow-benchmark.md](docs/domain/02-people-flow-benchmark.md) | 사람, 현재 흐름, 데이터, 기존 서비스, 논문 | ☑ |
-| 3 | [docs/domain/03-rules-states-llm.md](docs/domain/03-rules-states-llm.md) | 규칙, 상태 전이, LLM 자리, 법령·통계 | ☑ (3-2는 미팅 전 기준, 제안서 Ⅳ-12에 맞춰 수정 필요) |
+| 3 | [docs/domain/03-rules-states-llm.md](docs/domain/03-rules-states-llm.md) | 규칙, 상태 전이, LLM 자리, 법령·통계 | ☑ |
 | - | [docs/domain/cards/](docs/domain/cards/) | 논문·자료 근거 카드 (카드마다 파일 하나) | ☑ |
 | - | [docs/domain/ai-check-log.md](docs/domain/ai-check-log.md) | AI에게 물어본 것과 확인 결과 | ☑ |
 | 4 | [docs/decisions/topic-selection.md](docs/decisions/topic-selection.md) | 필수 조건 확인, 후보 평가, 주제 확정 | ☑ |
 | 5 | [docs/interview/mvp-assumptions-questions.md](docs/interview/mvp-assumptions-questions.md) | MVP 가설, 기능 목록, 가정·위험, 질문지, 미팅 준비 | ☑ |
 | 6 | [docs/proposal/README.md](docs/proposal/README.md) | **클라이언트에게 보내는 프로젝트 제안서** (Claude 초안 → 팀 확인 → Word 양식, 완성본 docx·PDF) | ☑ |
-| 6 | [docs/interview/client-meeting-1.md](docs/interview/client-meeting-1.md) | 1차 고객 미팅 기록 (질의응답, 피드백 처리, 팀 결정 D1~D15) | ☑ |
+| 6 | [docs/interview/client-meeting-1.md](docs/interview/client-meeting-1.md) | 1차 고객 미팅 기록 (질의응답, 피드백 처리, 확정된 것, 여전히 가정인 것) | ☑ |
 | - | `logs/pre-[GitHub 아이디].md` | 개인 회고 (사람마다 파일 하나) | ☑ |
 | - | `logs/daily/YYYY-MM-DD-[GitHub 아이디].md` | 매일 작업 기록 ([양식](logs/daily/daily-log-template.md)) | 매일 |
 | 2-1 | [docs/requirements/user-flows.md](docs/requirements/user-flows.md) | 첫 데모에서 보여줄 핵심 사용자 흐름 (상태 4개 이상) | ☑ |
