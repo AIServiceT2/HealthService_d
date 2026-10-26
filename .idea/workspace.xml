@@ -4,7 +4,14 @@
     <option name="autoReloadType" value="ALL" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="f3283e8d-0563-4b4f-b88e-62252c5179bf" name="변경" comment="" />
+    <list default="true" id="f3283e8d-0563-4b4f-b88e-62252c5179bf" name="변경" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/README-문서지도-추가.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/domain/ai-check-log-추가줄.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/domain/ai-check-log.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/domain/ai-check-log.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/team/working-agreement.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/team/working-agreement.md" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -53,6 +60,15 @@
     "vue.rearranger.settings.migration": "true"
   }
 }]]></component>
+  <component name="RecentsManager">
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/logs/daily" />
+      <recent name="$PROJECT_DIR$" />
+      <recent name="$PROJECT_DIR$/docs/domain" />
+      <recent name="$PROJECT_DIR$/.github" />
+      <recent name="$PROJECT_DIR$/.github/ISSUE_TEMPLATE" />
+    </key>
+  </component>
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
