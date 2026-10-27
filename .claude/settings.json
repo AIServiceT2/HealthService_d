@@ -7,12 +7,20 @@
     ],
     "ask": [
       "Edit(./docs/requirements/backlog.md)",
+      "Edit(./docs/decisions/mvp-scope.md)",
+      "Edit(./docs/STACK.md)",
+      "Edit(./.claude/settings.json)",
       "Bash(git push *)"
     ],
     "deny": [
       "Read(./.env)",
       "Read(./.env.*)",
-      "Edit(./docs/proposal/**)"
+      "Edit(./docs/proposal/**)",
+      "Edit(./docs/domain/README.md)",
+      "Edit(./docs/decisions/stack-inputs.md)",
+      "Bash(git push --force *)",
+      "Bash(git push -f *)",
+      "Bash(git push origin main)"
     ]
   }
 }
