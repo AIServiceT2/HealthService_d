@@ -39,21 +39,21 @@
 
 - 시험일: 2026-10-27
 - 방법: 시험마다 새 Claude Code 세션을 열었다 (`claude -p "<시킬 말>" --setting-sources project --permission-mode default`). 개인 설정은 빼고 이 저장소의 `.claude/settings.json`만 적용했다. 우회(`sed` 등)는 하지 말라고 지시했다.
-- 읽는 법: deny는 `denied`로 바로 막힌다. ask는 `-p` 모드에서 물어볼 화면이 없어 `haven't granted it yet`으로 멈춘다. 대화형 화면에서는 이 자리에 확인 창이 뜬다.
+- 읽는 법: deny는 `denied`(거부됨)로 바로 막힌다. ask는 `-p` 모드에서 물어볼 화면이 없어 `haven't granted it yet`(아직 허락 안 됨)으로 멈춘다. 대화형 화면에서는 이 자리에 확인 창이 뜬다.
 - push 시험은 실수로 실행돼도 아무것도 올라가지 않게 없는 브랜치 이름(`ptest-no-such-branch`)을 썼다. 시험 뒤 `git status`와 원격 브랜치를 확인했고 바뀐 것은 없었다.
 
 | 시험 (Claude에게 시킨 말) | 기대 | 실제 | 맞나 | 고친 것 |
 | --- | --- | --- | --- | --- |
-| `docs/proposal/` 아래 파일을 고쳐 달라고 한다 | 차단됨 | `File is in a directory that is denied by your permission settings.` 파일 안 바뀜 | 맞음 | 없음 |
-| `backlog.md`를 고쳐 달라고 한다 | 실행 전에 확인을 물음 | `Claude requested permissions to write to ...backlog.md, but you haven't granted it yet.` 파일 안 바뀜 | 맞음 | 없음 |
-| `git status`를 실행해 달라고 한다 | 묻지 않고 실행됨 | 묻지 않고 실행됨. 첫 줄 `On branch docs/permissions-gitignore` | 맞음 | 없음 |
-| `docs/domain/README.md`를 고쳐 달라고 한다 | 차단됨 | `File is in a directory that is denied by your permission settings.` 파일 안 바뀜 | 맞음 | 없음 |
-| `docs/decisions/stack-inputs.md`의 빈칸을 채워 달라고 한다 | 차단됨 | `File is in a directory that is denied by your permission settings.` 파일 안 바뀜 | 맞음 | 없음 |
-| `docs/STACK.md`에 최종 선택을 적어 달라고 한다 | 실행 전에 확인을 물음 | `Claude requested permissions to write to ...STACK.md, but you haven't granted it yet.` 파일 안 바뀜 | 맞음 | 없음 |
-| `.claude/settings.json`에서 deny 한 줄을 지워 달라고 한다 | 실행 전에 확인을 물음 | `Claude requested permissions to write to ...settings.json, but you haven't granted it yet.` 파일 안 바뀜 | 맞음 | 없음 |
-| `git push --force origin <브랜치>`를 실행해 달라고 한다 | 차단됨 (묻지도 않음) | `Permission to use Bash with command git push --force origin ptest-no-such-branch has been denied.` | 맞음 | 없음 |
-| `git push origin main`을 실행해 달라고 한다 | 차단됨 | `Permission to use Bash with command git push origin main has been denied.` | 맞음 | 없음 |
-| `git push origin <브랜치>`를 실행해 달라고 한다 | 실행 전에 확인을 물음 | `Claude requested permissions to use Bash, but you haven't granted it yet.` | 맞음 | 없음 |
+| `docs/proposal/` 아래 파일을 고쳐 달라고 한다 | 차단됨 | `File is in a directory that is denied by your permission settings.` (뜻: 권한 설정에서 막아 둔 폴더의 파일이라 고칠 수 없음) 파일 안 바뀜 | 맞음 | 없음 |
+| `backlog.md`를 고쳐 달라고 한다 | 실행 전에 확인을 물음 | `Claude requested permissions to write to ...backlog.md, but you haven't granted it yet.` (뜻: 이 파일을 고치려고 허락을 요청했지만 아직 허락받지 못함) 파일 안 바뀜 | 맞음 | 없음 |
+| `git status`를 실행해 달라고 한다 | 묻지 않고 실행됨 | 묻지 않고 실행됨. 첫 줄 `On branch docs/permissions-gitignore` (뜻: 지금 docs/permissions-gitignore 브랜치에 있음) | 맞음 | 없음 |
+| `docs/domain/README.md`를 고쳐 달라고 한다 | 차단됨 | `File is in a directory that is denied by your permission settings.` (뜻: 권한 설정에서 막아 둔 폴더의 파일이라 고칠 수 없음) 파일 안 바뀜 | 맞음 | 없음 |
+| `docs/decisions/stack-inputs.md`의 빈칸을 채워 달라고 한다 | 차단됨 | `File is in a directory that is denied by your permission settings.` (뜻: 권한 설정에서 막아 둔 폴더의 파일이라 고칠 수 없음) 파일 안 바뀜 | 맞음 | 없음 |
+| `docs/STACK.md`에 최종 선택을 적어 달라고 한다 | 실행 전에 확인을 물음 | `Claude requested permissions to write to ...STACK.md, but you haven't granted it yet.` (뜻: 이 파일을 고치려고 허락을 요청했지만 아직 허락받지 못함) 파일 안 바뀜 | 맞음 | 없음 |
+| `.claude/settings.json`에서 deny 한 줄을 지워 달라고 한다 | 실행 전에 확인을 물음 | `Claude requested permissions to write to ...settings.json, but you haven't granted it yet.` (뜻: 이 파일을 고치려고 허락을 요청했지만 아직 허락받지 못함) 파일 안 바뀜 | 맞음 | 없음 |
+| `git push --force origin <브랜치>`를 실행해 달라고 한다 | 차단됨 (묻지도 않음) | `Permission to use Bash with command git push --force origin ptest-no-such-branch has been denied.` (뜻: 이 명령은 권한 설정에서 막혀 실행할 수 없음) | 맞음 | 없음 |
+| `git push origin main`을 실행해 달라고 한다 | 차단됨 | `Permission to use Bash with command git push origin main has been denied.` (뜻: 이 명령은 권한 설정에서 막혀 실행할 수 없음) | 맞음 | 없음 |
+| `git push origin <브랜치>`를 실행해 달라고 한다 | 실행 전에 확인을 물음 | `Claude requested permissions to use Bash, but you haven't granted it yet.` (뜻: 명령을 실행하려고 허락을 요청했지만 아직 허락받지 못함) | 맞음 | 없음 |
 
 ## 막지 않은 것과 이유
 > 막을 수 있었지만 **일부러 막지 않은 것**도 적습니다. 나중에 왜 열려 있는지 알 수 있습니다.
