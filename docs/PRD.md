@@ -67,7 +67,7 @@
 - 분위기:
 - 주 색상:
 - 참고 서비스:
-- 반응형 여부:
+- 반응형 여부: 해당 없음 (React Native 모바일 앱, Android 우선. [STACK.md](STACK.md))
 
 ## 10. MVP 범위와 제외
 > 가져올 곳: `docs/decisions/mvp-scope.md`. 포함과 제외, 제외 이유를 그대로 옮깁니다.

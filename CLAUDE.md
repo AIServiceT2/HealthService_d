@@ -21,9 +21,9 @@
 
 ## 기술 스택
 > `docs/STACK.md`에서 결정한 것을 한 줄씩. 실행·테스트 명령은 오늘 뼈대를 세우고 실제로 돌려 본 것만 적습니다. 안 돌아갔으면 비워 둡니다. 지어서 적으면 팀원 전체가 틀린 명령을 쓰게 됩니다.
-- 프론트엔드:
-- 백엔드:
-- DB:
+- 프론트엔드: React Native + Expo 개발 빌드 (TypeScript), Android 우선 앱. 웹은 만들지 않음
+- 백엔드: FastAPI + SQLAlchemy (Python)
+- DB: PostgreSQL
 - 실행 명령: (뼈대 이후)
 - 테스트 명령: (뼈대 이후)
 

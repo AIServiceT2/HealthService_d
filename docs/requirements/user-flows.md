@@ -5,7 +5,7 @@
 지나가는 상태: `SUBMITTED` 제출됨 → `PREPARED` 계산 완료 → `APPROVED` 승인 (AI 판정) → `REWARDED` 지급 완료 (4개)
 
 - 1차 미팅 결과(client-meeting-1 피드백 7·8, 질의응답 2)를 반영한 제안서 v2 Ⅳ-12의 정상 경로를 따른다. AI 판정 확신도가 기준(90%) 이상이면 사람 확인 없이 `PREPARED → APPROVED`로 간다.
-- 03 3-2 표는 아직 미팅 전 기준(`PREPARED → PENDING_REVIEW → APPROVED`, 타 길드 검토)이라, 이 흐름에 맞게 고쳐야 한다.
+- 03 3-2 표도 이 흐름(AI 자동 승인 `PREPARED → APPROVED`, 기준 미만은 지인·길드장 확인)에 맞게 고쳤다 (2026-10-27).
 
 ## 첫 데모에서 보여줄 흐름 (1개)
 
