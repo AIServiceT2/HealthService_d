@@ -10,22 +10,44 @@
 > 5. **'막힌 지점'에는 오류 메시지를 그대로** 붙여넣습니다. 요약하지 않습니다. 다음 주 첫 과제가 됩니다.
 > 6. `>`로 시작하는 안내 문장은 지워도 됩니다.
 
-- 작성일:
-- 기술 담당:
+- 작성일: 10/27
+- 기술 담당: 성민규
 - 근거: `docs/STACK.md`
 
 ## 1. 받은 계획과 거른 것
 
 > Claude에게 계획만 받고 파일은 만들지 않은 단계입니다.
 
+> 폴더 이름(`mobile/`, `backend/`)은 STACK.md에 정해져 있지 않아 Claude가 제안한 이름입니다 `[제안·팀 확인 필요]`. 앱 폴더를 `app/`으로 하면 Expo Router의 `app/` 폴더와 겹쳐 `app/app/`이 되므로 피했습니다.
+
+> 백엔드 구조는 **모놀리식 + 모듈형**으로 팀이 정함 (2026-10-27, 성민규 전달). STACK.md에는 "백엔드는 하나만", "마이크로서비스 넣지 않음"까지만 있고 '모듈형'은 아직 기록되지 않음 → `docs/STACK.md` 또는 `docs/decisions/`에 기록 필요.
+
 | 계획에 있던 것 | 오늘 함 / 뺌 | 뺀 이유 |
 | --- | --- | --- |
-|  |  |  |
-|  |  |  |
+| 저장소 루트에 `mobile/`(앱)과 `backend/`(서버) 폴더를 나란히 둠 | 오늘 함 | — |
+| `mobile/`: `create-expo-app`의 TypeScript 빈 템플릿으로 생성 | 오늘 함 | — |
+| `mobile/`: Expo Go로 폰에서 빈 화면 띄우기 (`npx expo start`) | 오늘 함 | — |
+| `mobile/`: `expo-dev-client` 설치 후 `npx expo run:android`로 개발 빌드 | 뺌 | 이 PC에 Android SDK·adb가 없음(Android Studio 미설치). 빈 프로젝트 실행은 Expo Go로 확인 가능. 다음 주 첫 과제로 넘김 (출처: STACK.md 확인할 것) |
+| `mobile/`: NativeWind 설정 | 뺌 | 화면 꾸미기는 다음 주 범위 (안내 2번) |
+| `mobile/`: react-native-vision-camera, react-native-fast-tflite, reanimated 설치 | 뺌 | 기능 구현 단계이고 개발 빌드가 있어야 동작함 |
+| `mobile/`: Jest + React Native Testing Library 설정 | 뺌 | 추가 설정 패키지가 필요해 빈 프로젝트 실행 범위를 넘음. 앱 테스트 명령은 `확인 필요`로 둠 |
+| `backend/`: `.venv` 가상환경 + `fastapi`, `uvicorn` 설치, 버전을 `requirements.txt`에 고정 | 오늘 함 | — |
+| `backend/`: 모듈형 모놀리스 구조. 서버는 하나(`app/main.py`)이고 기능은 `app/modules/<모듈>/`로 나눔. 모듈마다 `router.py`(API)·`service.py`(규칙)·`schemas.py`(입출력)를 두고, 다른 모듈은 `service`를 통해서만 부름 | 오늘 함 | — |
+| `backend/`: 첫 모듈 `app/modules/health/`의 `GET /health`를 `app/main.py`에 등록하고 `uvicorn`으로 실행 | 오늘 함 | 모듈 구조가 실제로 도는지 확인할 최소 단위 |
+| `backend/`: 도메인 모듈 폴더를 미리 만들기 (후보: 운동 제출 F-02, 보상 계산·지급 F-03·F-05, AI 판정·확인 요청 F-04, 리플레이 F-06) | 뺌 | 모듈 경계와 이름은 팀이 정해야 함 `[제안·팀 확인 필요]`. 오늘은 기능 코드가 없어 빈 폴더만 생김 |
+| `backend/`: `pytest`로 `/health` 테스트 1개 (`backend/tests/`) | 오늘 함 | 3절 '테스트' 명령을 실제로 돌려 볼 최소 단위 |
+| `backend/`: SQLAlchemy + PostgreSQL + Docker Compose | 뺌 | DB 연결은 다음 주 범위 (안내 2번) |
+| 앱에서 백엔드 호출 연결 | 뺌 | 앱은 HTTP 주소를 기본으로 막아 HTTPS 터널이 필요함 (출처: STACK.md 시연 대안). 배포·연결은 다음 주 |
+| GitHub Actions CI, Render·Neon 배포 | 뺌 | 배포 설정은 다음 주 범위 (안내 2번) |
+| 생성 후 `git status`로 `node_modules/`, `.venv/`, `.expo/`가 안 보이는지 확인 | 오늘 함 | `.gitignore` 확인 (PR #73) |
 
 **계획에서 알려준 "막힐 가능성이 있는 곳"**
 
--
+- Expo Go 앱이 SDK 58 프로젝트를 여는지 `[추정]` — 스토어의 Expo Go는 최신 SDK 하나만 지원하므로 버전이 안 맞으면 열리지 않음. 실제로 열어 봐야 함
+- 학교 Wi-Fi에서 폰과 PC가 서로 안 보일 수 있음 → `npx expo start --tunnel`이 필요할 수 있음 `[추정]`
+- Expo SDK 58의 Node 최소 버전 `확인 필요` (이 PC는 Node 22.16.0) (출처: STACK.md 확인할 것)
+- `create-expo-app`이 이미 git 저장소인 폴더 안에서 따로 `git init`이나 자체 `.gitignore`를 만드는지 `[추정]` → 생성 후 `git status`로 확인
+- 팀원 PC가 Windows이거나 설치 권한이 없으면 Node·Python 설치부터 막힘 (출처: STACK.md 확인할 것 — 팀원별 OS·설치 권한)
 
 ## 2. 만든 것
 
