@@ -1,11 +1,18 @@
 # 핵심 사용자 흐름
 
 ## 연결된 상태 전이
-03-rules-states-llm.md의 핵심 대상: 운동 제출건 (WorkoutSubmission)
-지나가는 상태: `SUBMITTED` 제출됨 → `PREPARED` 계산 완료 → `APPROVED` 승인 (AI 판정) → `REWARDED` 지급 완료 (4개)
+03-rules-states-llm.md의 핵심 대상: 운동 제출건 (WorkoutSubmission) — 플레이어가 운동 세션 하나를 끝낼 때마다 생기는 기록 1건
+지나가는 상태: `SUBMITTED` 제출됨 → `PREPARED` 계산 완료 → `APPROVED` 승인 → `REWARDED` 지급 완료 (4개)
 
-- 1차 미팅 결과(client-meeting-1 피드백 7·8, 질의응답 2)를 반영한 제안서 v2 Ⅳ-12의 정상 경로를 따른다. AI 판정 확신도가 기준(90%) 이상이면 사람 확인 없이 `PREPARED → APPROVED`로 간다.
-- 03 3-2 표도 이 흐름(AI 자동 승인 `PREPARED → APPROVED`, 기준 미만은 지인·길드장 확인)에 맞게 고쳤다 (2026-10-27).
+| 상태 | 뜻 | 누가 바꾸나 |
+| --- | --- | --- |
+| `SUBMITTED` 제출됨 | 운동이 끝나 기록이 접수됨 | 시스템 |
+| `PREPARED` 계산 완료 | 보상과 타격 수가 계산되어 고정됨 | 규칙 엔진 |
+| `APPROVED` 승인 | AI가 실제로 한 운동이라고 판단함 | AI 판정 (확신도 90% 이상) |
+| `REWARDED` 지급 완료 | 보상이 한 번 반영되고 리플레이를 볼 수 있음 | 시스템 |
+
+- 이 흐름은 AI 확신도가 90% 이상인 경우라 사람 확인 없이 바로 승인된다. 90% 미만이면 사람 확인(`PENDING_REVIEW`)으로 가며, 그 경로는 아래 '이 흐름에 포함하지 않은 경로'에 있다.
+- 근거: 제안서 v2 Ⅳ-12, client-meeting-1 피드백 7·8, 질의응답 2, 03 3-2
 
 ## 첫 데모에서 보여줄 흐름 (1개)
 
