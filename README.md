@@ -54,6 +54,14 @@
 | 2-1 | [docs/team/working-agreement.md](docs/team/working-agreement.md) | 팀 작업 규칙 | ☑ (리뷰 대기 시간만 미정) |
 | 2-1 | [.github/ISSUE_TEMPLATE/](.github/ISSUE_TEMPLATE/) | 스토리·버그 이슈 양식 | ☑ |
 | 2-1 | [.github/pull_request_template.md](.github/pull_request_template.md) | PR 본문 양식, 리뷰 체크리스트 | ☑ |
+| 2-2 | [docs/STACK.md](docs/STACK.md) | 기술 스택 결정과 이유 | ☐ |
+| 2-2 | [docs/PRD.md](docs/PRD.md) | 정한 문서를 모은 PRD v0.1과 대조 기록 | ☐ |
+| 2-2 | [CLAUDE.md](CLAUDE.md) | Claude가 매 세션 읽는 팀 지침 | ☐ |
+| 2-2 | [.claude/settings.json](.claude/settings.json) | 허용·확인·차단 권한 | ☐ |
+| 2-2 | [docs/decisions/permissions.md](docs/decisions/permissions.md) | 권한 규칙의 이유와 시험 결과 | ☐ |
+| 2-2 | [docs/team/claude-rules.md](docs/team/claude-rules.md) | 팀 규칙 합의 기록 | ☐ |
+| 2-2 | [.claude/agents/](.claude/agents/) | stack-advisor, prd-writer | ☐ |
+| 2-2 | [docs/decisions/scaffold-log.md](docs/decisions/scaffold-log.md) | 뼈대 계획·실행 결과·막힌 지점 | ☐ |
 
 > 단계가 끝나면 상태 칸을 ☑로 바꾸고 PR로 올립니다.
 
