@@ -1,0 +1,10 @@
+# 로컬 개발·테스트용 PostgreSQL (STACK.md: 테스트도 실제 PostgreSQL 사용)
+# 로컬 전용이라 비밀번호 없이 접속(trust). 배포 DB(Neon)에는 쓰지 않는다.
+services:
+  db:
+    image: postgres:18
+    environment:
+      POSTGRES_DB: jeonunsi
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "5432:5432"
