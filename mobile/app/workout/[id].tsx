@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocalSearchParams } from 'expo-router';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { getSubmission, isSubmissionId, prepareSubmission, Submission } from '../../src/api/submissions';
+import { IS_MOCK_MODE, getSubmission, isSubmissionId, prepareSubmission, Submission } from '../../src/api/submissions';
 import { ActionButton } from '../../src/components/ActionButton';
 import { COLORS, FONT, RADIUS, SPACE } from '../../src/theme/tokens';
 
@@ -35,7 +35,7 @@ export default function Preview() {
   }, [id]);
   const prepared = record?.status === 'PREPARED';
   return <ScrollView contentContainerStyle={styles.page}>
-    <Text style={styles.kicker}>운동 기록 · 보상 미리보기</Text>
+    <Text style={styles.kicker}>{IS_MOCK_MODE ? '목데이터 · 실제 기록이 아니에요' : '운동 기록 · 보상 미리보기'}</Text>
     <Text style={styles.heading}>운동이 쌓인 만큼,{'\n'}공격도 강해져요.</Text>
     {busy && <View accessibilityLiveRegion="polite" style={styles.row}><ActivityIndicator color={COLORS.primary} /><Text style={styles.muted}>기록을 확인하고 있어요…</Text></View>}
     {!!error && <View accessibilityRole="alert" style={styles.card}><Text style={styles.error}>{error}</Text><Text style={styles.muted}>처리 결과가 불확실하면 다시 조회해 주세요.</Text></View>}
@@ -47,10 +47,10 @@ export default function Preview() {
         <View style={styles.divider} />
         <Text style={styles.muted}>예상 타격 수</Text>
         <Text style={[styles.count, { color: COLORS.primary }]}>{prepared ? record.snapshot?.hit_count : '—'}<Text style={styles.unit}>{prepared ? ' 타' : ''}</Text></Text>
-        <Text style={styles.body}>{prepared ? '서버에서 계산한 미리보기예요. 승인과 보상 지급은 아직이에요.' : record.status === 'SUBMITTED' ? '계산이 끝나면 타격 수를 보여드려요.' : '이 기록은 미리보기 단계를 벗어났어요. 현재 상태만 표시합니다.'}</Text>
+        <Text style={styles.body}>{prepared ? (IS_MOCK_MODE ? '목데이터 계산 예시예요. 실제 보상은 지급되지 않아요.' : '서버에서 계산한 미리보기예요. 승인과 보상 지급은 아직이에요.') : record.status === 'SUBMITTED' ? '계산이 끝나면 타격 수를 보여드려요.' : '이 기록은 미리보기 단계를 벗어났어요. 현재 상태만 표시합니다.'}</Text>
       </View>
       {record.status === 'SUBMITTED' && <>
-        <Text style={styles.muted}>개발 시연용 · 서버의 보상 계산을 수동 실행합니다.</Text>
+        <Text style={styles.muted}>{IS_MOCK_MODE ? '목데이터의 보상 계산을 실행합니다.' : '개발 시연용 · 서버의 보상 계산을 수동 실행합니다.'}</Text>
         <ActionButton title="보상 계산 실행" disabled={busy || needsRefresh} onPress={() => void load(true)} />
         {needsRefresh && <Text style={styles.muted}>다시 조회한 뒤 계산을 재시도할 수 있어요.</Text>}
       </>}
