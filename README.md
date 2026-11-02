@@ -74,6 +74,11 @@
 
 > 단계가 끝나면 상태 칸을 ☑로 바꾸고 PR로 올립니다.
 
+## 실행 방법
+
+- 실행·테스트 명령: `확인 필요` (뼈대에서 실제로 돌려 본 명령만 적음)
+- 처음 Claude Code를 열면 `.mcp.json`의 프로젝트 MCP 서버 승인을 묻는다. 서버 이름과 주소를 읽고 하나씩 승인한다 (`docs/decisions/mcp-use.md` 1절 '승인 방법')
+
 ## 작업 규칙
 
 작업 규칙은 [docs/team/working-agreement.md](docs/team/working-agreement.md)로 옮겨 다듬었습니다. 핵심만 적습니다.
