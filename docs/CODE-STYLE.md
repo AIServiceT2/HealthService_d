@@ -14,7 +14,7 @@
 | 5   | 커밋 메시지: `feat:` `fix:` `docs:` `chore:` `test:` + 내용 (1커밋 = 1의도)                                                                                                                                                      | `git log --oneline`                                               |
 | 6   | 테스트 이름: 어떤 스토리를 확인하는지 알 수 있게 `US-xx`를 넣는다 (pytest 함수 이름 `test_us04_...`, Jest `describe('US-04 ...')`)                                                                                               | PR 리뷰에서 새 테스트 이름에 `US-xx`가 있다                       |
 | 7   | 테스트의 기대값을 구현에 맞춰 바꾸지 않는다. 기존 테스트의 기대값을 바꿔야 하면 PR 설명에 이유를 쓰고 테스트 담당이 승인한다                                                                                                     | 구현 PR의 `git diff`에서 기존 테스트 파일의 기대값 변경 여부 확인 |
-| 8   | 비밀 값(키, 비밀번호)을 코드·문서에 쓰지 않는다. `.env`에만 두고 저장소에 올리지 않는다                                                                                                                                          | `git ls-files .env CLAUDE.local.md` 결과가 비어 있다              |
+| 8   | 비밀 값(키, 비밀번호)을 코드·문서·`.mcp.json`에 쓰지 않는다. `.env`에만 두고 저장소에 올리지 않는다 | `git ls-files .env CLAUDE.local.md` 결과가 비어 있다. `.mcp.json` PR에서 키·토큰이 없는지 확인 (mcp-use.md 4절) |
 
 ## 담당 폴더
 
