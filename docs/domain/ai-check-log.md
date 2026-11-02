@@ -98,6 +98,16 @@
 | 2026-10-27 | 이시은 | PRD 대조 | PRD 문서 대조 기록 세 줄(새 기능·바뀐 인수 조건·빠진 스토리)을 Claude가 채우려 함 | Claude 대조 결과는 세 줄 모두 "없음". 8절 인수 조건 55개를 backlog와 글자 단위로 비교해 일치. 출처: logs/daily/2026-10-27-이시은.md | 보류 | 양식상 팀이 직접 채우는 칸이라 결과만 듣고 표는 비워 둠 |
 | 2026-10-27 | 이시은 | PRD 초안 | `client-meeting-1.md`의 "1주차"와 ai-check-log의 "03 3-2 수정 보류" 줄도 함께 고치자고 함 | 둘 다 그때 상황을 적은 기록임. 출처: logs/daily/2026-10-27-이시은.md | 보류 | 당시 기록이라 고치지 않음 |
 | 2026-10-27 | 이시은 | PRD 초안 | user-flows·backlog 정리와 PRD 작성을 한 PR로 올리자고 함 | 한 PR 한 블록 규칙(CLAUDE.md 팀 규칙)과 다름. 출처: logs/daily/2026-10-27-이시은.md | 보류 | 두 PR(#80, #82)로 나눔 |
-| 2026-11-03 | | | | | | |
-| 2026-11-03 | | | | | | |
-| 2026-11-03 | | | | | | |
+| 2026-11-02 | 성민규 | PRD 검토 | prd-reviewer: 8절 인수 조건 54행·10절 제외 이유·2절 LLM 칸·취소/반려 경로가 backlog·mvp-scope 내용을 옮겨 적었으니 가리키기만 하게 줄이자 (지적 1~4) | 출처: docs/decisions/prd-review.md 1~4번 | 보류 | 팀 판단 "반영하지 않음". 원본을 다 써야 해서 (prd-review.md) |
+| 2026-11-02 | 성민규 | PRD 검토 | prd-reviewer: 첫 데모 범위가 크니 STACK.md의 범위 재논의 조건을 PRD 10절에 가리키자 (지적 14) | 출처: prd-review.md 14번 | 보류 | 팀 판단 "반영하지 않음". 이유는 prd-review.md에 작성 필요 |
+| 2026-11-02 | 성민규 | PRD 검토 | prd-reviewer: F-01 누락, `REVOKED` 표시, 미정 칸 기한, 확신도 계산 방법·로그인 방식 행 추가 (지적 5~13) | 출처: prd-review.md 5~13번, PR #93 | 채택 | PRD v1.0에 반영 (PR #93) |
+| 2026-11-02 | 성민규 | 기능 후보 | Claude: US-02는 LLM 관여 "예(L3·L4 생성)" 스토리라 양식 안내상 오늘 피하라는 기능이다 | backlog US-02 LLM 관여 "예", first-feature.md 양식 안내 2번. 출처: first-feature.md 주의 문구 | 보류 | 팀이 US-02를 고름. 대신 오늘 범위를 LLM 없이 계산·미리보기로 좁힘 (first-feature.md 1절) |
+| 2026-11-02 | 성민규 | 조각 반영 | Claude: ai-check-log·.mcp.json·.gitignore 조각은 기록·MCP 선택 전이라 아직 붙이지 말자 | 출처: PR #91 본문 | 보류 | PM이 일단 모두 반영하라고 함. 빈 줄·빈 설정·주석만 넣음 (PR #91) |
+| 2026-11-02 | 손범수 | 기능 구현 | Claude: API.md에서 미정이던 경로 2개, 스냅샷 키 `hit_count`, 운동 종류 값 `SQUAT`, 오류 형식 `{"detail": ...}`, 재계산 요청 409를 제안값으로 정함 | 409는 인수 조건에 없는 응답. 코드 주석에 "제안" 표시. 출처: PR #101 AI 제안 검토·리뷰 요청 | 보류 | 개발자2·PM 합의 전이라 확정하지 않음. API.md에는 아직 반영 안 함 |
+| 2026-11-02 | 손범수 | 데이터·디자인·스타일 점검 | Claude: DATA-MODEL.md에 필드 후보와 영문 필드 이름·값(`SQUAT`, `AI_AUTO` 등)까지 넣은 초안 | 양식은 "Claude는 빠진 필드와 모순을 찾아 주기만 한다". 출처: PR #94 AI 제안 검토 | 보류 | 영문 이름·`[추가]` 필드는 "팀 확인 필요"로 표시하고 확정하지 않음 |
+| 2026-11-02 | 이시은 | 데이터·디자인·스타일 점검 | Claude: CODE-STYLE 규칙 4(DATA-MODEL은 개발자1만 고침)가 양식 안내와, 규칙 5(커밋 메시지)가 CLAUDE.md의 한국어 조건과 충돌한다 | 출처: PR #96 AI 제안 검토·리뷰 요청 | 보류 | 규칙 내용은 팀이 정함. Claude가 고치지 않고 리뷰 요청으로 남김 |
+| 2026-11-02 | 김지은 | MCP 선택 | Claude(공식 문서 조회): Context7 README가 권장하는 `npx ctx7 setup`(OAuth로 키 생성, 사용자 범위)으로 설치 | 저장소 `.mcp.json`·키 없음 결정과 맞지 않음. 출처: docs/decisions/mcp-use.md 1절 "Claude가 찾았지만 쓰지 않은 것" | 보류 | `claude mcp add --scope project --transport http`로 설치 (PR #98) |
+| 2026-11-02 | 김지은 | MCP 선택 | Claude(공식 문서 조회): Figma 문서가 권장하는 플러그인 설치 `claude plugin install figma@claude-plugins-official` | 각자 설치하는 방식이라 저장소 `.mcp.json`으로 팀 설정을 맞추는 결정과 다름. 출처: mcp-use.md 1절 | 보류 | 플러그인 방식은 쓰지 않음 (PR #102) |
+| 2026-11-02 | 김지은 | MCP 선택 | Claude가 찾은 후보 GitHub MCP·Playwright MCP·PostgreSQL MCP·Expo MCP | GitHub: 쓰기 도구·PAT 필요 / Playwright: 웹 브라우저용 / PostgreSQL: 보관되어 유지보수 끝남(npm "no longer supported") / Expo: 개발 빌드 전. 출처: mcp-use.md 1절, 김지은 작업 기록 | 보류 | GitHub·Playwright·PostgreSQL은 고르지 않음, Expo는 보류 (팀 결정, PR #102) |
+| 2026-11-02 | 강준석 | 기능 구현 | AI: 목데이터를 고르는 별도 예시 선택 버튼 추가 | 출처: PR #109 AI 제안 검토, 강준석 작업 기록 | 보류 | 기존 UUID 입력창으로 충분해서 버튼은 제외 |
+| 2026-11-02 | 강준석 | 기능 구현 | AI: API.md에서 미정인 경로·응답 키를 현재 서버 구현(`/submissions/{id}`, `/prepare`, `snapshot.hit_count`)에 맞춰 연결 | 서버 코드(router.py·service.py)와 대조. 출처: 강준석 작업 기록, PR #106 | 채택 | 임시로 서버 구현에 맞춤. API.md 경로·응답 형식 합의는 남음 |
