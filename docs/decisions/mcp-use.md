@@ -9,7 +9,8 @@
 > 4. 연결 문제는 **오류 메시지 그대로** 적습니다. 못 고쳐도 괜찮습니다.
 > 5. `>`로 시작하는 안내 문장은 지워도 됩니다.
 
-- 작성 시작일:
+- 작성 시작일: 2026-11-02
+- 상태: **1차 초안 (Claude 작성, 팀 검토 전)**. 1절의 "고른다/보류"는 Claude의 제안이며 팀이 확정한다 `[제안·팀 확인 필요]`. 공식 문서 내용은 2026-11-02 Claude가 웹 페이지를 열어 요약한 것이라, 팀원이 같은 주소를 직접 열어 확인하기 전까지 `[추정]`이다 (CLAUDE.md 작업 방식).
 
 ## 1. 팀 결정 — 우리 팀에 필요한 MCP
 
@@ -17,35 +18,46 @@
 
 | 필요한 일 | 왜 필요한가 (우리 팀 상황에서) |
 | --- | --- |
-| | |
+| 새 버전 라이브러리의 최신 공식 문서 찾기 (Expo SDK 58, react-native-vision-camera v5, react-native-fast-tflite 3.x, NativeWind 4.x, FastAPI·SQLAlchemy 2.1) | 다섯 명 모두 React Native가 처음이고(출처: STACK.md 팀원별 새로 배워야 할 것), VisionCamera v5는 프레임 처리 방식이 `useFrameOutput`으로 바뀌었다(출처: STACK.md 외부 사실 확인 기록). Claude가 옛 버전 API로 코드를 쓰면 바로 막힌다. 패키지 호환성 검증도 남아 있다(출처: STACK.md 추가 검증 항목 — 패키지 호환성) |
+| GitHub 이슈·PR 확인 | 팀 규칙이 브랜치 → PR → 팀원 Approve → 병합이고, backlog의 "관련 이슈" 칸을 채워야 한다(출처: CLAUDE.md 팀 규칙, backlog.md 각 스토리). 다만 Approve·병합은 Claude에게 맡기지 않는다(출처: CLAUDE.md Claude에게 맡기지 않는 것) |
+| 화면 확인 | 첫 기능은 화면·서버·데이터를 모두 거친다(출처: first-feature.md 안내 2). 하지만 우리 앱은 웹이 없는 Android 앱이다(출처: STACK.md 최종 선택) |
+| DB 내용 확인 | 상태 전이·한 번만 지급 테스트에서 실제 PostgreSQL 행을 봐야 한다(출처: STACK.md 확정 전 검증 계획). 다만 DB 연결은 아직 안 했다(출처: scaffold-log.md 1절 — SQLAlchemy + PostgreSQL "뺌") |
 
 **후보 비교와 선택** (Claude가 찾아 준 것도 공식 문서·저장소로 직접 확인한 것만 적음)
 
 | 후보 서버 | 공식 문서·저장소 (주소, 절) | 하는 일 | 내 컴퓨터에서 실행되는 명령 | 읽기만 / 쓰기도 | 키 필요 | 고른다 / 보류 / 고르지 않는다 | 이유 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| | | | | | | | |
-| | | | | | | | |
+| Context7 | https://github.com/upstash/context7 (Installation, Available Tools › MCP Tools), https://context7.com/docs/resources/all-clients (Claude Code) | 라이브러리 이름 → ID 찾기(`resolve-library-id`), 그 ID의 문서 조회(`query-docs`) | 원격 HTTP 서버라 내 컴퓨터에서 실행되는 명령 없음. 로컬 방식을 쓰면 `npx -y @upstash/context7-mcp` | 읽기만 `[추정]` (README에 "read-only" 표현은 없고 도구가 검색·조회 2개뿐) | 필수 아님. README는 "API Key Recommended"(요청 한도를 늘리려면 무료 키) | **고른다** `[제안]` | 위 첫 번째 필요한 일에 바로 맞음. 쓰기 도구가 없고 키 없이 `.mcp.json`에 넣을 수 있음 |
+| GitHub MCP Server | https://github.com/github/github-mcp-server (Local GitHub MCP Server, Handling PATs Securely, Tool Configuration) | 저장소·이슈·PR·Actions 조회와 생성·수정 | 로컬: `docker run -i --rm -e GITHUB_PERSONAL_ACCESS_TOKEN ghcr.io/github/github-mcp-server` (Docker 필요) | 쓰기도 (`--read-only`로 쓰기 도구를 끌 수 있음) | 필요 (PAT 또는 OAuth 브라우저 로그인) | **보류** `[제안]` | 쓰기 도구에 PR 병합 등이 있어 "Approve·병합은 사람이" 규칙과 부딪힐 수 있음. 키가 필요해 `.mcp.json`(키 없음)에 바로 넣기 어려움. 팀원별 `gh` CLI 사용 여부를 먼저 확인 |
+| Playwright MCP | https://github.com/microsoft/playwright-mcp (Requirements, Getting started) | 브라우저 열기·클릭·입력 (접근성 트리 기반) | `npx @playwright/mcp@latest` (Node.js 18 이상) | 쓰기도 (브라우저 조작) | 필요 없음 | **고르지 않는다** `[제안]` | 웹 브라우저 자동화 도구이고 `--mobile`·`--device`도 모바일 브라우저 흉내일 뿐 네이티브 Android 앱은 다루지 않음. 우리는 웹을 만들지 않음(출처: STACK.md) |
+| PostgreSQL MCP (MCP 공식 예제 서버) | https://github.com/modelcontextprotocol/servers ("Archived" 절), https://github.com/modelcontextprotocol/servers-archived/tree/main/src/postgres (Components, Configuration › NPX·Docker) | 테이블 스키마 보기(리소스), SQL 실행(`query` 도구) | `npx -y @modelcontextprotocol/server-postgres <접속 문자열>` 또는 `docker run -i --rm mcp/postgres <접속 문자열>` | 읽기만 ("All queries are executed within a READ ONLY transaction") | 키는 없지만 **DB 접속 문자열**(`postgresql://사용자:비밀번호@호스트:포트/DB이름`)이 명령 인자로 들어감 | **보류** `[제안]` | ① 2025-05-29 보관(archive)되어 더 이상 유지보수되지 않음. npm 최신 0.6.2(2024-12-04)에 "Package no longer supported" 표시 (2026-11-02 npm 레지스트리 확인). ② 접속 문자열에 비밀번호가 들어가 키 없는 `.mcp.json`에 그대로 넣을 수 없음 (`${VAR}` 환경 변수로 빼는 방법은 있음, 출처: Claude Code MCP 문서 Environment variable expansion). ③ DB 연결 전이라 지금 볼 DB가 없음. 유지되는 다른 PostgreSQL 서버는 아직 찾지 않음 `확인 필요` |
 
 | 항목 | 우리 결정 |
 | --- | --- |
-| 쓰는 서버 (팀당 1~2개부터. 없으면 "연결하지 않음"과 이유) | |
-| 설정 위치 | 저장소 `.mcp.json` (키 없음) |
-| 승인 방법 | 각자 프로젝트 서버를 읽고 하나씩 승인 (일괄 승인 설정 안 씀) |
-| 버전 고정 여부 🔧 | |
-| 설치에 쓴 공식 문서 (주소, 절) | |
-| 보류한 서버와 이유 | |
+| 쓰는 서버 (팀당 1~2개부터. 없으면 "연결하지 않음"과 이유) | Context7 1개 `[제안·팀 확인 필요]` |
+| 설정 위치 | 저장소 `.mcp.json` (키 없음). **아직 만들지 않음** (2026-11-02 기준 저장소에 `.mcp.json` 없음) |
+| 승인 방법 | 각자 프로젝트 서버를 읽고 하나씩 승인 (일괄 승인 설정 안 씀). 대화형 세션은 `.mcp.json` 서버를 쓰기 전에 승인을 묻고, 선택을 되돌리려면 `claude mcp reset-project-choices` (출처: Claude Code MCP 문서 Project server approvals and workspace trust) |
+| 버전 고정 여부 🔧 | 원격 HTTP 서버라 서버 버전을 우리가 고정할 수 없음 `[추정]`. 로컬(`npx`) 방식으로 바꾸면 `@upstash/context7-mcp@버전`으로 고정 가능 — 고정할 버전 `확인 필요` |
+| 설치에 쓴 공식 문서 (주소, 절) | https://code.claude.com/docs/en/mcp (MCP installation scopes › Project scope, Managing your servers), https://context7.com/docs/resources/all-clients (Claude Code). 설치 명령 초안: `claude mcp add --scope project --transport http context7 https://mcp.context7.com/mcp` — 두 문서의 예시(`--scope project` 예시 + Context7 원격 예시에서 키 헤더를 뺀 것)를 합친 것이라 **실행 전, `확인 필요`** |
+| 보류한 서버와 이유 | GitHub MCP Server: 쓰기 도구·PAT 필요 (위 표). PostgreSQL MCP: 보관되어 유지보수가 끝났고, 접속 문자열에 비밀번호가 들어가며, DB 연결 전. 다시 볼 조건 — GitHub는 이슈 연결 작업이 많아질 때 `--read-only`로, DB용은 Docker Compose PostgreSQL이 선 뒤 |
+
+> **Claude가 찾았지만 쓰지 않은 것:** Context7 README가 권장하는 설치는 `npx ctx7 setup`(OAuth로 API 키를 만들어 설정)이다. 키가 생기고 사용자 범위로 설치되는 방식이라, "저장소 `.mcp.json`, 키 없음" 결정과 맞지 않아 쓰지 않았다. Context7 문서의 Claude Code 예시도 `--scope user`라 `--scope project`로 바꿔야 한다.
 
 ## 2. 연결 확인 (5명 전원, 구현을 시작하기 전에)
 
+> `.mcp.json`을 올리는 PR이 병합된 뒤 각자 채운다. 아래 김지은 행은 `.mcp.json`이 없는 상태(2026-11-02)의 결과다.
+
 | 이름 | 따로 설치한 것 (런타임·브라우저 등, 공식 문서 주소) | `claude mcp list` 상태 | `/mcp` 상태 | 남은 문제 (실패하면 운영체제, 명령, 오류 메시지 그대로) |
-| --- | --- | --- | --- | --- | --- |
-| | | | | |
-| | | | | |
-| | | | | |
-| | | | | |
-| | | | | |
+| 김지은| 강준석 | 성민규 | 손범수 | 이시은 |
+| 김지은 | 없음 (원격 HTTP라 추가 설치 불필요 `[추정]`). Node v22.14.0은 이미 있음 | 프로젝트 서버(context7) 없음 — `.mcp.json` 미작성. 개인 계정 서버 중 `aws-mcp`가 `✘ Failed to connect — -32602: Invalid request parameters` (프로젝트와 무관) | `미실행` | `.mcp.json` 병합 후 다시 확인 |
+| 강준석 | | | | |
+| 성민규 | | | | |
+| 손범수 | | | | |
+| 이시은 | | | | |
 
 ## 3. 사용 기록
+
+> 아직 MCP로 한 작업이 없다. 2026-11-02 공식 문서 확인은 MCP가 아니라 Claude의 웹 조회로 했으므로 여기 적지 않는다.
 
 | 날짜 | 누가 | MCP (서버 이름) | 어떤 작업 | 무엇을 요청했나 | 무엇을 얻었나 | 내가 직접 확인한 것 | 쓰지 않은 것과 이유 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
