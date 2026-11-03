@@ -55,28 +55,50 @@
 | 2-1 | [.github/ISSUE_TEMPLATE/](.github/ISSUE_TEMPLATE/) | 스토리·버그 이슈 양식 | ☑ |
 | 2-1 | [.github/pull_request_template.md](.github/pull_request_template.md) | PR 본문 양식, 리뷰 체크리스트 | ☑ |
 | 2-2 | [docs/STACK.md](docs/STACK.md) | 기술 스택 결정과 이유 | ☑ (LLM 제공사·예산은 검토 보류) |
-| 2-2 | [docs/PRD.md](docs/PRD.md) | 정한 문서를 모은 PRD v0.1과 대조 기록 | ☐ (v0.1 초안, 검토 전) |
+| 2-2 | [docs/PRD.md](docs/PRD.md) | 정한 문서를 모은 PRD와 대조 기록 | ☑ (v1.0, 3-1 검토 지적 5~13번 반영) |
 | 2-2 | [CLAUDE.md](CLAUDE.md) | Claude가 매 세션 읽는 팀 지침 | ☑ (실행·테스트 명령은 뼈대 이후) |
 | 2-2 | [.claude/settings.json](.claude/settings.json) | 허용·확인·차단 권한 | ☑ |
 | 2-2 | [docs/decisions/permissions.md](docs/decisions/permissions.md) | 권한 규칙의 이유와 시험 결과 | ☑ |
 | 2-2 | [docs/team/claude-rules.md](docs/team/claude-rules.md) | 팀 규칙 합의 기록 | ☑ |
 | 2-2 | [.claude/agents/](.claude/agents/) | stack-advisor, prd-writer | ☑ |
 | 2-2 | [docs/decisions/scaffold-log.md](docs/decisions/scaffold-log.md) | 뼈대 계획·실행 결과·막힌 지점 | ☐ (1절 계획만, 실행 전) |
-| 3-1 | [docs/decisions/prd-review.md](docs/decisions/prd-review.md) | PRD 검토 지적과 팀 판단 | ☐ |
-| 3-1 | [docs/DATA-MODEL.md](docs/DATA-MODEL.md) | 데이터 구조·상태값·시드 데이터 | ☐ |
-| 3-1 | [docs/DESIGN.md](docs/DESIGN.md) | UI 디자인 방향·토큰·화면 목록 | ☐ |
-| 3-1 | [docs/CODE-STYLE.md](docs/CODE-STYLE.md) | 팀 코딩 스타일 | ☐ |
-| 3-1 | [.mcp.json](.mcp.json) | 팀이 고른 MCP 서버 설정 (키 없음). **MCP를 고른 팀만** | ☐ |
-| 3-1 | [docs/decisions/mcp-use.md](docs/decisions/mcp-use.md) | MCP를 고른 이유(또는 고르지 않은 이유), 설치, 연결 확인, 사용 기록 | ☐ |
-| 3-1 | [docs/decisions/first-feature.md](docs/decisions/first-feature.md) | 우리가 고른 첫 기능과 범위, 실행 확인 | ☐ |
-| 3-1 | [docs/API.md](docs/API.md) | 화면·서버가 주고받는 약속 (기능 1항목) | ☐ |
-| 3-1 | [.claude/agents/](.claude/agents/) | prd-reviewer | ☐ |
+| 3-1 | [docs/decisions/prd-review.md](docs/decisions/prd-review.md) | PRD 검토 지적과 팀 판단 | ☑ (지적 5~15번 이유 작성 필요) |
+| 3-1 | [docs/DATA-MODEL.md](docs/DATA-MODEL.md) | 데이터 구조·상태값·시드 데이터 | ☑ (초안, 팀 확인 전) |
+| 3-1 | [docs/DESIGN.md](docs/DESIGN.md) | UI 디자인 방향·토큰·화면 목록 | ☑ (초안, 팀 검토 전) |
+| 3-1 | [docs/CODE-STYLE.md](docs/CODE-STYLE.md) | 팀 코딩 스타일 | ☑ (포매터·담당 폴더 `확인 필요`) |
+| 3-1 | [.mcp.json](.mcp.json) | 팀이 고른 MCP 서버 설정 (키 없음). **MCP를 고른 팀만** | ☑ (Context7) |
+| 3-1 | [docs/decisions/mcp-use.md](docs/decisions/mcp-use.md) | MCP를 고른 이유(또는 고르지 않은 이유), 설치, 연결 확인, 사용 기록 | ☑ (Context7·Figma 선택, 연결 확인 진행 중) |
+| 3-1 | [docs/decisions/first-feature.md](docs/decisions/first-feature.md) | 우리가 고른 첫 기능과 범위, 실행 확인 | ☑ (US-02, 실행 확인 1/5명) |
+| 3-1 | [docs/API.md](docs/API.md) | 화면·서버가 주고받는 약속 (기능 1항목) | ☑ (US-02, 경로·응답 형식 합의 필요) |
+| 3-1 | [.claude/agents/](.claude/agents/) | prd-reviewer | ☑ |
 
 > 단계가 끝나면 상태 칸을 ☑로 바꾸고 PR로 올립니다.
 
 ## 실행 방법
 
-- 실행·테스트 명령: `확인 필요` (뼈대에서 실제로 돌려 본 명령만 적음)
+> 아래 명령은 **김지은 Mac(Apple M3, macOS 27.0.1)에서 실제로 성공한 것**만 옮겼습니다 (출처: [first-feature.md](docs/decisions/first-feature.md) 3절). 나머지 4명은 아직 확인 전입니다. 환경변수 이름은 각 폴더의 `.env.example`을 봅니다 (값은 저장소에 올리지 않음).
+
+**서버 (US-02 보상 계산·미리보기)**
+```bash
+docker compose up -d db
+cd backend
+python3.11 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+python -m scripts.seed                     # 계산 시험용 SUBMITTED 건 생성
+.venv/bin/uvicorn app.main:app --port 8000 # GET /health → {"status":"ok"}
+.venv/bin/python -m pytest -v              # 3 passed
+```
+- 주의: 테스트가 끝날 때 `workout_submission`을 비우는데 개발용 DB와 같은 DB라 시드로 넣은 건도 지워집니다 (first-feature.md 3절 남은 문제 ②)
+
+**앱**
+```bash
+cd mobile
+npm ci
+npm test            # 4 pass
+npm run typecheck   # 오류 없음
+```
+- 앱 실행(`npm start`, `npm run android`)과 실기기 확인: `확인 필요` (아직 아무도 폰에서 열어 보지 않음)
+- 앱 환경변수: 서버 주소 `EXPO_PUBLIC_API_URL`, 목데이터 모드 `EXPO_PUBLIC_USE_MOCK` (`true`면 목데이터)
 - 처음 Claude Code를 열면 `.mcp.json`의 프로젝트 MCP 서버 승인을 묻는다. 서버 이름과 주소를 읽고 하나씩 승인한다 (`docs/decisions/mcp-use.md` 1절 '승인 방법')
 
 ## 작업 규칙
