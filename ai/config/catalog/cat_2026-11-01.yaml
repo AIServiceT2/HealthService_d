@@ -1,0 +1,67 @@
+# 전운시 렙 판정 카탈로그. 모든 값은 가안(팀 합의 필요) — docs/DECISIONS.md 참고.
+# SPEC 11장 값에서 추가·변경한 키는 주석으로 표시했다.
+catalog_version: cat_2026-11-01
+exercise: SQUAT
+features:
+  min_visibility: 0.5
+  one_euro: { min_cutoff: 1.0, beta: 0.05, d_cutoff: 1.0 }
+  filter_reset_gap_ms: 500
+  calibration_window_ms: 1000
+squat:
+  descent_start_angle: 160
+  attempt_angle: 145
+  depth_accept_angle: 100
+  stand_angle: 160
+  bottom_hysteresis_deg: 8
+  depth_mode: angle            # angle | angle_or_hip_drop
+  hip_drop_accept: 0.25
+  min_rep_ms: 800
+  min_descent_ms: 300
+  max_rep_ms: 10000
+  max_invalid_ratio_in_rep: 0.2
+  max_gap_in_rep_ms: 1000
+liveness:
+  hand_above_head_margin: 0.2
+  head_height_ratio: 0.9       # [추가] 코 대신 어깨 기준 머리 높이 추정 (D-02)
+  liveness_hold_ms: 1000
+  wrong_hand_hold_ms: 1000
+  min_valid_ratio: 0.3
+confidence:
+  weights: { vis: 0.25, valid: 0.25, track: 0.2, consistency: 0.15, unaccepted: 0.15 }
+  consistency_k: { duration_cv: 3.0, depth_std: 0.1 }
+  min_reps_for_consistency: 3  # [추가] SPEC 7.1 "인정 렙 3개 미만이면 0.5"
+  neutral_score: 0.5           # [추가] 위 경우와 시도 렙 0개일 때 쓰는 값
+  liveness_penalty: 0.5
+  calibration: [[0.0, 0.0], [1.0, 1.0]]
+form_tags:
+  shallow_ratio: 0.3
+  depth_std_deg: 12
+  trunk_lean_deg: 45
+  asymmetry_deg: 15
+  too_fast_ratio: 0.2
+  out_of_frame_ratio: 0.2
+anomaly:
+  regular_timing_min_reps: 5
+  regular_timing_std_ms: 40
+  frozen_ms: 2000
+  frozen_motion_ratio: 0.00002   # [추가] 프레임 간 관절 이동량 / 이미지 대각선 이 값 이하면 '얼어붙음' (사실상 같은 좌표)
+  zero_jitter_min_ms: 2000       # [추가] 정지 구간이 이 길이 이상일 때만 떨림 검사
+  zero_jitter_ratio: 0.0002      # [추가] 정지 구간 평균 떨림 / 이미지 대각선 이 값 미만이면 ZERO_JITTER
+  stationary_speed_ratio: 0.06   # [추가] 관절 평균 속도 / 이미지 대각선 (초당) 이 값 미만이면 '정지 구간'
+  proportion_shift_ratio: 0.2
+  reset_gap_ms: 1000
+  reset_count: 3
+  min_avg_rep_ms: 1000
+recount:
+  recount_tolerance: 0.10
+  confidence_diff_warn: 0.15
+  auto_approve_threshold: 0.90
+  liveness_policy: restart      # restart | review
+  rep_match_iou: 0.5            # [추가] SPEC 9.2 렙 매칭 IoU 기준
+# 모델 계열별 덮어쓰기 (D-01). 키 구조는 위와 같고 바꿀 값만 쓴다.
+model_overrides:
+  mediapipe: {}
+  movenet:
+    features:
+      min_visibility: 0.3        # [가정] MoveNet score는 MediaPipe visibility보다 낮게 나오는 경향
+    liveness: {}

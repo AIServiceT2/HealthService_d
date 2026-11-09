@@ -1,0 +1,85 @@
+{
+  "engineVersion": "0.1.0",
+  "vectors": [
+    {
+      "name": "01_normal_mediapipe",
+      "description": "[합성] 측면 정상 4렙, 무작위 동작 통과",
+      "frames": 247,
+      "recognizedReps": 4,
+      "attemptedReps": 4,
+      "aiConfidence": 0.925
+    },
+    {
+      "name": "02_normal_movenet",
+      "description": "[합성] 01과 같은 동작, MoveNet 17개 형식",
+      "frames": 247,
+      "recognizedReps": 4,
+      "attemptedReps": 4,
+      "aiConfidence": 0.925
+    },
+    {
+      "name": "03_mirrored",
+      "description": "[합성] 01과 같은 동작, 미러링된 좌표 + mirrored=true",
+      "frames": 247,
+      "recognizedReps": 4,
+      "attemptedReps": 4,
+      "aiConfidence": 0.925
+    },
+    {
+      "name": "04_shallow_fast",
+      "description": "[합성] 얕은 렙 2, 빠른 렙 1, 정상 1",
+      "frames": 221,
+      "recognizedReps": 1,
+      "attemptedReps": 4,
+      "aiConfidence": 0.9
+    },
+    {
+      "name": "05_out_of_frame",
+      "description": "[합성] 첫 렙 바닥이 1.3초 가려짐",
+      "frames": 162,
+      "recognizedReps": 1,
+      "attemptedReps": 2,
+      "aiConfidence": 0.742
+    },
+    {
+      "name": "06_liveness_expired",
+      "description": "[합성] 손을 들지 않아 무작위 동작 만료",
+      "frames": 155,
+      "recognizedReps": 2,
+      "attemptedReps": 2,
+      "aiConfidence": 0.45
+    },
+    {
+      "name": "07_liveness_wrong_hand",
+      "description": "[합성] 왼손 지시에 오른손만 듦",
+      "frames": 155,
+      "recognizedReps": 2,
+      "attemptedReps": 2,
+      "aiConfidence": 0.45
+    },
+    {
+      "name": "08_boundary_depth",
+      "description": "[합성] 최저각이 깊이 기준(100°) 근처",
+      "frames": 200,
+      "recognizedReps": 2,
+      "attemptedReps": 3,
+      "aiConfidence": 0.9
+    },
+    {
+      "name": "09_front_view",
+      "description": "[합성] 정면 촬영 (각도 모드에서 얕음 판정)",
+      "frames": 195,
+      "recognizedReps": 0,
+      "attemptedReps": 3,
+      "aiConfidence": 0.9
+    },
+    {
+      "name": "10_no_liveness_far",
+      "description": "[합성] 무작위 동작 없음, 멀리서 촬영",
+      "frames": 232,
+      "recognizedReps": 4,
+      "attemptedReps": 4,
+      "aiConfidence": 0.463
+    }
+  ]
+}

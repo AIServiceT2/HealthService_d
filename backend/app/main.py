@@ -6,6 +6,7 @@
 
 from fastapi import FastAPI
 
+from app.core.errors import install_error_handlers
 from app.modules.auth.router import router as auth_router
 from app.modules.battle.router import router as battle_router
 from app.modules.character.router import router as character_router
@@ -21,6 +22,7 @@ from app.modules.submission.router import stub_router as submission_stub_router
 from app.modules.workout_session.router import router as workout_session_router
 
 app = FastAPI(title="전운시 API")
+install_error_handlers(app)  # 에러 본문 { code, message, details } (노션 API 명세서 공통 규칙)
 app.include_router(health_router)
 app.include_router(submission_router)
 

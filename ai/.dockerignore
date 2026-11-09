@@ -1,0 +1,13 @@
+.venv
+data
+models
+reports
+tests
+tools
+test_vectors
+docs
+**/__pycache__
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.coverage

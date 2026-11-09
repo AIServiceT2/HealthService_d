@@ -1,0 +1,10 @@
+# CI용 — mediapipe, opencv 제외 (tools/의 추출·웹캠 도구는 CI에서 돌리지 않음)
+-r requirements-service.txt
+matplotlib==3.11.2
+scikit-learn==1.9.1
+pytest==9.2.0
+pytest-cov==7.1.0
+ruff==0.17.4
+mypy==2.4.1
+types-PyYAML==6.0.12.20261103
+httpx==0.28.1
