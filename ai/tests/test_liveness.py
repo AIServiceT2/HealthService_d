@@ -4,7 +4,7 @@ from rep_engine.config import Catalog, EngineConfig
 from rep_engine.liveness import INSTRUCTIONS, LivenessEvaluator, evaluate_liveness, issue_challenge
 from rep_engine.schemas import LivenessAction, LivenessResult, LivenessStatus
 from tests.featurize import skeletons
-from tests.synth import Hand, SynthConfig, challenge
+from tools.synth import Hand, SynthConfig, challenge
 
 L, R, B = (
     LivenessAction.RAISE_LEFT_HAND,

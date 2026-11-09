@@ -43,6 +43,23 @@ curl http://localhost:8001/internal/health
 
 토큰은 `X-Internal-Token` 헤더로 보냅니다. 오류 형식은 `{code, message, details}`이고, 요청·응답 예시는 9단계에서 채웁니다.
 
+## 개발 도구 (`tools/`)
+
+모두 `ai/`에서 `python -m tools.<이름> --help`로 사용법을 볼 수 있습니다. 자세한 예시와 데이터 수집 가이드는 9단계에서 채웁니다.
+
+| 도구 | 하는 일 | 확인 상태 (2026-11-09) |
+| --- | --- | --- |
+| `download_models` | MediaPipe lite/full/heavy `.task`를 `models/`로 받기 | 실행 확인 |
+| `extract_keypoints` | 영상 → 세션 JSON (15fps, 얼굴 null, 청크 분할) | 사람 없는 테스트 영상으로만 확인 |
+| `webcam_demo` | 실시간 렙 판정 화면 (L/R/S/Q) | 영상 입력 `--headless`로만 확인. 카메라 창은 직접 확인 필요 |
+| `plot_session` | 세션 → kneeAngle 그래프 PNG | 합성 세션으로 확인 |
+| `evaluate` | 라벨 CSV 전체 평가 → reports/eval_* | 합성 샘플로 확인 |
+| `compare_models` | lite/full/heavy 정확도·추론 시간 비교 | 사람 없는 영상으로만 확인 |
+| `calibrate_confidence` | isotonic 보정 점 목록·신뢰도 곡선 | 합성 샘플로 확인 |
+| `angle_study` | 촬영 각도·거리별 정확도 리포트 | 합성 샘플로 확인 |
+| `make_test_vectors` | `test_vectors/` 생성 (모바일 팀 공유) | 실행 확인 |
+| `make_sample_data` | 합성 세션·`data/labels_sample.csv` 생성 (실데이터 아님) | 실행 확인 |
+
 ## PyCharm 설정
 
 1. 저장소 루트(`dictionaryT`)를 프로젝트로 엽니다.
@@ -69,4 +86,5 @@ curl http://localhost:8001/internal/health
 | `rep_engine/session.py` | 세션 실행기 (`SessionRunner` 스트리밍, `run_session` 배치) |
 | `rep_engine/recount.py` | 서버 재계산 비교, R12 감소, 자동 승인 판정 |
 | `config/catalog/` | 판정 기준값 (모두 가안) |
-| `tests/synth.py` | 합성 스쿼트 생성기 (측면·정면, MediaPipe·MoveNet, 잡음·가림·손 들기) |
+| `tools/synth.py` | 합성 스쿼트 생성기 (측면·45°·정면, 거리, MediaPipe·MoveNet, 잡음·가림·손 들기) |
+| `test_vectors/` | 모바일 팀 공유용 입력·기대 결과 ([비교 규칙](test_vectors/README.md)) |

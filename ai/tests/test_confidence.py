@@ -10,7 +10,7 @@ from rep_engine.schemas import (
     RepReason,
 )
 from tests.featurize import make_rep, reps_for, skeletons
-from tests.synth import SynthConfig, rep_windows, varied_squats
+from tools.synth import SynthConfig, rep_windows, varied_squats
 
 EV = LivenessEvidence(
     max_hold_ms=1000, wrong_hand_max_hold_ms=0, valid_frame_ratio=1.0, wrong_hand_detected=False

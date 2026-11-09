@@ -14,7 +14,7 @@ from rep_engine.schemas import (
     Severity,
 )
 from rep_engine.session import run_session
-from tests.synth import LivenessAction, SynthConfig, challenge, synth_session, varied_squats
+from tools.synth import LivenessAction, SynthConfig, challenge, synth_session, varied_squats
 
 
 @pytest.fixture(scope="module")

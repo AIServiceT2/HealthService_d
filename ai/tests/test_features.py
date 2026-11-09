@@ -13,7 +13,7 @@ from rep_engine.features.geometry import (
 )
 from rep_engine.landmarks import Joint
 from tests.featurize import features
-from tests.synth import RepSpec, SynthConfig
+from tools.synth import RepSpec, SynthConfig
 
 
 # --- 기하 ---------------------------------------------------------------------

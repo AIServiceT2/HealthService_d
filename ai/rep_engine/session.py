@@ -70,6 +70,11 @@ class SessionRunner:
         return self._liveness_result
 
     @property
+    def features(self) -> list[FrameFeatures]:
+        """렙 판정 구간의 프레임 특징 (그래프·디버깅용, 읽기 전용으로 쓴다)."""
+        return list(self._count_feats)
+
+    @property
     def counting(self) -> bool:
         """렙 판정 단계인지 (무작위 동작 확인이 끝났거나 없음)."""
         return self._count_after is not None

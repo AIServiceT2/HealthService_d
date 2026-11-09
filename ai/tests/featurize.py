@@ -6,7 +6,7 @@ from rep_engine.adapters import SkeletonFrame, adapter_for_model_version
 from rep_engine.config import EngineConfig
 from rep_engine.features.extractor import FeatureExtractor, FrameFeatures
 from rep_engine.schemas import RepEvent, RepReason
-from tests.synth import SynthConfig, synth_frames, synth_meta
+from tools.synth import SynthConfig, synth_frames, synth_meta
 
 
 def skeletons(sc: SynthConfig) -> list[SkeletonFrame]:

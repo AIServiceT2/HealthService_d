@@ -5,7 +5,7 @@ from rep_engine.config import EngineConfig
 from rep_engine.features.extractor import FeatureExtractor
 from rep_engine.schemas import AnomalyCode, RepEvent, Severity
 from tests.featurize import make_rep, reps_for, skeletons
-from tests.synth import RepSpec, SynthConfig, rep_windows, varied_squats
+from tools.synth import RepSpec, SynthConfig, rep_windows, varied_squats
 
 
 def codes(

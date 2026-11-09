@@ -4,7 +4,7 @@ from rep_engine.config import EngineConfig
 from rep_engine.schemas import FormTag, RepReason
 from rep_engine.summary import pose_summary
 from tests.featurize import make_rep, reps_for
-from tests.synth import SynthConfig, varied_squats
+from tools.synth import SynthConfig, varied_squats
 
 
 def test_values(cfg: EngineConfig) -> None:

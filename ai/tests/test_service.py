@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 
 from rep_engine.schemas import LivenessAction
 from service.app import TOKEN_ENV, app
-from tests.synth import SynthConfig, challenge, synth_frames, synth_session, varied_squats
+from tools.synth import SynthConfig, challenge, synth_frames, synth_session, varied_squats
 
 TOKEN = "test-token"
 H = {"X-Internal-Token": TOKEN}

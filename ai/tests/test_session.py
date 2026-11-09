@@ -13,7 +13,7 @@ from rep_engine.errors import (
 )
 from rep_engine.schemas import LivenessAction, LivenessStatus, SessionResult
 from rep_engine.session import SessionRunner, run_frames, run_session
-from tests.synth import SynthConfig, challenge, squats, synth_frames, synth_session, varied_squats
+from tools.synth import SynthConfig, challenge, squats, synth_frames, synth_session, varied_squats
 
 LEAD = 4000  # 무작위 동작 구간 뒤에 첫 렙이 시작되도록
 

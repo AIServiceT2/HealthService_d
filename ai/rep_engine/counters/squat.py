@@ -42,6 +42,8 @@ class SquatCounter(ExerciseCounter):
         self._n_total = 0
         self._n_invalid = 0
         self._last_valid_t = 0
+        # 시도 각도 전에 화면 밖으로 나간 렙: 다시 나타날 때 깊이 앉아 있으면 OUT_OF_FRAME
+        self._pending_oof = False
 
     @classmethod
     def from_config(cls, cfg: EngineConfig) -> SquatCounter:
@@ -88,10 +90,12 @@ class SquatCounter(ExerciseCounter):
             and self._max_hip_drop >= c.hip_drop_accept
         )
 
-    def _close(self, end_t: int, out_of_frame: bool) -> list[RepEvent]:
-        """렙을 끝낸다. 시도 각도에 못 미쳤으면 아무것도 기록하지 않는다."""
+    def _close(
+        self, end_t: int, out_of_frame: bool, require_attempt: bool = True
+    ) -> list[RepEvent]:
+        """렙을 끝낸다. 시도 각도에 못 미쳤으면(require_attempt) 아무것도 기록하지 않는다."""
         c = self._cfg
-        if self._min_angle >= c.attempt_angle:
+        if require_attempt and self._min_angle >= c.attempt_angle:
             return []
         invalid_ratio = self._n_invalid / self._n_total if self._n_total else 0.0
         reason: RepReason | None
@@ -137,9 +141,17 @@ class SquatCounter(ExerciseCounter):
             return []
 
         if self._state == WAIT_STAND:
+            events: list[RepEvent] = []
+            if angle is not None and self._pending_oof:
+                # 하강 중 화면 밖으로 나갔다가 시도 각도 아래로 앉은 채 다시 나타남 → 가려진 렙
+                self._pending_oof = False
+                if angle < c.attempt_angle:
+                    events = self._close(
+                        end_t=self._last_valid_t, out_of_frame=True, require_attempt=False
+                    )
             if angle is not None and angle >= c.stand_angle:
                 self._state = STANDING
-            return []
+            return events
 
         # DESCENDING / ASCENDING: 렙 진행 중
         self._n_total += 1
@@ -147,11 +159,13 @@ class SquatCounter(ExerciseCounter):
             self._n_invalid += 1
             if f.t - self._last_valid_t > c.max_gap_in_rep_ms:
                 self._state = WAIT_STAND
+                self._pending_oof = self._min_angle >= c.attempt_angle
                 return self._close(end_t=self._last_valid_t, out_of_frame=True)
             return []
 
         if f.t - self._start_t > c.max_rep_ms:
             self._state = WAIT_STAND  # 렙 폐기 (기록 없음)
+            self._pending_oof = False
             return []
 
         self._last_valid_t = f.t

@@ -1,9 +1,10 @@
-"""합성 스쿼트 세션 생성기 (테스트·도구 공용).
+"""합성 스쿼트 세션 생성기 (테스트·도구 공용). 실측 데이터가 아니다.
 
 서 있는 사람의 관절을 3D(좌우 X, 위 Y, 앞 Z, 단위 = 몸 길이)로 만들고, 무릎 내각을
 시간에 따라 바꿔 엉덩이·무릎·발목을 기하학적으로 계산한 뒤 화면에 투영한다.
 
 - 측면(`view="side"`): 화면 가로 = Z. 2D 무릎 내각 = 지정한 각도.
+- 45°(`view="diag45"`): 화면 가로 = X·cos45° + Z·sin45°.
 - 정면(`view="front"`): 화면 가로 = X. 무릎이 바깥으로 벌어져
   2D 각도는 덜 작아지고 엉덩이가 내려간다.
 
@@ -41,7 +42,7 @@ from rep_engine.schemas import (
 )
 
 Hand = Literal["LEFT", "RIGHT", "BOTH"]
-View = Literal["side", "front"]
+View = Literal["side", "diag45", "front"]
 Model = Literal["mediapipe", "movenet"]
 
 STAND_ANGLE = 175.0
@@ -83,6 +84,8 @@ class SynthConfig:
     image_width: int = 720
     image_height: int = 1280
     view: View = "side"
+    #: 화면 세로 대비 몸 길이 비율 (가까이 0.5, 멀리 약 0.25)
+    person_scale: float = 0.5
     model: Model = "mediapipe"
     mirrored: bool = False
     noise_px: float = 0.0
@@ -203,9 +206,14 @@ def pose_3d(knee_angle: float, hands: Hand | None, torso_scale: float = 1.0) -> 
 
 def _project(p: Vec3, cfg: SynthConfig) -> tuple[float, float]:
     """3D → 정규화 이미지 좌표."""
-    scale = 0.5 * cfg.image_height
+    scale = cfg.person_scale * cfg.image_height
     ground = 0.92 * cfg.image_height
-    u = p[0] if cfg.view == "front" else p[2] + SIDE_DEPTH_OFFSET * math.copysign(1.0, p[0])
+    if cfg.view == "front":
+        u = p[0]
+    elif cfg.view == "diag45":
+        u = (p[0] + p[2]) * math.sqrt(0.5)
+    else:
+        u = p[2] + SIDE_DEPTH_OFFSET * math.copysign(1.0, p[0])
     x_px = 0.5 * cfg.image_width + u * scale
     y_px = ground - p[1] * scale
     return x_px / cfg.image_width, y_px / cfg.image_height

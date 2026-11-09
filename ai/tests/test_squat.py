@@ -7,7 +7,7 @@ from rep_engine.counters.base import make_counter, registered_exercises
 from rep_engine.counters.squat import ASCENDING, DESCENDING, STANDING, SquatCounter
 from rep_engine.schemas import RepEvent, RepReason
 from tests.featurize import features
-from tests.synth import STAND_ANGLE, RepSpec, SynthConfig, rep_windows, squats
+from tools.synth import STAND_ANGLE, RepSpec, SynthConfig, rep_windows, squats
 
 
 def count(sc: SynthConfig, cfg: EngineConfig) -> list[RepEvent]:
@@ -87,7 +87,7 @@ def test_reason_priority_too_fast_over_shallow(cfg: EngineConfig) -> None:
 
 
 def _noisy(base: SynthConfig, amp: float, seed: int) -> SynthConfig:
-    from tests.synth import knee_angle_at, total_ms
+    from tools.synth import knee_angle_at, total_ms
 
     def fn(t: int) -> float:
         return knee_angle_at(base, t) + random.Random(seed * 100003 + t).uniform(-amp, amp)
@@ -156,6 +156,16 @@ def test_gap_before_attempt_angle_is_not_recorded(cfg: EngineConfig) -> None:
     start, _, _ = rep_windows(sc)[0]
     sc.invalid_ranges = [(start + 350, start + 3800)]
     assert count(sc, cfg) == []
+
+
+def test_hidden_bottom_reappearing_deep_is_out_of_frame(cfg: EngineConfig) -> None:
+    # 시도 각도(145°)에 닿기 전부터 바닥까지 가려지고, 다시 나타날 때 아직 깊이 앉아 있음
+    sc = SynthConfig(reps=[RepSpec(duration_ms=2600, bottom_angle=85)])
+    start, _, _ = rep_windows(sc)[0]
+    sc.invalid_ranges = [(start + 500, start + 2000)]
+    ev = count(sc, cfg)
+    assert reasons(ev) == [RepReason.OUT_OF_FRAME]
+    assert ev[0].end_t < start + 500
 
 
 def test_rep_in_progress_at_end_is_not_recorded(cfg: EngineConfig) -> None:
