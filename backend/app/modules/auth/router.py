@@ -1,11 +1,16 @@
-"""auth API. 노션 '전운시 API 명세서'의 MVP 필수 항목을 경로만 만든 것.
+"""auth API. 노션 '전운시 API 명세서' API-001~005.
 
-기능은 아직 없고 모두 501을 돌려준다. 입출력 형식은 명세 확정 후 schemas.py에 추가한다.
+로그인 방식은 PRD에서 미정이라 노션 명세의 가안(EMAIL, access 30분·refresh 14일)대로 만든다.
+아직 구현하지 않은 API는 501을 돌려준다.
 """
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
 
+from app.core.db import get_db
 from app.core.stub import not_implemented
+from app.modules.auth import service
+from app.modules.auth.schemas import SignupRequest, SignupResponse
 
 router = APIRouter(tags=["auth"])
 
@@ -13,11 +18,13 @@ router = APIRouter(tags=["auth"])
 @router.post(
     "/auth/signup",
     summary="[API-001] 회원 가입",
-    description="권한: NONE",
-    status_code=501,
+    description="권한: NONE. 14세 미만·이메일 중복·형식 오류는 400 VALIDATION_FAILED",
+    status_code=201,
+    response_model=SignupResponse,
 )
-def api_001() -> None:
-    not_implemented()
+def api_001(req: SignupRequest, db: Session = Depends(get_db)) -> SignupResponse:
+    user = service.signup(db, req)
+    return SignupResponse(user_id=user.id)
 
 
 @router.post(
