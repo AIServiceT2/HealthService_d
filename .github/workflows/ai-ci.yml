@@ -1,0 +1,31 @@
+# ai/ (AI 렙 판정 엔진) 검사 — ai/ 아래 파일이 바뀐 push·PR에서만 실행
+name: ai-ci
+
+on:
+  push:
+    paths: ["ai/**", ".github/workflows/ai-ci.yml"]
+  pull_request:
+    paths: ["ai/**", ".github/workflows/ai-ci.yml"]
+
+defaults:
+  run:
+    working-directory: ai
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: ai/requirements-ci.txt
+      - name: 의존성 설치 (mediapipe·opencv 제외)
+        run: pip install -r requirements-ci.txt
+      - name: ruff
+        run: ruff check
+      - name: mypy
+        run: mypy rep_engine
+      - name: pytest
+        run: pytest --cov=rep_engine --cov-fail-under=90

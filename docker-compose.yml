@@ -8,3 +8,12 @@ services:
       POSTGRES_HOST_AUTH_METHOD: trust
     ports:
       - "5432:5432"
+
+  # AI 렙 판정 내부 API (ai/README.md). 백엔드는 http://ai:8001/internal/... 로 호출.
+  # AI_INTERNAL_TOKEN이 비어 있으면 보호된 엔드포인트는 모두 401 (값은 .env에, 저장소에 넣지 않음)
+  ai:
+    build: ./ai
+    environment:
+      - AI_INTERNAL_TOKEN=${AI_INTERNAL_TOKEN:-}
+    ports:
+      - "8001:8001"
