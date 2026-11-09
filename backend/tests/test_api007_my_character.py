@@ -1,21 +1,17 @@
 """API-007 내 캐릭터·성장 조회 — 노션 '전운시 API 명세서' API-007.
 
 캐릭터는 US 번호가 없는 F-01(US-01~05의 전제)이라 테스트 이름에 API ID를 쓴다 (CODE-STYLE 6번과 다름, 팀 확인 필요).
-인증은 임시: Bearer 토큰 값 = 사용자 UUID (app/modules/character/deps.py).
+로그인은 실제 회원 가입·로그인으로 받은 access token을 쓴다 (tests/character_helpers.py).
 """
 
-import uuid
-
-
-def _auth(user_id: uuid.UUID) -> dict[str, str]:
-    return {"Authorization": f"Bearer {user_id}"}
+from tests.character_helpers import new_player
 
 
 def test_api007_returns_my_character_growth(client):
-    user_id = uuid.uuid4()
-    client.post("/characters", json={"avatarId": "AVATAR_01"}, headers=_auth(user_id))
+    user_id, headers = new_player(client)
+    client.post("/characters", json={"avatarId": "AVATAR_01"}, headers=headers)
 
-    res = client.get("/characters/me", headers=_auth(user_id))
+    res = client.get("/characters/me", headers=headers)
 
     assert res.status_code == 200
     # level·exp.pending·lockedItemCount는 의존 기능이 없어 생성 직후 값 (service.py 참고)
@@ -30,18 +26,21 @@ def test_api007_returns_my_character_growth(client):
 
 
 def test_api007_returns_only_own_character(client):
-    me, other = uuid.uuid4(), uuid.uuid4()
-    client.post("/characters", json={"avatarId": "AVATAR_01"}, headers=_auth(me))
-    client.post("/characters", json={"avatarId": "AVATAR_02"}, headers=_auth(other))
+    me, my_headers = new_player(client)
+    _, other_headers = new_player(client)
+    client.post("/characters", json={"avatarId": "AVATAR_01"}, headers=my_headers)
+    client.post("/characters", json={"avatarId": "AVATAR_02"}, headers=other_headers)
 
-    res = client.get("/characters/me", headers=_auth(me))
+    res = client.get("/characters/me", headers=my_headers)
 
     assert res.json()["userId"] == str(me)
     assert res.json()["avatarId"] == "AVATAR_01"
 
 
 def test_api007_without_character_is_404(client):
-    res = client.get("/characters/me", headers=_auth(uuid.uuid4()))
+    _, headers = new_player(client)
+
+    res = client.get("/characters/me", headers=headers)
 
     assert res.status_code == 404
     assert res.json()["code"] == "NOT_FOUND"

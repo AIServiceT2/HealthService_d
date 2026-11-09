@@ -1,18 +1,18 @@
 """character API. 노션 '전운시 API 명세서' API-006~008.
 
 API-006 캐릭터 생성, API-007 내 캐릭터·성장 조회, API-008 캐릭터 수정.
-에러 본문은 노션 명세 공통 규칙 { code, message, details } (errors.py).
+로그인 확인은 auth 모듈의 get_current_user (Bearer access token, JWT).
+에러 본문 { code, message, details }은 전역 처리기(app/core/errors.py)가 만든다.
 """
-
-import uuid
 
 from fastapi import APIRouter, Body, Depends
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
+from app.core.errors import AppError
+from app.modules.auth.dependencies import get_current_user
+from app.modules.auth.models import User
 from app.modules.character import service
-from app.modules.character.deps import get_current_user_id
-from app.modules.character.errors import ApiError, ApiErrorRoute
 from app.modules.character.schemas import (
     CharacterCreate,
     CharacterRead,
@@ -22,14 +22,17 @@ from app.modules.character.schemas import (
     MyCharacterRead,
 )
 
-# 입력 오류는 422가 아니라 400 VALIDATION_FAILED로 돌려준다 (errors.py).
+# 입력 오류는 전역 처리기가 422가 아니라 400 VALIDATION_FAILED로 돌려준다.
 # FastAPI는 라우트에 422·4XX·default 응답이 없으면 Swagger에 422를 자동으로 넣으므로,
 # 공통 에러 본문을 4XX로 선언해 실제와 다른 422가 문서에 보이지 않게 한다.
 router = APIRouter(
     tags=["character"],
-    route_class=ApiErrorRoute,
     responses={"4XX": {"model": ErrorResponse, "description": "공통 에러 본문 { code, message, details }"}},
 )
+
+
+def _not_found() -> AppError:
+    return AppError(404, "NOT_FOUND", "캐릭터가 아직 없습니다.")
 
 
 @router.post(
@@ -47,14 +50,14 @@ router = APIRouter(
 )
 def create_character(
     body: CharacterCreate | None = Body(default=None),
-    user_id: uuid.UUID = Depends(get_current_user_id),
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     avatar_id = body.avatar_id if body is not None else None
     try:
-        return service.create_character(db, user_id, avatar_id)
+        return service.create_character(db, user.id, avatar_id)
     except service.CharacterAlreadyExists:
-        raise ApiError(409, "INVALID_STATE", "이미 캐릭터가 있습니다.")
+        raise AppError(409, "INVALID_STATE", "이미 캐릭터가 있습니다.")
 
 
 @router.get(
@@ -72,13 +75,13 @@ def create_character(
     },
 )
 def read_my_character(
-    user_id: uuid.UUID = Depends(get_current_user_id),
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     try:
-        growth = service.get_my_character_growth(db, user_id)
+        growth = service.get_my_character_growth(db, user.id)
     except service.CharacterNotFound:
-        raise ApiError(404, "NOT_FOUND", "캐릭터가 아직 없습니다.")
+        raise _not_found()
     return MyCharacterRead(
         user_id=growth.user_id,
         avatar_id=growth.avatar_id,
@@ -106,11 +109,11 @@ def read_my_character(
 )
 def update_my_character(
     body: CharacterUpdate,
-    user_id: uuid.UUID = Depends(get_current_user_id),
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     changes = body.model_dump(include=body.model_fields_set)
     try:
-        return service.update_my_character(db, user_id, **changes)
+        return service.update_my_character(db, user.id, **changes)
     except service.CharacterNotFound:
-        raise ApiError(404, "NOT_FOUND", "캐릭터가 아직 없습니다.")
+        raise _not_found()
