@@ -1,0 +1,6 @@
+# 도커 이미지(내부 API)용 — rep_engine + service만 실행
+numpy==2.4.6
+pydantic==2.14.3
+PyYAML==6.0.3
+fastapi==0.162.2
+uvicorn==0.54.0
