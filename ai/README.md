@@ -23,6 +23,26 @@ cd ai
 .venv/bin/ruff check && .venv/bin/mypy rep_engine && .venv/bin/pytest
 ```
 
+## 내부 API 실행
+
+```bash
+# 로컬 (ai/에서)
+AI_INTERNAL_TOKEN=<로컬용 값> .venv/bin/uvicorn service.app:app --port 8001
+
+# 도커 (저장소 루트에서). 토큰은 루트 .env 또는 셸 환경변수로 (저장소에 넣지 않음)
+docker compose up -d --build ai
+curl http://localhost:8001/internal/health
+```
+
+| 엔드포인트 | 토큰 | 내용 |
+| --- | --- | --- |
+| `GET /internal/health` | 불필요 | `{status, engineVersion, catalogVersions}` |
+| `POST /internal/recount` | 필요 | `{meta, chunks, client, userReducedCount?}` → `{result, comparison, decision}` |
+| `POST /internal/liveness/evaluate` | 필요 | `{meta, frames}` → `LivenessResult` |
+| `POST /internal/liveness/issue` | 필요 | → `{action, instruction, challengeId}` |
+
+토큰은 `X-Internal-Token` 헤더로 보냅니다. 오류 형식은 `{code, message, details}`이고, 요청·응답 예시는 9단계에서 채웁니다.
+
 ## PyCharm 설정
 
 1. 저장소 루트(`dictionaryT`)를 프로젝트로 엽니다.

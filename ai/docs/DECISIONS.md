@@ -52,6 +52,13 @@
 | D-41 | 렙 대조: 서버 렙 순서대로, 아직 안 쓴 클라이언트 렙 중 시간 IoU가 가장 큰 것(같으면 앞쪽)을 IoU ≥ 0.5일 때 짝짓는 결정적 탐욕 매칭. 클라이언트 렙은 `startT`·`endT`·`accepted`(·`reason`)만 읽고 나머지 필드는 무시. 클라이언트 `poseSummary`는 형식 검사 없이 기록용 | 제안·팀 합의 필요 (API-026 필드) | SPEC 9.2 |
 | D-42 | 인정 렙이 0개여도 다른 조건을 만족하면 `AUTO_APPROVE`가 나올 수 있다. 보상 0 처리는 백엔드 규칙(US-01 일일 상한 초과와 같은 방식)에 맡긴다 | 확인 필요 | SPEC 9.3에 없음 |
 | D-43 | 성능: 9,092프레임(15fps 약 10분) `run_session` 0.44초 (Apple M3, 2026-11-09, 커버리지 계측 없이). 측면 선택·어댑터에서 IntEnum 인덱싱을 정수로 바꿔 0.56초에서 줄였다. 성능 테스트는 측정 구간에서만 추적기(`sys.settrace`)를 잠시 꺼서, CI의 `--cov` 실행에서도 실제 실행 시간을 잰다 | 확정 (측정값) | SPEC 9.4 |
+| D-44 | **API 전체 처리 시간:** 10분 세션 요청 본문이 MediaPipe 17.1MB, MoveNet 9.5MB다. JSON 파싱·검증에 0.89초 / 0.66초, 재계산(청크 크기 재직렬화 포함)에 0.66초 / 0.32초가 걸렸다(M3, 2026-11-09). **재계산 자체는 1초 안이지만 파싱까지 합치면 MediaPipe 약 1.6초.** 백엔드가 청크를 받는 대로 나눠 보내는 방식, 본문 압축 형식(D-06)을 함께 정해야 함 | 제안·팀 합의 필요 | SPEC 9.4 |
+| D-45 | 내부 토큰: `AI_INTERNAL_TOKEN`이 비어 있으면 보호된 엔드포인트는 모두 401(fail closed). 비교는 `secrets.compare_digest`. 토큰 값은 `.env`에만 두고 저장소에 넣지 않는다 | 확정(보안 기본값) | SPEC 9.4, 루트 CLAUDE.md 비밀 값 규칙 |
+| D-46 | API 오류: 요청 형식·청크·모델·카탈로그 → 400 `VALIDATION_FAILED`(누락 청크는 `details.missingSeq`), R12 위반 → 400 `INVALID_REDUCTION`, 토큰 → 401 `UNAUTHORIZED`, 서버 카탈로그 파일 오류 → 500 `CONFIG_ERROR`. JSON 필드는 camelCase만 받는다(snake_case 필드는 400). `/internal/liveness/issue`는 동작·문구·ID만 주고 `issuedAtT`·`expiresAtT`는 백엔드가 세션 시각 기준으로 정한다 | 제안·팀 합의 필요 (백엔드 계약) | SPEC 9.4. backend/에 기존 AI 호출 계약 없음(2026-11-09 확인) |
+| D-47 | 루트 `docker-compose.yml`의 `ai` 블록은 SPEC의 `${AI_INTERNAL_TOKEN}` 대신 `${AI_INTERNAL_TOKEN:-}`를 쓴다. 동작은 같다(값이 없으면 빈 문자열). 토큰이 없는 팀원이 `docker compose up -d db`만 실행해도 경고가 뜨던 것을 없애기 위해서. 포트 8001은 기존 서비스(db 5432, 백엔드 8000)와 겹치지 않는다 | 확정 (리더 결정: 테크리더와 합의) | SPEC 2.1 |
+| D-48 | `ai-ci.yml` 트리거 경로에 `ai/**`와 함께 워크플로 파일 자신(`.github/workflows/ai-ci.yml`)을 넣었다. 워크플로만 고친 PR에서도 검사가 돌게 하려고 | 제안 | SPEC 2.1 |
+| D-49 | Docker 이미지는 `python:3.11-slim`에 비루트 사용자(uid 10001)로 실행한다. 2026-11-09 로컬에서 `docker compose up -d --build ai`로 빌드·실행해 health·401·발급·재계산 응답을 확인했다 | 확정 (실행 확인) | SPEC 2.1 |
+| D-50 | 테스트 실행 시 `StarletteDeprecationWarning: Using httpx with starlette.testclient is deprecated`가 뜬다. backend/와 같은 경고(first-feature.md 3절). 동작에는 영향 없음 | 확인 필요 (테크리더) | — |
 
 ## 루트 규칙과의 충돌 (SPEC 0장 요구)
 
