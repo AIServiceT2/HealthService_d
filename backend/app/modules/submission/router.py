@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
+from app.core.stub import not_implemented
 from app.modules.submission import service
 from app.modules.submission.schemas import SubmissionRead
 
@@ -34,3 +35,38 @@ def prepare_submission(submission_id: uuid.UUID, db: Session = Depends(get_db)):
         raise HTTPException(status_code=409, detail=str(e))
     except service.CalculationError as e:
         raise HTTPException(status_code=500, detail=f"calculation failed: {e}")
+
+
+# ---- 빈 API (노션 API 명세서, 기능 없음 → 501) ----
+# 경로가 /submissions로 시작하지 않는 것도 있어 prefix 없는 라우터를 따로 둔다.
+stub_router = APIRouter(tags=["submission"])
+
+
+@stub_router.post(
+    "/workout-sessions/{id}/submit",
+    summary="[API-026] 세션 종료·운동 제출",
+    description="권한: OWNER",
+    status_code=501,
+)
+def api_026(id: uuid.UUID) -> None:
+    not_implemented()
+
+
+@stub_router.get(
+    "/me/submissions",
+    summary="[API-029] 내 제출 목록",
+    description="권한: PLAYER",
+    status_code=501,
+)
+def api_029() -> None:
+    not_implemented()
+
+
+@stub_router.post(
+    "/submissions/{id}/cancel",
+    summary="[API-030] 승인 전 제출 취소",
+    description="권한: OWNER",
+    status_code=501,
+)
+def api_030(id: uuid.UUID) -> None:
+    not_implemented()
