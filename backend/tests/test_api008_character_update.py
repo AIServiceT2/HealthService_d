@@ -70,6 +70,23 @@ def test_api008_invalid_avatar_id_is_400(client):
     assert res.json()["code"] == "VALIDATION_FAILED"
 
 
+def test_api008_blank_avatar_id_is_400(client):
+    user_id = uuid.uuid4()
+    _create(client, user_id)
+
+    res = client.patch("/characters/me", json={"avatarId": "   "}, headers=_auth(user_id))
+
+    assert res.status_code == 400
+    assert client.get("/characters/me", headers=_auth(user_id)).json()["avatarId"] == "AVATAR_01"
+
+
+def test_api008_docs_show_400_not_422(client):
+    responses = client.get("/openapi.json").json()["paths"]["/characters/me"]["patch"]["responses"]
+
+    assert "400" in responses
+    assert "422" not in responses
+
+
 def test_api008_without_character_is_404(client):
     res = client.patch("/characters/me", json={"avatarId": "AVATAR_02"}, headers=_auth(uuid.uuid4()))
 

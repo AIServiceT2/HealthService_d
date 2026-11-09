@@ -22,7 +22,14 @@ from app.modules.character.schemas import (
     MyCharacterRead,
 )
 
-router = APIRouter(tags=["character"], route_class=ApiErrorRoute)
+# 입력 오류는 422가 아니라 400 VALIDATION_FAILED로 돌려준다 (errors.py).
+# FastAPI는 라우트에 422·4XX·default 응답이 없으면 Swagger에 422를 자동으로 넣으므로,
+# 공통 에러 본문을 4XX로 선언해 실제와 다른 422가 문서에 보이지 않게 한다.
+router = APIRouter(
+    tags=["character"],
+    route_class=ApiErrorRoute,
+    responses={"4XX": {"model": ErrorResponse, "description": "공통 에러 본문 { code, message, details }"}},
+)
 
 
 @router.post(

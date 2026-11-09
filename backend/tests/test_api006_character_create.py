@@ -59,3 +59,25 @@ def test_api006_invalid_body_is_400(client):
 
     assert res.status_code == 400
     assert res.json()["code"] == "VALIDATION_FAILED"
+
+
+def test_api006_blank_avatar_id_is_400(client):
+    res = client.post("/characters", json={"avatarId": "   "}, headers=_auth(uuid.uuid4()))
+
+    assert res.status_code == 400
+    assert res.json()["code"] == "VALIDATION_FAILED"
+
+
+def test_api006_avatar_id_is_trimmed(client):
+    res = client.post("/characters", json={"avatarId": "  AVATAR_01 "}, headers=_auth(uuid.uuid4()))
+
+    assert res.status_code == 201
+    assert res.json()["avatarId"] == "AVATAR_01"
+
+
+def test_api006_docs_show_400_not_422(client):
+    """입력 오류는 400으로 돌려주므로 Swagger에도 422가 없어야 한다."""
+    responses = client.get("/openapi.json").json()["paths"]["/characters"]["post"]["responses"]
+
+    assert "400" in responses
+    assert "422" not in responses

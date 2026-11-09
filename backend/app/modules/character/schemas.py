@@ -1,9 +1,13 @@
 """캐릭터 API 입출력. JSON 키는 노션 API 명세서대로 camelCase, 파이썬 안에서는 snake_case."""
 
 import uuid
+from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 from pydantic.alias_generators import to_camel
+
+# 선택 범위는 미정 (노션 API-006·008). 앞뒤 공백을 지운 뒤 1~32자. 공백만 있으면 400
+AvatarId = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=32)]
 
 
 class _CamelModel(BaseModel):
@@ -13,7 +17,7 @@ class _CamelModel(BaseModel):
 class CharacterCreate(_CamelModel):
     """API-006 요청. avatarId는 선택이고 선택 범위는 미정 (노션 API-006)."""
 
-    avatar_id: str | None = Field(default=None, min_length=1, max_length=32)
+    avatar_id: AvatarId | None = None
 
 
 class CharacterUpdate(_CamelModel):
@@ -25,11 +29,11 @@ class CharacterUpdate(_CamelModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    avatar_id: str | None = Field(default=None, min_length=1, max_length=32)
+    avatar_id: AvatarId | None = None
 
 
 class CharacterRead(_CamelModel):
-    """API-006 응답 201: { userId, avatarId, exp, level }."""
+    """API-006 응답 201 / API-008 응답 200: { userId, avatarId, exp, level }."""
 
     user_id: uuid.UUID
     avatar_id: str | None
