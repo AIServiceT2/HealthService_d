@@ -71,6 +71,7 @@
 | 3-1 | [docs/decisions/first-feature.md](docs/decisions/first-feature.md) | 우리가 고른 첫 기능과 범위, 실행 확인 | ☑ (US-02, 실행 확인 1/5명) |
 | 3-1 | [docs/API.md](docs/API.md) | 화면·서버가 주고받는 약속 (기능 1항목) | ☑ (US-02, 경로·응답 형식 합의 필요) |
 | 3-1 | [.claude/agents/](.claude/agents/) | prd-reviewer | ☑ |
+| - | [ai/README.md](ai/README.md) | AI 렙 판정 엔진·내부 API·도구 (결정·팀 합의 필요 항목은 [ai/docs/DECISIONS.md](ai/docs/DECISIONS.md)) | ☑ (합성 데이터로만 검증, 실데이터 확인 전) |
 
 > 단계가 끝나면 상태 칸을 ☑로 바꾸고 PR로 올립니다.
 
