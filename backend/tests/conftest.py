@@ -18,7 +18,7 @@ def _tables():
 def _clean_tables():
     yield
     with engine.begin() as conn:
-        conn.execute(text("TRUNCATE workout_submission"))
+        conn.execute(text("TRUNCATE workout_submission, character"))
 
 
 @pytest.fixture
