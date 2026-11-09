@@ -1,0 +1,14 @@
+.venv/
+models/*.task
+data/videos/*
+!data/videos/.gitkeep
+reports/
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+# 생성물: 합성 샘플(tools.make_sample_data로 재생성), 웹캠 저장 세션(실제 사람 좌표, 공개 저장소)
+data/keypoints/sample/
+data/keypoints/webcam/
+data/labels_sample.csv

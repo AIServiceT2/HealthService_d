@@ -1,0 +1,5 @@
+# 로컬 개발 전체 (2026-11-09 설치 시점 버전으로 고정)
+-r requirements-ci.txt
+# 자세 추정 — tools/ 전용 (rep_engine은 import하지 않음)
+mediapipe==1.2.2
+opencv-python==5.0.0.93
