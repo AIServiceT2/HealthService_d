@@ -254,3 +254,49 @@ def test_f01_api004_cannot_revoke_other_users_refresh_token(client):
     )
     assert res.status_code == 204
     assert _refresh(client, victim["refreshToken"]).status_code == 200
+
+
+# ---- API-005 내 계정 조회 ----
+
+
+def test_f01_api005_me_returns_my_account(client):
+    user_id = _signup(client).json()["userId"]
+    access = _login(client).json()["accessToken"]
+
+    res = client.get("/me", headers=_bearer(access))
+    assert res.status_code == 200
+    assert res.json() == {
+        "id": user_id,
+        "nickname": "민규",
+        "birthDate": "2010-03-14",
+        "roles": ["PLAYER"],
+        "guildId": None,
+        "isGuildLeader": False,
+        "hasCharacter": False,
+    }
+
+
+def test_f01_api005_me_does_not_expose_email_or_password(client):
+    _signup(client)
+    access = _login(client).json()["accessToken"]
+    body = client.get("/me", headers=_bearer(access)).json()
+    assert "email" not in body
+    assert not any("password" in key.lower() for key in body)
+
+
+def test_f01_api005_me_without_or_with_bad_bearer_is_401(client):
+    for headers in ({}, _bearer("not-a-jwt"), {"Authorization": "Basic abc"}):
+        res = client.get("/me", headers=headers)
+        assert res.status_code == 401, headers
+        assert res.json()["code"] == "UNAUTHENTICATED"
+
+
+def test_f01_api005_token_of_deleted_user_is_401(client, db):
+    from app.modules.auth.models import User
+
+    user_id = _signup(client).json()["userId"]
+    access = _login(client).json()["accessToken"]
+    db.delete(db.get(User, uuid.UUID(user_id)))
+    db.commit()
+
+    assert client.get("/me", headers=_bearer(access)).status_code == 401

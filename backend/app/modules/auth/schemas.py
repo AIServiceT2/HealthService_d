@@ -51,3 +51,13 @@ class LoginUser(CamelModel):
 
 class LoginResponse(TokenResponse):
     user: LoginUser
+
+
+class MeResponse(CamelModel):
+    id: uuid.UUID
+    nickname: str
+    birth_date: date
+    roles: list[str]
+    guild_id: uuid.UUID | None
+    is_guild_leader: bool
+    has_character: bool

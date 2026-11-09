@@ -1,14 +1,12 @@
 """auth API. 노션 '전운시 API 명세서' API-001~005.
 
 로그인 방식은 PRD에서 미정이라 노션 명세의 가안(EMAIL, access 30분·refresh 14일)대로 만든다.
-아직 구현하지 않은 API는 501을 돌려준다.
 """
 
 from fastapi import APIRouter, Depends, Response
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
-from app.core.stub import not_implemented
 from app.modules.auth import service
 from app.modules.auth.dependencies import get_current_user
 from app.modules.auth.models import User
@@ -16,6 +14,7 @@ from app.modules.auth.schemas import (
     LoginRequest,
     LoginResponse,
     LoginUser,
+    MeResponse,
     RefreshRequest,
     SignupRequest,
     SignupResponse,
@@ -88,8 +87,17 @@ def api_004(
 @router.get(
     "/me",
     summary="[API-005] 내 계정 조회",
-    description="권한: PLAYER",
-    status_code=501,
+    description="권한: PLAYER. Bearer 토큰이 없거나 유효하지 않으면 401 UNAUTHENTICATED",
+    response_model=MeResponse,
 )
-def api_005() -> None:
-    not_implemented()
+def api_005(user: User = Depends(get_current_user)) -> MeResponse:
+    return MeResponse(
+        id=user.id,
+        nickname=user.nickname,
+        birth_date=user.birth_date,
+        roles=["PLAYER"],  # 지금은 가입한 사용자 모두 PLAYER. 운영자 역할은 admin API 구현 때
+        guild_id=user.guild_id,
+        # 길드·캐릭터 테이블이 아직 없어 false. 길드(API-009~)·캐릭터(API-006~) 구현 때 실제 값으로
+        is_guild_leader=False,
+        has_character=False,
+    )
