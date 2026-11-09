@@ -128,3 +128,69 @@ def test_f01_api002_refresh_token_is_stored_only_as_hash(client, db):
     stored = db.scalars(select(RefreshToken.token_hash)).all()
     assert len(stored) == 1
     assert refresh not in stored
+
+
+# ---- API-003 토큰 재발급 ----
+
+
+def _refresh(client, token):
+    return client.post("/auth/refresh", json={"refreshToken": token})
+
+
+def test_f01_api003_refresh_issues_new_tokens(client):
+    _signup(client)
+    old = _login(client).json()["refreshToken"]
+
+    res = _refresh(client, old)
+    assert res.status_code == 200
+    body = res.json()
+    assert set(body) == {"accessToken", "accessTokenExpiresIn", "refreshToken"}
+    assert body["accessTokenExpiresIn"] == 1800
+    assert body["refreshToken"] != old
+
+
+def test_f01_api003_old_refresh_token_is_revoked_after_rotation(client):
+    _signup(client)
+    old = _login(client).json()["refreshToken"]
+    new = _refresh(client, old).json()["refreshToken"]
+
+    reused = _refresh(client, old)
+    assert reused.status_code == 401
+    assert reused.json()["code"] == "UNAUTHENTICATED"
+    assert _refresh(client, new).status_code == 200
+
+
+def test_f01_api003_unknown_or_expired_refresh_token_is_401(client, db):
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy import update
+
+    from app.modules.auth.models import RefreshToken
+
+    assert _refresh(client, "not-a-real-token").status_code == 401
+
+    _signup(client)
+    token = _login(client).json()["refreshToken"]
+    db.execute(update(RefreshToken).values(expires_at=datetime.now(UTC) - timedelta(seconds=1)))
+    db.commit()
+    res = _refresh(client, token)
+    assert res.status_code == 401
+    assert res.json()["code"] == "UNAUTHENTICATED"
+
+
+def test_f01_api003_same_refresh_token_twice_at_once_succeeds_only_once(client):
+    from concurrent.futures import ThreadPoolExecutor
+
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+
+    _signup(client)
+    token = _login(client).json()["refreshToken"]
+
+    def call(_):
+        return TestClient(app).post("/auth/refresh", json={"refreshToken": token}).status_code
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        codes = sorted(pool.map(call, range(2)))
+    assert codes == [200, 401]

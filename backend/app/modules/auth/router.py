@@ -14,8 +14,10 @@ from app.modules.auth.schemas import (
     LoginRequest,
     LoginResponse,
     LoginUser,
+    RefreshRequest,
     SignupRequest,
     SignupResponse,
+    TokenResponse,
 )
 
 router = APIRouter(tags=["auth"])
@@ -52,11 +54,17 @@ def api_002(req: LoginRequest, db: Session = Depends(get_db)) -> LoginResponse:
 @router.post(
     "/auth/refresh",
     summary="[API-003] 토큰 재발급",
-    description="권한: NONE",
-    status_code=501,
+    description="권한: NONE. refresh 토큰도 새로 발급하고 이전 토큰은 폐기(rotation). "
+    "만료·폐기된 토큰은 401 UNAUTHENTICATED",
+    response_model=TokenResponse,
 )
-def api_003() -> None:
-    not_implemented()
+def api_003(req: RefreshRequest, db: Session = Depends(get_db)) -> TokenResponse:
+    tokens = service.refresh(db, req.refresh_token)
+    return TokenResponse(
+        access_token=tokens.access_token,
+        access_token_expires_in=tokens.access_token_expires_in,
+        refresh_token=tokens.refresh_token,
+    )
 
 
 @router.post(

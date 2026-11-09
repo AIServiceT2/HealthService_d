@@ -39,6 +39,10 @@ class TokenResponse(CamelModel):
     refresh_token: str
 
 
+class RefreshRequest(CamelModel):
+    refresh_token: str = Field(min_length=1, max_length=256)
+
+
 class LoginUser(CamelModel):
     id: uuid.UUID
     nickname: str

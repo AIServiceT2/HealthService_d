@@ -9,7 +9,7 @@ from datetime import UTC, date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import jwt
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.core.config import ACCESS_TOKEN_TTL_SECONDS, REFRESH_TOKEN_TTL_SECONDS, jwt_secret
@@ -138,3 +138,32 @@ def login(db: Session, req: LoginRequest) -> tuple[User, IssuedTokens]:
     tokens = _issue_tokens(db, user.id)
     db.commit()
     return user, tokens
+
+
+def _revoke_refresh(db: Session, refresh_token: str) -> uuid.UUID | None:
+    """유효한(만료·폐기 전) refresh 토큰을 폐기하고 user_id를 돌려준다. 없으면 None.
+
+    조건부 UPDATE 한 번으로 처리해, 같은 토큰이 동시에 두 번 와도 하나만 성공한다.
+    """
+    now = _now()
+    return db.scalar(
+        update(RefreshToken)
+        .where(
+            RefreshToken.token_hash == _hash_refresh(refresh_token),
+            RefreshToken.revoked_at.is_(None),
+            RefreshToken.expires_at > now,
+        )
+        .values(revoked_at=now)
+        .returning(RefreshToken.user_id)
+    )
+
+
+def refresh(db: Session, refresh_token: str) -> IssuedTokens:
+    """refresh 토큰 rotation: 이전 토큰을 폐기하고 새 access·refresh 토큰을 발급한다 (노션 API-003)."""
+    user_id = _revoke_refresh(db, refresh_token)
+    if user_id is None:
+        db.rollback()
+        raise AppError(401, "UNAUTHENTICATED", "refresh 토큰이 만료되었거나 폐기되었습니다.")
+    tokens = _issue_tokens(db, user_id)
+    db.commit()
+    return tokens
