@@ -214,7 +214,7 @@ curl -X POST http://localhost:8001/internal/recount \
 | --- | --- | --- |
 | `download_models` | MediaPipe lite/full/heavy `.task`를 `models/`로 받기 | 실행 확인 |
 | `extract_keypoints` | 영상 → 세션 JSON (15fps, 얼굴 null, 청크 분할) | 사람 없는 테스트 영상으로만 확인 |
-| `webcam_demo` | 실시간 렙 판정 화면 | 영상 입력 `--headless`로만 확인. 카메라 창은 직접 확인 필요 |
+| `webcam_demo` | 실시간 렙 판정 화면, `--snapshots`로 인정 렙 최저점 사진 저장 | 리더가 카메라로 실행 확인. 사진 저장은 합성 입력으로 확인 |
 | `plot_session` | 세션 → kneeAngle 그래프 PNG | 합성 세션으로 확인 |
 | `evaluate` | 라벨 CSV 전체 평가 | 합성 샘플로 확인 |
 | `compare_models` | lite/full/heavy 정확도·추론 시간 | 사람 없는 영상으로만 확인 (시간 비교 무의미, D-60) |
@@ -240,6 +240,9 @@ cd ai
 ```bash
 # 웹캠 데모 (키: L 무작위 동작 · R 리셋 · S 저장 · Q 종료). 처음엔 macOS가 카메라 권한을 묻는다
 .venv/bin/python -m tools.webcam_demo --model lite
+# 인정 렙마다 최저점 사진 1장 → ~/Downloads/jeonunsi_snapshots/<세션ID>/rep03_86.2deg.jpg
+# 흐림 없음(얼굴이 나옴). 이 PC에만 두고 저장소·공유 폴더에 올리지 않는다 (D-65)
+.venv/bin/python -m tools.webcam_demo --model lite --snapshots
 .venv/bin/python -m tools.webcam_demo --source data/videos/s01.mp4 --headless   # 창 없이
 
 # 다른 카탈로그(기준값)로 비교 평가
