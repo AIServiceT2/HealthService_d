@@ -23,7 +23,9 @@ def _tables():
 def _clean_tables():
     yield
     with engine.begin() as conn:
-        conn.execute(text("TRUNCATE workout_submission, app_user, refresh_token CASCADE"))
+        conn.execute(
+            text("TRUNCATE workout_submission, character, app_user, refresh_token CASCADE")
+        )
 
 
 @pytest.fixture
