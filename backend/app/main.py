@@ -6,9 +6,33 @@
 
 from fastapi import FastAPI
 
+from app.modules.auth.router import router as auth_router
+from app.modules.battle.router import router as battle_router
+from app.modules.character.router import router as character_router
+from app.modules.guild.router import router as guild_router
 from app.modules.health.router import router as health_router
+from app.modules.llm.router import router as llm_router
+from app.modules.result.router import router as result_router
+from app.modules.review.router import router as review_router
+from app.modules.reward.router import router as reward_router
+from app.modules.snapshot.router import router as snapshot_router
 from app.modules.submission.router import router as submission_router
+from app.modules.submission.router import stub_router as submission_stub_router
+from app.modules.workout_session.router import router as workout_session_router
 
 app = FastAPI(title="전운시 API")
 app.include_router(health_router)
 app.include_router(submission_router)
+
+# 아래는 노션 'API 명세서' MVP 필수(API-001~051)의 빈 API. 기능 없이 501을 돌려준다.
+app.include_router(auth_router)
+app.include_router(character_router)
+app.include_router(guild_router)
+app.include_router(workout_session_router)
+app.include_router(submission_stub_router)
+app.include_router(snapshot_router)
+app.include_router(review_router)
+app.include_router(reward_router)
+app.include_router(battle_router)
+app.include_router(result_router)
+app.include_router(llm_router)
