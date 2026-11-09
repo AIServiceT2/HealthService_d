@@ -2,12 +2,14 @@
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
+import numpy as np
 import pytest
 
 from rep_engine.config import ConfigError
 from rep_engine.landmarks import MEDIAPIPE_FACE_INDICES
-from rep_engine.schemas import CHUNK_SPEC, ChunkSpec, Frame
+from rep_engine.schemas import CHUNK_SPEC, ChunkSpec, Frame, RepEvent
 from rep_engine.validation import chunk_size_bytes
 from tools import angle_study, calibrate_confidence, evaluate, make_sample_data, plot_session
 from tools.common import load_session, save_session, split_chunks
@@ -113,3 +115,60 @@ def test_plot_session(sample: Path, tmp_path: Path) -> None:
     session = next((sample.parent / "keypoints").glob("*.json"))
     out = plot_session.plot(session, tmp_path / "p.png")
     assert out.stat().st_size > 10_000
+
+
+# --- webcam_demo 최저점 사진 (카메라·cv2 없이) ---------------------------------
+
+
+def _demo_run(
+    snapshot_dir: Path | None,
+) -> tuple[list[tuple[Path, int, int]], list[RepEvent], str]:
+    from tools.synth import RepSpec
+    from tools.webcam_demo import Demo
+
+    saved: list[tuple[Path, int, int]] = []
+
+    def writer(path: Path, image: Any, frame: Frame, event: RepEvent) -> None:
+        saved.append((path, int(image[0]), frame.t))
+
+    sc = SynthConfig(
+        reps=[RepSpec(85, 2000), RepSpec(90, 2200), RepSpec(125, 2000), RepSpec(80, 2400)],
+        noise_px=1.5,
+    )
+    demo = Demo(720, 1280, "lite", "test", False, "cat_2026-11-01", snapshot_dir, writer)
+    events: list[RepEvent] = []
+    for f in synth_frames(sc):
+        events += demo.push(f, np.array([f.t]))  # 이미지 대신 "어느 시각 프레임인지"를 담은 배열
+    return saved, events, demo.meta.session_id
+
+
+def test_snapshot_saves_bottom_frame_of_accepted_reps_only(tmp_path: Path) -> None:
+    saved, events, session_id = _demo_run(tmp_path)
+    accepted = [e for e in events if e.accepted]
+    assert len(events) == 4 and len(accepted) == 3  # 얕은 렙 1개는 사진 없음
+    assert len(saved) == 3
+    for (path, image_t, frame_t), e in zip(saved, accepted, strict=True):
+        assert image_t == frame_t == e.bottom_t  # 엔진이 정한 최저점 프레임
+        assert path == tmp_path / session_id / f"rep{e.index:02d}_{e.min_knee_angle:.1f}deg.jpg"
+
+
+def test_snapshot_off_by_default() -> None:
+    saved, events, _ = _demo_run(None)
+    assert saved == [] and sum(e.accepted for e in events) == 3
+
+
+def test_bottom_snapshot_rules() -> None:
+    from tests.featurize import make_rep
+    from tools.webcam_demo import BottomSnapshot
+
+    b = BottomSnapshot()
+    fr = Frame(t=0, landmarks=None)
+    b.observe(True, 100, 120.0, np.array([100]), fr)
+    b.observe(True, 166, 90.0, np.array([166]), fr)
+    b.observe(True, 233, 95.0, np.array([233]), fr)  # 더 깊지 않으면 유지
+    b.observe(True, 300, None, np.array([300]), fr)  # 무효 프레임은 무시
+    picked = b.take(make_rep(start=0, dur=332))  # bottom_t = 166
+    assert picked is not None and int(picked[0][0]) == 166
+    assert b.take(make_rep(start=0, dur=400)) is None  # bottom_t 200 ≠ 166 → 저장 안 함
+    b.observe(False, 400, 170.0, np.array([400]), fr)  # 렙 밖 → 후보 버림
+    assert b.image is None and b.take(make_rep(start=0, dur=332)) is None
