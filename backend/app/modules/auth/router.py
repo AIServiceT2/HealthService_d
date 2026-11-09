@@ -4,12 +4,14 @@
 아직 구현하지 않은 API는 501을 돌려준다.
 """
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
 from app.core.stub import not_implemented
 from app.modules.auth import service
+from app.modules.auth.dependencies import get_current_user
+from app.modules.auth.models import User
 from app.modules.auth.schemas import (
     LoginRequest,
     LoginResponse,
@@ -70,11 +72,17 @@ def api_003(req: RefreshRequest, db: Session = Depends(get_db)) -> TokenResponse
 @router.post(
     "/auth/logout",
     summary="[API-004] 로그아웃",
-    description="권한: PLAYER",
-    status_code=501,
+    description="권한: PLAYER. 전달한 refresh 토큰을 폐기한다. Bearer 토큰이 없거나 유효하지 않으면 "
+    "401 UNAUTHENTICATED",
+    status_code=204,
 )
-def api_004() -> None:
-    not_implemented()
+def api_004(
+    req: RefreshRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Response:
+    service.logout(db, user.id, req.refresh_token)
+    return Response(status_code=204)
 
 
 @router.get(

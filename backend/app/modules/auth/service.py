@@ -158,6 +158,24 @@ def _revoke_refresh(db: Session, refresh_token: str) -> uuid.UUID | None:
     )
 
 
+def logout(db: Session, user_id: uuid.UUID, refresh_token: str) -> None:
+    """본인의 refresh 토큰을 폐기한다 (노션 API-004).
+
+    남의 토큰·이미 폐기된 토큰·없는 토큰이면 아무것도 바꾸지 않는다. 명세의 에러는 Bearer 401뿐이라
+    이 경우도 204로 끝낸다 (같은 로그아웃 요청을 다시 보내도 결과가 같음).
+    """
+    db.execute(
+        update(RefreshToken)
+        .where(
+            RefreshToken.token_hash == _hash_refresh(refresh_token),
+            RefreshToken.user_id == user_id,
+            RefreshToken.revoked_at.is_(None),
+        )
+        .values(revoked_at=_now())
+    )
+    db.commit()
+
+
 def refresh(db: Session, refresh_token: str) -> IssuedTokens:
     """refresh 토큰 rotation: 이전 토큰을 폐기하고 새 access·refresh 토큰을 발급한다 (노션 API-003)."""
     user_id = _revoke_refresh(db, refresh_token)

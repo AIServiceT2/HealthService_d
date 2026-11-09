@@ -194,3 +194,63 @@ def test_f01_api003_same_refresh_token_twice_at_once_succeeds_only_once(client):
     with ThreadPoolExecutor(max_workers=2) as pool:
         codes = sorted(pool.map(call, range(2)))
     assert codes == [200, 401]
+
+
+# ---- API-004 로그아웃 ----
+
+
+def _bearer(token):
+    return {"Authorization": f"Bearer {token}"}
+
+
+def test_f01_api004_logout_revokes_refresh_token(client):
+    _signup(client)
+    tokens = _login(client).json()
+
+    res = client.post(
+        "/auth/logout",
+        json={"refreshToken": tokens["refreshToken"]},
+        headers=_bearer(tokens["accessToken"]),
+    )
+    assert res.status_code == 204
+    assert res.content == b""
+    assert _refresh(client, tokens["refreshToken"]).status_code == 401
+
+
+def test_f01_api004_logout_without_or_with_bad_bearer_is_401(client):
+    _signup(client)
+    tokens = _login(client).json()
+    body = {"refreshToken": tokens["refreshToken"]}
+
+    for headers in ({}, _bearer("not-a-jwt"), _bearer(tokens["refreshToken"])):
+        res = client.post("/auth/logout", json=body, headers=headers)
+        assert res.status_code == 401, headers
+        assert res.json()["code"] == "UNAUTHENTICATED"
+    # 거부된 요청은 refresh 토큰을 폐기하지 않는다
+    assert _refresh(client, tokens["refreshToken"]).status_code == 200
+
+
+def test_f01_api004_expired_access_token_is_401(client):
+    from datetime import UTC, datetime, timedelta
+
+    from app.modules.auth.service import create_access_token
+
+    user_id = uuid.UUID(_signup(client).json()["userId"])
+    expired = create_access_token(user_id, now=datetime.now(UTC) - timedelta(hours=1))
+    res = client.post("/auth/logout", json={"refreshToken": "x"}, headers=_bearer(expired))
+    assert res.status_code == 401
+
+
+def test_f01_api004_cannot_revoke_other_users_refresh_token(client):
+    _signup(client)
+    victim = _login(client).json()
+    _signup(client, email="other@example.com", nickname="다른사람")
+    attacker = _login(client, email="other@example.com").json()
+
+    res = client.post(
+        "/auth/logout",
+        json={"refreshToken": victim["refreshToken"]},
+        headers=_bearer(attacker["accessToken"]),
+    )
+    assert res.status_code == 204
+    assert _refresh(client, victim["refreshToken"]).status_code == 200
