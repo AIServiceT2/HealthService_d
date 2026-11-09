@@ -25,3 +25,25 @@ class SignupRequest(CamelModel):
 
 class SignupResponse(CamelModel):
     user_id: uuid.UUID
+
+
+class LoginRequest(CamelModel):
+    provider: Literal["EMAIL"]
+    email: str = Field(min_length=1, max_length=254)
+    password: str = Field(min_length=1, max_length=64)
+
+
+class TokenResponse(CamelModel):
+    access_token: str
+    access_token_expires_in: int
+    refresh_token: str
+
+
+class LoginUser(CamelModel):
+    id: uuid.UUID
+    nickname: str
+    guild_id: uuid.UUID | None
+
+
+class LoginResponse(TokenResponse):
+    user: LoginUser

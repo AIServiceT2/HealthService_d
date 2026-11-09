@@ -81,3 +81,50 @@ def test_f01_api001_password_is_not_stored_in_plain_text(client, db):
     user = db.get(User, uuid.UUID(user_id))
     assert user.password_hash != SIGNUP["password"]
     assert SIGNUP["password"] not in user.password_hash
+
+
+# ---- API-002 로그인 ----
+
+LOGIN = {"provider": "EMAIL", "email": SIGNUP["email"], "password": SIGNUP["password"]}
+
+
+def _login(client, **overrides):
+    return client.post("/auth/login", json={**LOGIN, **overrides})
+
+
+def test_f01_api002_login_returns_tokens_and_user(client):
+    user_id = _signup(client).json()["userId"]
+
+    res = _login(client)
+    assert res.status_code == 200
+    body = res.json()
+    assert body["accessToken"]
+    assert body["accessTokenExpiresIn"] == 1800
+    assert body["refreshToken"]
+    assert body["user"] == {"id": user_id, "nickname": "민규", "guildId": None}
+
+
+def test_f01_api002_wrong_password_or_unknown_email_is_401(client):
+    _signup(client)
+    for override in ({"password": "wrong-password"}, {"email": "nobody@example.com"}):
+        res = _login(client, **override)
+        assert res.status_code == 401, override
+        assert res.json()["code"] == "UNAUTHENTICATED"
+
+
+def test_f01_api002_invalid_body_is_400(client):
+    res = client.post("/auth/login", json={"provider": "EMAIL", "email": SIGNUP["email"]})
+    assert res.status_code == 400
+    assert res.json()["code"] == "VALIDATION_FAILED"
+
+
+def test_f01_api002_refresh_token_is_stored_only_as_hash(client, db):
+    from sqlalchemy import select
+
+    from app.modules.auth.models import RefreshToken
+
+    _signup(client)
+    refresh = _login(client).json()["refreshToken"]
+    stored = db.scalars(select(RefreshToken.token_hash)).all()
+    assert len(stored) == 1
+    assert refresh not in stored

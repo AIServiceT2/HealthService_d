@@ -10,7 +10,13 @@ from sqlalchemy.orm import Session
 from app.core.db import get_db
 from app.core.stub import not_implemented
 from app.modules.auth import service
-from app.modules.auth.schemas import SignupRequest, SignupResponse
+from app.modules.auth.schemas import (
+    LoginRequest,
+    LoginResponse,
+    LoginUser,
+    SignupRequest,
+    SignupResponse,
+)
 
 router = APIRouter(tags=["auth"])
 
@@ -30,11 +36,17 @@ def api_001(req: SignupRequest, db: Session = Depends(get_db)) -> SignupResponse
 @router.post(
     "/auth/login",
     summary="[API-002] 로그인",
-    description="권한: NONE",
-    status_code=501,
+    description="권한: NONE. 이메일·비밀번호 불일치는 401 UNAUTHENTICATED",
+    response_model=LoginResponse,
 )
-def api_002() -> None:
-    not_implemented()
+def api_002(req: LoginRequest, db: Session = Depends(get_db)) -> LoginResponse:
+    user, tokens = service.login(db, req)
+    return LoginResponse(
+        access_token=tokens.access_token,
+        access_token_expires_in=tokens.access_token_expires_in,
+        refresh_token=tokens.refresh_token,
+        user=LoginUser(id=user.id, nickname=user.nickname, guild_id=user.guild_id),
+    )
 
 
 @router.post(
