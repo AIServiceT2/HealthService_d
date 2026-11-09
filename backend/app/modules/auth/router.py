@@ -20,6 +20,7 @@ from app.modules.auth.schemas import (
     SignupResponse,
     TokenResponse,
 )
+from app.modules.character import service as character_service
 
 router = APIRouter(tags=["auth"])
 
@@ -90,14 +91,17 @@ def api_004(
     description="권한: PLAYER. Bearer 토큰이 없거나 유효하지 않으면 401 UNAUTHENTICATED",
     response_model=MeResponse,
 )
-def api_005(user: User = Depends(get_current_user)) -> MeResponse:
+def api_005(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> MeResponse:
     return MeResponse(
         id=user.id,
         nickname=user.nickname,
         birth_date=user.birth_date,
         roles=["PLAYER"],  # 지금은 가입한 사용자 모두 PLAYER. 운영자 역할은 admin API 구현 때
         guild_id=user.guild_id,
-        # 길드·캐릭터 테이블이 아직 없어 false. 길드(API-009~)·캐릭터(API-006~) 구현 때 실제 값으로
+        # 길드 테이블이 아직 없어 false. 길드(API-009~) 구현 때 실제 값으로
         is_guild_leader=False,
-        has_character=False,
+        has_character=character_service.has_character(db, user.id),
     )

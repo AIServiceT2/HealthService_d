@@ -33,6 +33,11 @@ class CharacterGrowth:
 _UNSET = object()
 
 
+def has_character(db: Session, user_id: uuid.UUID) -> bool:
+    """사용자에게 캐릭터가 있는지 (노션 API-005 hasCharacter)."""
+    return db.scalar(select(Character.id).where(Character.user_id == user_id)) is not None
+
+
 def update_my_character(db: Session, user_id: uuid.UUID, avatar_id: object = _UNSET) -> Character:
     """본인 캐릭터만 수정한다 (노션 API-008). 없으면 CharacterNotFound.
 

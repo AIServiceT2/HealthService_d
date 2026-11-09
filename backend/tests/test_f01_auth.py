@@ -300,3 +300,12 @@ def test_f01_api005_token_of_deleted_user_is_401(client, db):
     db.commit()
 
     assert client.get("/me", headers=_bearer(access)).status_code == 401
+
+
+def test_f01_api005_me_has_character_true_after_character_created(client):
+    _signup(client)
+    access = _login(client).json()["accessToken"]
+    assert client.post("/characters", headers=_bearer(access)).status_code == 201
+
+    body = client.get("/me", headers=_bearer(access)).json()
+    assert body["hasCharacter"] is True
