@@ -106,7 +106,11 @@ def test_api009_docs_error_details_allow_list(client):
     res = client.post("/guilds", json={"name": "가"}, headers=headers)
     assert isinstance(res.json()["details"], list)
 
-    schemas = client.get("/openapi.json").json()["components"]["schemas"]
-    details = schemas["ErrorResponse"]["properties"]["details"]
+    # 다른 모듈에도 ErrorResponse가 있어 문서의 스키마 이름이 바뀔 수 있으므로, 이름이 아니라
+    # POST /guilds의 400 응답이 가리키는 스키마를 따라간다
+    doc = client.get("/openapi.json").json()
+    content = doc["paths"]["/guilds"]["post"]["responses"]["400"]["content"]["application/json"]
+    name = content["schema"]["$ref"].rsplit("/", 1)[-1]
+    details = doc["components"]["schemas"][name]["properties"]["details"]
     allowed = {option.get("type") for option in details["anyOf"]}
     assert {"object", "array", "null"} <= allowed
