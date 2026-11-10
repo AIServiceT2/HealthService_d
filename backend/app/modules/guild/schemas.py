@@ -4,10 +4,11 @@ import uuid
 from datetime import datetime
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, StringConstraints
 from pydantic.alias_generators import to_camel
 
 from app.modules.guild.models import (
+    INVITE_CODE_PATTERN,
     INVITE_DEFAULT_HOURS,
     INVITE_MAX_HOURS,
     INVITE_MIN_HOURS,
@@ -86,6 +87,30 @@ class InvitationCreated(_CamelModel):
 
     invite_code: str
     expires_at: datetime
+
+
+def _normalize_code(value: object) -> object:
+    # 패턴 검사 전에 앞뒤 공백을 지우고 대문자로 바꾼다 (손으로 입력한 소문자도 받음).
+    # 문자열이 아니면 그대로 넘겨 400이 되게 한다
+    return value.strip().upper() if isinstance(value, str) else value
+
+
+# 영문 대문자·숫자 6자
+InviteCode = Annotated[
+    str, BeforeValidator(_normalize_code), StringConstraints(pattern=INVITE_CODE_PATTERN)
+]
+
+
+class GuildJoin(_CamelModel):
+    """API-013 요청: { inviteCode }."""
+
+    invite_code: InviteCode
+
+
+class GuildJoined(_CamelModel):
+    """API-013 응답 200: { guildId }."""
+
+    guild_id: uuid.UUID
 
 
 class ErrorResponse(BaseModel):

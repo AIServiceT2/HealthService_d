@@ -39,6 +39,14 @@ class NotGuildLeader(Exception):
     pass
 
 
+class InvitationNotFound(Exception):
+    pass
+
+
+class InvitationExpired(Exception):
+    pass
+
+
 _INVITE_CODE_ATTEMPTS = 5
 
 
@@ -195,3 +203,26 @@ def issue_invitation(
             continue
         return invitation
     raise RuntimeError("초대 코드를 만들지 못했습니다 (겹침 반복).")
+
+
+def join_by_invitation(db: Session, user_id: uuid.UUID, code: str) -> uuid.UUID:
+    """초대 코드로 길드에 가입하고 길드 ID를 돌려준다 (노션 API-013).
+
+    없는 코드면 InvitationNotFound, 만료된 코드면 InvitationExpired,
+    이미 길드에 소속되어 있으면 AlreadyInGuild. 같은 코드는 만료 전까지 여러 명이 쓸 수 있다.
+    """
+    try:
+        user = _lock_user(db, user_id)
+        invitation = db.get(GuildInvitation, code)
+        if invitation is None:
+            raise InvitationNotFound(code)
+        if invitation.expires_at <= datetime.now(UTC):
+            raise InvitationExpired(code)
+        if user.guild_id is not None:
+            raise AlreadyInGuild(str(user_id))
+        user.guild_id = invitation.guild_id
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    return invitation.guild_id
