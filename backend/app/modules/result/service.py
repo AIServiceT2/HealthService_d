@@ -7,7 +7,9 @@ from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.modules.llm import rules as llm_rules
 from app.modules.reward.models import Item, RewardLedger
+from app.modules.snapshot import rules as snapshot_rules
 from app.modules.snapshot.models import SubmissionSnapshot
 from app.modules.submission import service as submission_service
 from app.modules.submission.constants import SubmissionStatus
@@ -16,7 +18,13 @@ from app.modules.submission.models import RepEvent, WorkoutSubmission
 # LLM(L3·L4)이 없거나 실패했을 때 기본 문구. docs/DESIGN.md 5절 'LLM 결과 표시'의 제안 문구 그대로
 # (서사 문구는 '지급 완료 화면에서만 사용'이라 REWARDED만 보여 주는 이 API에 맞음) [제안·팀 확인 필요]
 FALLBACK_NARRATIVE = "운동 기록이 전투에 반영됐어요"
-FALLBACK_FORM_COMMENT = "교정 안내를 불러오지 못했어요. 다음 운동 전 판정 기준을 확인해 주세요."
+# L4 기본 문구는 LLM 생성(API-050)이 저장하는 문구와 같은 것을 쓴다
+FALLBACK_FORM_COMMENT = llm_rules.FALLBACK_FORM_TIP
+
+# LLM 생성(API-049·050)이 실패해 ai_story·ai_form_tip에 저장해 둔 기본 문구.
+# 이 값이 저장돼 있으면 LLM 결과가 아니므로 isFallback=true로 보여 준다 (backlog US-05)
+STORED_NARRATIVE_FALLBACKS = (snapshot_rules.FALLBACK_NARRATIVE,)
+STORED_FORM_COMMENT_FALLBACKS = (llm_rules.FALLBACK_FORM_TIP,)
 
 # 다른 모듈의 '없음·남의 건'을 그대로 쓴다
 SubmissionNotFound = submission_service.SubmissionNotFound
