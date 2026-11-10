@@ -21,6 +21,7 @@ from app.modules.auth.schemas import (
     TokenResponse,
 )
 from app.modules.character import service as character_service
+from app.modules.guild import service as guild_service
 
 router = APIRouter(tags=["auth"])
 
@@ -101,7 +102,6 @@ def api_005(
         birth_date=user.birth_date,
         roles=["PLAYER"],  # 지금은 가입한 사용자 모두 PLAYER. 운영자 역할은 admin API 구현 때
         guild_id=user.guild_id,
-        # 길드 테이블이 아직 없어 false. 길드(API-009~) 구현 때 실제 값으로
-        is_guild_leader=False,
+        is_guild_leader=guild_service.is_guild_leader(db, user),
         has_character=character_service.has_character(db, user.id),
     )

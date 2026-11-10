@@ -309,3 +309,13 @@ def test_f01_api005_me_has_character_true_after_character_created(client):
 
     body = client.get("/me", headers=_bearer(access)).json()
     assert body["hasCharacter"] is True
+
+
+def test_f01_api005_me_is_guild_leader_for_leader_only(client):
+    from tests.guild_helpers import join_with_code, new_guild
+
+    guild_id, _, leader_headers = new_guild(client)
+    _, member_headers = join_with_code(client, guild_id, leader_headers)
+
+    assert client.get("/me", headers=leader_headers).json()["isGuildLeader"] is True
+    assert client.get("/me", headers=member_headers).json()["isGuildLeader"] is False
