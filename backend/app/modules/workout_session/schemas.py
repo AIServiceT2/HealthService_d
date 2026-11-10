@@ -1,7 +1,7 @@
 """session API 입출력. JSON 키는 노션 API 명세서대로 camelCase, 파이썬 안에서는 snake_case."""
 
 import uuid
-from datetime import date
+from datetime import date, datetime
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -95,3 +95,19 @@ class StartSessionResponse(_CamelModel):
     remaining_daily_cap: int
     liveness: LivenessChallengeOut
     chunk_spec: ChunkSpecOut
+
+
+# ---- API-021 무작위 동작 확인 결과 ----
+
+
+class LivenessRequest(_CamelModel):
+    challenge_id: uuid.UUID
+    detected_action: str = Field(max_length=32)
+    # 판정 기준이 미정이라 범위만 검사하고 판정에는 쓰지 않음 (service.submit_liveness)
+    score: float = Field(ge=0, le=1)
+    detected_at: datetime
+
+
+class LivenessResponse(_CamelModel):
+    passed: bool
+    retry_allowed: bool

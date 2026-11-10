@@ -3,9 +3,10 @@
 import secrets
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
@@ -112,3 +113,64 @@ def start_session(
     db.add(session)
     db.commit()
     return session, daily_cap(user_id, exercise_code)
+
+
+# ---- 본인 세션 확인 (API-021~027 공통) ----
+
+
+def get_owned_session(
+    db: Session, user_id: uuid.UUID, session_id: uuid.UUID, *, lock: bool = False
+) -> WorkoutSession:
+    """세션이 없으면 404, 남의 세션이면 403 (노션 API-025 Error Code).
+
+    lock=True면 행을 잠가, 상태를 바꾸는 요청이 동시에 와도 하나씩 처리한다.
+    """
+    stmt = select(WorkoutSession).where(WorkoutSession.id == session_id)
+    if lock:
+        stmt = stmt.with_for_update()
+    session = db.scalars(stmt).one_or_none()
+    if session is None:
+        raise AppError(404, "NOT_FOUND", "세션을 찾을 수 없습니다.")
+    if session.user_id != user_id:
+        raise AppError(403, "FORBIDDEN", "본인 세션만 조회할 수 있습니다.")
+    return session
+
+
+def _invalid_state(message: str) -> AppError:
+    return AppError(409, "INVALID_STATE", message)
+
+
+# ---- 무작위 동작 확인 (API-021) ----
+
+
+def submit_liveness(
+    db: Session,
+    user_id: uuid.UUID,
+    session_id: uuid.UUID,
+    challenge_id: uuid.UUID,
+    detected_action: str,
+    now: datetime | None = None,
+) -> bool:
+    """앱이 판정한 무작위 동작 결과를 받아 liveness_passed에 저장한다 (노션 API-021).
+
+    통과 조건 [가정]: 발급한 동작과 같고, 서버가 받은 시각이 발급 후 제한 시간 안.
+    - 제한 시간은 앱이 보낸 detectedAt이 아니라 서버 시각으로 잰다 (앱 시계는 바꿀 수 있음).
+    - score는 기준값이 미정이라 판정에 쓰지 않는다 (PRD 미정 표 '무작위 동작 확인 실패 시 처리').
+    - 실패해도 다시 시도할 수 없다. 재시작/제출 허용 정책이 미정이라 한 번만 받는다.
+    """
+    now = now or _now()
+    try:
+        session = get_owned_session(db, user_id, session_id, lock=True)
+        if session.status != SessionStatus.ACTIVE or session.liveness_passed is not None:
+            raise _invalid_state("종료된 세션이거나 이미 확인을 끝냈습니다.")
+        if challenge_id != session.liveness_challenge_id:
+            raise _validation_failed("CHALLENGE_MISMATCH")
+
+        deadline = session.liveness_issued_at + timedelta(seconds=LIVENESS_TIMEOUT_SECONDS)
+        passed = detected_action == session.liveness_action and now <= deadline
+        session.liveness_passed = passed
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    return passed

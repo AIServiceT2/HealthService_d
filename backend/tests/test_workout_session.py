@@ -6,6 +6,8 @@
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
+from sqlalchemy import text
+
 from tests.character_helpers import new_player
 
 # ---- API-018 운동 목록·판정 기준·튜토리얼 ----
@@ -113,3 +115,80 @@ def test_us01_api020_rejects_bad_goal_and_target(client):
 
 def test_us01_api020_requires_login(client):
     assert client.post("/workout-sessions", json=START_BODY).status_code == 401
+
+
+# ---- API-021 무작위 동작 확인 결과 전송 ----
+
+
+def liveness_body(started, action=None):
+    return {
+        "challengeId": started["liveness"]["challengeId"],
+        "detectedAction": action or started["liveness"]["action"],
+        "score": 0.93,
+        "detectedAt": "2026-11-09T05:01:12Z",
+    }
+
+
+def post_liveness(client, headers, started, body=None):
+    return client.post(
+        f"/workout-sessions/{started['sessionId']}/liveness",
+        json=body or liveness_body(started),
+        headers=headers,
+    )
+
+
+def test_us01_api021_passes_when_action_matches(client):
+    _, headers = new_player(client)
+    started = start_session(client, headers)
+
+    res = post_liveness(client, headers, started)
+
+    assert res.status_code == 200
+    assert res.json() == {"passed": True, "retryAllowed": False}
+
+
+def test_us01_api021_fails_on_wrong_action_and_cannot_retry(client):
+    _, headers = new_player(client)
+    started = start_session(client, headers)
+    wrong = next(a for a in ("RAISE_LEFT_HAND", "RAISE_RIGHT_HAND") if a != started["liveness"]["action"])
+
+    res = post_liveness(client, headers, started, liveness_body(started, wrong))
+
+    assert res.status_code == 422
+    assert res.json()["code"] == "LIVENESS_FAILED"
+    # 한 번 판정하면 다시 보낼 수 없음
+    assert post_liveness(client, headers, started).status_code == 409
+
+
+def test_us01_api021_fails_after_timeout(client, db):
+    _, headers = new_player(client)
+    started = start_session(client, headers)
+    db.execute(
+        text("UPDATE workout_session SET liveness_issued_at = now() - interval '11 seconds' WHERE id = :id"),
+        {"id": started["sessionId"]},
+    )
+    db.commit()
+
+    res = post_liveness(client, headers, started)
+
+    assert res.status_code == 422
+    assert res.json()["code"] == "LIVENESS_FAILED"
+
+
+def test_us01_api021_rejects_other_challenge_id(client):
+    _, headers = new_player(client)
+    started = start_session(client, headers)
+    body = {**liveness_body(started), "challengeId": "00000000-0000-0000-0000-000000000000"}
+
+    res = post_liveness(client, headers, started, body)
+
+    assert res.status_code == 400
+    assert res.json()["code"] == "VALIDATION_FAILED"
+
+
+def test_us01_api021_only_owner(client):
+    _, owner = new_player(client)
+    _, other = new_player(client)
+    started = start_session(client, owner)
+
+    assert post_liveness(client, other, started).status_code == 403

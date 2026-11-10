@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
+from app.core.errors import AppError
 
 from app.core.stub import not_implemented
 from app.modules.auth.dependencies import get_current_user
@@ -29,6 +30,8 @@ from app.modules.workout_session.schemas import (
     ExerciseItem,
     ExercisesResponse,
     LivenessChallengeOut,
+    LivenessRequest,
+    LivenessResponse,
     StartSessionRequest,
     StartSessionResponse,
 )
@@ -113,11 +116,25 @@ def api_020(
 @router.post(
     "/workout-sessions/{id}/liveness",
     summary="[API-021] 무작위 동작 확인 결과 전송",
-    description="권한: OWNER",
-    status_code=501,
+    description=(
+        "권한: OWNER. 발급한 동작과 같고 제한 시간(서버 시각 기준) 안이면 통과. "
+        "실패는 422 LIVENESS_FAILED, 이미 확인했거나 진행 중이 아니면 409 INVALID_STATE. "
+        "재시도는 허용하지 않음(실패 정책 미정)"
+    ),
+    response_model=LivenessResponse,
 )
-def api_021(id: uuid.UUID) -> None:
-    not_implemented()
+def api_021(
+    id: uuid.UUID,
+    req: LivenessRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> LivenessResponse:
+    passed = service.submit_liveness(db, user.id, id, req.challenge_id, req.detected_action)
+    if not passed:
+        raise AppError(
+            422, "LIVENESS_FAILED", "지시한 동작을 확인하지 못했습니다.", {"retryAllowed": False}
+        )
+    return LivenessResponse(passed=True, retry_allowed=False)
 
 
 @router.put(
