@@ -14,6 +14,7 @@ from app.core.errors import AppError
 from app.modules.auth.dependencies import get_current_user
 from app.modules.auth.models import User
 from app.modules.reward import service
+from app.modules.reward.models import ItemStatus
 from app.modules.reward.schemas import (
     AppliedRead,
     DamageRead,
@@ -80,7 +81,9 @@ def grant(
         already_granted=result.already_granted,
         applied=AppliedRead(
             exp=result.exp,
-            items=[ItemRef(item_id=i.id, status=i.status) for i in result.items],
+            # 지급 당시 결과를 그대로 돌려준다: 아이템은 지급 직후 항상 LOCKED (backlog US-04 #2).
+            # 같은 요청을 24시간 뒤에 다시 보내도 첫 응답과 같아야 한다 (US-04 (실패·거절) 1번째)
+            items=[ItemRef(item_id=i.id, status=ItemStatus.LOCKED) for i in result.items],
             damage=DamageRead(
                 target_type=result.damage.target_type,
                 target_id=result.damage.target_id,

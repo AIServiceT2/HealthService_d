@@ -202,3 +202,24 @@ def test_us04_my_character_reads_exp_and_pending_at_same_time(client, db):
     # 지급 전 시점이든 후 시점이든 한 시점의 값이어야 한다
     assert exp in ({"confirmed": 0, "pending": 0}, {"confirmed": 0, "pending": 150})
     assert _my_character(client, headers)["exp"] == {"confirmed": 0, "pending": 150}
+
+
+def test_us04_same_grant_request_after_unlock_returns_first_result(client, db):
+    """24시간 뒤 잠금이 풀린 다음에 같은 지급 요청이 와도 첫 응답(아이템 LOCKED)과 같다 (US-04 (실패·거절))."""
+    from datetime import timedelta
+
+    from tests.submission_helpers import TEST_INTERNAL_TOKEN
+
+    submission_id, _ = approved_submission(client, db)
+    key = str(uuid.uuid4())
+    first = grant(client, submission_id, key).json()
+    ledger = db.get(RewardLedger, uuid.UUID(submission_id))
+    ledger.rewarded_at -= timedelta(hours=25)
+    db.commit()
+    released = client.post("/internal/reward-locks/release", headers={"X-Internal-Token": TEST_INTERNAL_TOKEN})
+    assert released.json()["releasedItems"] == 1
+
+    again = grant(client, submission_id, key).json()
+
+    assert again["applied"]["items"] == first["applied"]["items"]
+    assert [i["status"] for i in again["applied"]["items"]] == ["LOCKED"]
