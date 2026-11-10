@@ -22,3 +22,7 @@ DEMO_DUNGEON_ID = uuid.UUID("3d1f6c2a-5b7e-4c1a-9f0e-2a8b6d4c1e70")
 DUNGEONS: dict[uuid.UUID, Dungeon] = {
     DEMO_DUNGEON_ID: Dungeon(id=DEMO_DUNGEON_ID, name="초원 던전", enemy_name="고블린", enemy_hp_max=5000),
 }
+
+
+# 길드 주간 보스 최대 체력 (노션 API-046 예시 값) [가안·팀 확인 필요]
+GUILD_BOSS_HP_MAX = 50000

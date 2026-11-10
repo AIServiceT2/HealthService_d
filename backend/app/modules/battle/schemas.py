@@ -1,6 +1,8 @@
 """전투 API 입출력. JSON 키는 노션 API 명세서대로 camelCase."""
 
 import uuid
+from datetime import date
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 from pydantic.alias_generators import to_camel
@@ -27,6 +29,18 @@ class DungeonRead(_CamelModel):
     name: str
     enemy: EnemyRead
     my_progress: DungeonProgressRead
+
+
+class GuildBossRead(_CamelModel):
+    """API-046 응답 200: { bossId, status, hpMax, hp, guildTotalDamage, weekStart, weekEnd }."""
+
+    boss_id: uuid.UUID
+    status: Literal["ACTIVE", "DEFEATED"]
+    hp_max: int
+    hp: int
+    guild_total_damage: int
+    week_start: date
+    week_end: date
 
 
 class ErrorResponse(BaseModel):

@@ -1,6 +1,6 @@
 """battle API. 노션 '전운시 API 명세서' API-045·046.
 
-구현: API-045 던전 상태 조회. API-046은 경로만 있고 501을 돌려준다.
+구현: API-045 던전 상태 조회, API-046 길드 보스 상태 조회.
 """
 
 import uuid
@@ -10,11 +10,16 @@ from sqlalchemy.orm import Session
 
 from app.core.db import get_db
 from app.core.errors import AppError
-from app.core.stub import not_implemented
 from app.modules.auth.dependencies import get_current_user
 from app.modules.auth.models import User
 from app.modules.battle import service
-from app.modules.battle.schemas import DungeonProgressRead, DungeonRead, EnemyRead, ErrorResponse
+from app.modules.battle.schemas import (
+    DungeonProgressRead,
+    DungeonRead,
+    EnemyRead,
+    ErrorResponse,
+    GuildBossRead,
+)
 
 # 입력 오류는 전역 처리기가 400으로 돌려주므로 Swagger에 실제와 다른 422가 보이지 않게 4XX를 선언한다
 router = APIRouter(
@@ -59,8 +64,33 @@ def read_dungeon(
 @router.get(
     "/guilds/{guild_id}/boss",
     summary="[API-046] 길드 보스 상태 조회",
-    description="권한: GUILD_MEMBER",
-    status_code=501,
+    description=(
+        "권한: GUILD_MEMBER. 이번 주(월~일, KST) 보스. 없으면 처음 조회할 때 만든다 (가안 HP 50000). "
+        "hp = hpMax − guildTotalDamage, 0이면 DEFEATED. guildTotalDamage는 지금 길드 소속원이 이 보스를 "
+        "대상으로 지급받은 건의 피해 합계 (탈퇴한 사람 몫은 빠짐). 보스를 처음 조회할 때 만들므로 404는 나오지 않는다."
+    ),
+    response_model=GuildBossRead,
+    response_model_by_alias=True,
+    responses={
+        401: _UNAUTHENTICATED,
+        403: {"model": ErrorResponse, "description": "FORBIDDEN 길드 소속원만 조회할 수 있습니다."},
+    },
 )
-def api_046(guild_id: uuid.UUID) -> None:
-    not_implemented()
+def read_guild_boss(
+    guild_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        status = service.get_guild_boss_status(db, user.id, guild_id)
+    except service.NotGuildMember:
+        raise AppError(403, "FORBIDDEN", "길드 소속원만 조회할 수 있습니다.")
+    return GuildBossRead(
+        boss_id=status.boss.id,
+        status=status.status,
+        hp_max=status.boss.hp_max,
+        hp=status.hp,
+        guild_total_damage=status.guild_total_damage,
+        week_start=status.boss.week_start,
+        week_end=status.week_end,
+    )
