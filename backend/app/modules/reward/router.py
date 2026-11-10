@@ -1,25 +1,87 @@
-"""reward API. 노션 '전운시 API 명세서'의 MVP 필수 항목을 경로만 만든 것.
+"""reward API. 노션 '전운시 API 명세서' API-041~044.
 
-기능은 아직 없고 모두 501을 돌려준다. 입출력 형식은 명세 확정 후 schemas.py에 추가한다.
+구현: API-041 보상·피해 1회 반영. 나머지는 경로만 있고 501을 돌려준다.
+/internal API는 서버 내부 호출 전용 (X-Internal-Token, snapshot/internal.py).
 """
 
 import uuid
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, Header
+from sqlalchemy.orm import Session
 
+from app.core.db import get_db
+from app.core.errors import AppError
 from app.core.stub import not_implemented
+from app.modules.reward import service
+from app.modules.reward.schemas import (
+    AppliedRead,
+    DamageRead,
+    ErrorResponse,
+    GrantResponse,
+    ItemRef,
+)
+from app.modules.snapshot.internal import require_internal_token
 
-router = APIRouter(tags=["reward"])
+# 입력 오류는 전역 처리기가 400으로 돌려주므로 Swagger에 실제와 다른 422가 보이지 않게 4XX를 선언한다
+router = APIRouter(
+    tags=["reward"],
+    responses={"4XX": {"model": ErrorResponse, "description": "공통 에러 본문 { code, message, details }"}},
+)
+
+_INTERNAL_401 = {"model": ErrorResponse, "description": "UNAUTHENTICATED 서버 내부 호출 전용입니다."}
 
 
 @router.post(
     "/internal/submissions/{id}/grant",
     summary="[API-041] 보상·피해 1회 반영",
-    description="권한: SYSTEM",
-    status_code=501,
+    description=(
+        "권한: SYSTEM (서버 내부 호출 전용, X-Internal-Token). Idempotency-Key 필수. "
+        "스냅샷 값만큼 경험치·아이템을 한 트랜잭션으로 반영하고 APPROVED → REWARDED. "
+        "같은 키로 다시 부르면 첫 결과를 alreadyGranted: true로, 다른 키면 409 ALREADY_REWARDED. "
+        "아이템은 24시간 LOCKED. 캐릭터가 없으면 409 (명세에 없음, 제안). "
+        "임시: 피해는 던전·보스 모델이 없어 결과에만 담고, 능력치 경험치는 반영하지 않는다."
+    ),
+    response_model=GrantResponse,
+    response_model_by_alias=True,
+    responses={
+        401: _INTERNAL_401,
+        404: {"model": ErrorResponse, "description": "NOT_FOUND 제출건을 찾을 수 없습니다."},
+        409: {
+            "model": ErrorResponse,
+            "description": "INVALID_STATE APPROVED 상태가 아닙니다. / ALREADY_REWARDED 다른 요청으로 이미 지급되었습니다.",
+        },
+    },
+    dependencies=[Depends(require_internal_token)],
 )
-def api_041(id: uuid.UUID) -> None:
-    not_implemented()
+def grant(
+    id: uuid.UUID,
+    idempotency_key: uuid.UUID = Header(alias="Idempotency-Key"),
+    db: Session = Depends(get_db),
+):
+    try:
+        result = service.grant(db, id, idempotency_key)
+    except service.SubmissionNotFound:
+        raise AppError(404, "NOT_FOUND", "제출건을 찾을 수 없습니다.")
+    except service.AlreadyRewarded:
+        raise AppError(409, "ALREADY_REWARDED", "다른 요청으로 이미 지급되었습니다.")
+    except service.NotApproved:
+        raise AppError(409, "INVALID_STATE", "APPROVED 상태가 아닙니다.")
+    except service.NoCharacter:
+        raise AppError(409, "INVALID_STATE", "캐릭터가 없어 지급할 수 없습니다.", {"reason": "NO_CHARACTER"})
+    return GrantResponse(
+        submission_id=result.submission_id,
+        already_granted=result.already_granted,
+        applied=AppliedRead(
+            exp=result.exp,
+            items=[ItemRef(item_id=i.id, status=i.status) for i in result.items],
+            damage=DamageRead(
+                target_type=result.damage.target_type,
+                target_id=result.damage.target_id,
+                amount=result.damage.amount,
+            ),
+        ),
+        rewarded_at=result.rewarded_at,
+    )
 
 
 @router.post(
