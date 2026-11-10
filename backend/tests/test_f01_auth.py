@@ -319,3 +319,17 @@ def test_f01_api005_me_is_guild_leader_for_leader_only(client):
 
     assert client.get("/me", headers=leader_headers).json()["isGuildLeader"] is True
     assert client.get("/me", headers=member_headers).json()["isGuildLeader"] is False
+
+
+def test_f01_api001_concurrent_duplicate_email_is_400_not_500(client, monkeypatch):
+    """같은 이메일 가입이 동시에 와서 중복 검사를 둘 다 통과해도 500이 아니라 400 (유니크 제약)."""
+    from app.modules.auth import service
+
+    assert _signup(client).status_code == 201
+    # 두 번째 요청이 첫 요청의 커밋 전에 중복 검사를 지나간 상황을 만든다
+    monkeypatch.setattr(service, "_email_taken", lambda db, email: False)
+
+    res = _signup(client)
+
+    assert res.status_code == 400
+    assert res.json()["details"] == {"reason": "EMAIL_ALREADY_USED"}

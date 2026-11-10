@@ -10,6 +10,7 @@ from zoneinfo import ZoneInfo
 
 import jwt
 from sqlalchemy import select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import ACCESS_TOKEN_TTL_SECONDS, REFRESH_TOKEN_TTL_SECONDS, jwt_secret
@@ -52,13 +53,17 @@ def _validation_failed(reason: str) -> AppError:
     return AppError(400, "VALIDATION_FAILED", "입력값이 올바르지 않습니다.", {"reason": reason})
 
 
+def _email_taken(db: Session, email: str) -> bool:
+    return db.scalar(select(User.id).where(User.email == email)) is not None
+
+
 def signup(db: Session, req: SignupRequest, today: date | None = None) -> User:
     today = today or datetime.now(KST).date()
     if _age_on(req.birth_date, today) < MIN_SIGNUP_AGE:
         raise _validation_failed("UNDER_MIN_AGE")
 
     email = req.email.strip().lower()
-    if db.scalar(select(User.id).where(User.email == email)) is not None:
+    if _email_taken(db, email):
         raise _validation_failed("EMAIL_ALREADY_USED")
 
     user = User(
@@ -69,7 +74,12 @@ def signup(db: Session, req: SignupRequest, today: date | None = None) -> User:
         birth_date=req.birth_date,
     )
     db.add(user)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # 같은 이메일 가입이 동시에 와서 위 검사를 둘 다 통과한 경우. email 유니크 제약이 하나만 남긴다
+        db.rollback()
+        raise _validation_failed("EMAIL_ALREADY_USED") from None
     return user
 
 
