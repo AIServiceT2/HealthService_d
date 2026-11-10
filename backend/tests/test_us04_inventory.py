@@ -67,3 +67,30 @@ def test_us04_inventory_without_token_is_401(client):
 
     assert res.status_code == 401
     assert res.json()["code"] == "UNAUTHENTICATED"
+
+
+def test_us04_after_24h_item_shows_unlocked_without_batch_and_matches_character(client, db):
+    """해제 배치(API-042)를 안 돌려도 24시간이 지나면 아이템은 UNLOCKED로 보이고,
+    캐릭터의 lockedItemCount·exp.pending과 서로 맞는다 (US-04 (정상) 2번째)."""
+    import uuid as _uuid
+    from datetime import timedelta
+
+    from app.modules.reward.models import RewardLedger
+    from tests.reward_helpers import approved_submission, grant
+
+    submission_id, headers = approved_submission(client, db)
+    grant(client, submission_id)
+    me = client.get("/characters/me", headers=headers).json()
+    assert me["lockedItemCount"] == 1 and me["exp"]["pending"] == 150
+    assert [i["status"] for i in client.get("/me/inventory", headers=headers).json()["items"]] == ["LOCKED"]
+
+    db.get(RewardLedger, _uuid.UUID(submission_id)).rewarded_at -= timedelta(hours=24, seconds=1)
+    db.commit()
+
+    me = client.get("/characters/me", headers=headers).json()
+    assert me["lockedItemCount"] == 0
+    assert me["exp"] == {"confirmed": 150, "pending": 0}
+    assert [i["status"] for i in client.get("/me/inventory", headers=headers).json()["items"]] == ["UNLOCKED"]
+    assert [i["status"] for i in client.get("/me/rewards", headers=headers).json()["items"][0]["items"]] == ["UNLOCKED"]
+    drops = client.get(f"/submissions/{submission_id}/result", headers=headers).json()["card"]["drops"]
+    assert [d["status"] for d in drops] == ["UNLOCKED"]

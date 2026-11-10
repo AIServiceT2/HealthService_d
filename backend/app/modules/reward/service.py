@@ -159,6 +159,22 @@ def release_locks(db: Session, now: datetime | None = None) -> ReleaseResult:
     return ReleaseResult(released_items=result.rowcount, confirmed_stats=0)
 
 
+# ---- 아이템 잠금 상태 (API-007·043·044·047 공통) ----
+
+
+def item_status(item: Item, rewarded_at: datetime, now: datetime | None = None) -> str:
+    """보여 줄 아이템 상태. 지급 뒤 24시간이 지났으면 해제 배치(API-042)를 아직 안 돌렸어도 UNLOCKED.
+
+    경험치 '확정 대기'(pending_exp_subquery)도 시각으로 계산하므로, 아이템도 같은 기준으로 보여 줘야
+    배치를 돌리기 전에 경험치는 확정·아이템은 잠김으로 어긋나지 않는다 (backlog US-04 (정상) 2번째).
+    경계는 release_locks와 같다(지급 + 24시간 '이후', 같은 시각 포함).
+    """
+    now = now or datetime.now(UTC)
+    if item.status == ItemStatus.UNLOCKED or rewarded_at <= now - PROTECTION_PERIOD:
+        return ItemStatus.UNLOCKED
+    return ItemStatus.LOCKED
+
+
 # ---- 내 지급 내역 (노션 API-043) ----
 
 
@@ -248,6 +264,7 @@ def list_my_rewards(db: Session, user_id: uuid.UUID, cursor: str | None, limit: 
 class InventoryItem:
     item: Item
     unlock_at: datetime
+    status: str
 
 
 def my_inventory(db: Session, user_id: uuid.UUID) -> list[InventoryItem]:
@@ -262,7 +279,11 @@ def my_inventory(db: Session, user_id: uuid.UUID) -> list[InventoryItem]:
         .where(Item.user_id == user_id)
         .order_by(RewardLedger.rewarded_at.desc(), Item.submission_id.desc(), Item.id)
     ).all()
-    return [InventoryItem(item, rewarded_at + PROTECTION_PERIOD) for item, rewarded_at in rows]
+    now = datetime.now(UTC)
+    return [
+        InventoryItem(item, rewarded_at + PROTECTION_PERIOD, item_status(item, rewarded_at, now))
+        for item, rewarded_at in rows
+    ]
 
 
 # ---- 다른 모듈용 (API-007 내 캐릭터·성장 조회) ----
@@ -285,10 +306,17 @@ def pending_exp_subquery(user_id: uuid.UUID, now: datetime | None = None):
     )
 
 
-def locked_item_count_subquery(user_id: uuid.UUID):
+def locked_item_count_subquery(user_id: uuid.UUID, now: datetime | None = None):
+    """잠긴 아이템 수. 지급 뒤 24시간이 안 지났고 아직 해제되지 않은 것만 센다 (item_status와 같은 기준)."""
+    now = now or datetime.now(UTC)
     return (
         select(func.count())
         .select_from(Item)
-        .where(Item.user_id == user_id, Item.status == ItemStatus.LOCKED)
+        .join(RewardLedger, RewardLedger.submission_id == Item.submission_id)
+        .where(
+            Item.user_id == user_id,
+            Item.status == ItemStatus.LOCKED,
+            RewardLedger.rewarded_at > now - PROTECTION_PERIOD,
+        )
         .scalar_subquery()
     )

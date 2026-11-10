@@ -1,6 +1,7 @@
 """캐릭터 규칙. 다른 모듈은 이 파일의 함수로만 캐릭터를 다룬다."""
 
 import uuid
+from datetime import UTC, datetime
 from dataclasses import dataclass
 
 from sqlalchemy import select
@@ -73,11 +74,13 @@ def get_my_character_growth(db: Session, user_id: uuid.UUID) -> CharacterGrowth:
     # reward 모듈이 character 모델을 쓰므로 순환 import를 피하려고 함수 안에서 가져온다
     from app.modules.reward import service as reward_service
 
+    # 확정 대기 경험치와 잠긴 아이템 수를 같은 시각 기준으로 센다 (24시간 경계에서 서로 어긋나지 않게)
+    now = datetime.now(UTC)
     row = db.execute(
         select(
             Character,
-            reward_service.pending_exp_subquery(user_id).label("pending"),
-            reward_service.locked_item_count_subquery(user_id).label("locked"),
+            reward_service.pending_exp_subquery(user_id, now).label("pending"),
+            reward_service.locked_item_count_subquery(user_id, now).label("locked"),
         )
         .where(Character.user_id == user_id)
         # 같은 세션에 이미 읽어 둔 Character가 있어도 이 문장의 값으로 채워 pending과 시점을 맞춘다

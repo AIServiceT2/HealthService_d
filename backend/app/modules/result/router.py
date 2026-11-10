@@ -13,6 +13,7 @@ from app.core.errors import AppError
 from app.modules.auth.dependencies import get_current_user
 from app.modules.auth.models import User
 from app.modules.result import service
+from app.modules.reward import service as reward_service
 from app.modules.result.schemas import (
     CardRead,
     DropRead,
@@ -81,7 +82,10 @@ def read_result(
             hit_count=card.snapshot.hit_count,
             exp=card.snapshot.exp,
             total_damage=card.snapshot.total_damage,
-            drops=[DropRead(item_id=i.id, status=i.status) for i in card.drops],
+            drops=[
+                DropRead(item_id=i.id, status=reward_service.item_status(i, card.rewarded_at))
+                for i in card.drops
+            ],
             rewarded_at=card.rewarded_at,
             daily_cap_exceeded=card.daily_cap_exceeded,
         ),

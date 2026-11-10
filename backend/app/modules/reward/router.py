@@ -144,7 +144,7 @@ def list_my_rewards(
             RewardEntryRead(
                 submission_id=e.submission_id,
                 exp=e.exp,
-                items=[ItemRef(item_id=i.id, status=i.status) for i in e.items],
+                items=[ItemRef(item_id=i.id, status=service.item_status(i, e.rewarded_at)) for i in e.items],
                 damage=e.damage,
                 rewarded_at=e.rewarded_at,
                 protection_ends_at=e.protection_ends_at,
@@ -177,7 +177,7 @@ def my_inventory(
             InventoryItemRead(
                 item_id=i.item.id,
                 submission_id=i.item.submission_id,
-                status=i.item.status,
+                status=i.status,
                 unlock_at=i.unlock_at,
             )
             for i in service.my_inventory(db, user.id)
