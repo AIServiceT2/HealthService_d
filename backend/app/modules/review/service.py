@@ -328,3 +328,45 @@ def review_material(db: Session, reviewer_id: uuid.UUID, submission_id: uuid.UUI
     _assigned_review(db, reviewer_id, submission_id)
     submission = db.get(WorkoutSubmission, submission_id)
     return Material(submission, db.get(User, submission.user_id), _share_content(submission))
+
+
+# ---- 확인자 승인 (API-038) ----
+
+
+def _lock_for_reviewer(
+    db: Session, reviewer_id: uuid.UUID, submission_id: uuid.UUID, expected_version: int
+) -> tuple[WorkoutSubmission, ReviewRequest]:
+    """제출건 행을 잠근 뒤 확인자·version·상태를 검사한다 (승인·반려 공통).
+
+    검사 순서: 확인 요청 없음 404 → 요청받은 확인자 아님 403 → version 412 → PENDING_REVIEW 아님 409.
+    신청자 본인은 확인자가 될 수 없으므로(API-035) 403에서 막힌다.
+    """
+    try:
+        submission = _lock_submission(db, submission_id)
+    except SubmissionNotFound:
+        raise ReviewNotFound(str(submission_id)) from None
+    review = _assigned_review(db, reviewer_id, submission_id)
+    if submission.version != expected_version:
+        raise VersionMismatch(submission.version)
+    if submission.status != SubmissionStatus.PENDING_REVIEW:
+        raise InvalidState(submission.status)
+    return submission, review
+
+
+def approve_review(
+    db: Session, reviewer_id: uuid.UUID, submission_id: uuid.UUID, expected_version: int
+) -> WorkoutSubmission:
+    """PENDING_REVIEW → APPROVED(REVIEWER) (노션 API-038, backlog US-07).
+
+    취소(API-030)와 같은 행을 잠그고 version을 비교하므로 동시에 와도 하나만 성공한다.
+    """
+    try:
+        submission, _ = _lock_for_reviewer(db, reviewer_id, submission_id, expected_version)
+        submission.status = SubmissionStatus.APPROVED
+        submission.approval_path = "REVIEWER"
+        submission.version += 1
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    return submission

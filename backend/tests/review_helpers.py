@@ -77,3 +77,10 @@ def pending_review(client, *, confidence: float = 0.82):
     res = request_review(client, sid, member_headers, leader_id)
     assert res.status_code == 201, res.json()
     return sid, member_headers, leader_id, leader_headers
+
+
+def approve(client, submission_id: str, reviewer_headers, version: int):
+    """확인자 승인 (API-038)."""
+    return client.post(
+        f"/review-requests/{submission_id}/approve", headers=reviewer_headers | {"If-Match": f'"{version}"'}
+    )

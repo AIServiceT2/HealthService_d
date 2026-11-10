@@ -116,3 +116,13 @@ class ReviewMaterial(_CamelModel):
     summary: str | None
     anomalies: list[Anomaly]
     pain_notice: str | None
+
+
+# ---- API-038 확인자 승인 ----
+
+
+class ReviewApproved(_CamelModel):
+    submission_id: uuid.UUID
+    submission_status: str
+    approval_path: str
+    version: int

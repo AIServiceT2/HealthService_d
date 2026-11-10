@@ -27,6 +27,7 @@ from app.modules.review.schemas import (
     RequesterNickname,
     RequesterRead,
     ReviewMaterial,
+    ReviewApproved,
     ReviewerRead,
     ReviewRequestCreate,
     ReviewRequestCreated,
@@ -252,11 +253,32 @@ def api_037(
 @router.post(
     "/review-requests/{id}/approve",
     summary="[API-038] 확인자 승인",
-    description="권한: REVIEWER",
-    status_code=501,
+    description=(
+        "권한: REVIEWER(요청받은 확인자만). If-Match 필수(제출건 version). PENDING_REVIEW → APPROVED(REVIEWER). "
+        "취소와 동시에 오면 하나만 성공. 취소됐거나 이미 처리됐으면 409, version 불일치 412"
+    ),
+    response_model=ReviewApproved,
 )
-def api_038(id: uuid.UUID) -> None:
-    not_implemented()
+def api_038(
+    id: uuid.UUID,
+    if_match: str = Header(alias="If-Match"),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ReviewApproved:
+    expected_version = _parse_if_match(if_match)
+    try:
+        s = service.approve_review(db, user.id, id, expected_version)
+    except service.ReviewNotFound:
+        raise AppError(404, "NOT_FOUND", "확인 요청을 찾을 수 없습니다.")
+    except service.NotReviewer:
+        raise AppError(403, "FORBIDDEN", "요청받은 확인자만 승인할 수 있습니다.")
+    except service.VersionMismatch as e:
+        raise _concurrent_update(e.args[0])
+    except service.InvalidState:
+        raise AppError(409, "INVALID_STATE", "취소되었거나 이미 처리된 요청입니다.")
+    return ReviewApproved(
+        submission_id=s.id, submission_status=s.status, approval_path=s.approval_path, version=s.version
+    )
 
 
 @router.post(
