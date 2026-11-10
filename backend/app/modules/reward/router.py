@@ -1,17 +1,20 @@
 """reward API. 노션 '전운시 API 명세서' API-041~044.
 
-구현: API-041 보상·피해 1회 반영, API-042 24시간 잠금 해제. 나머지는 경로만 있고 501을 돌려준다.
+구현: API-041 보상·피해 1회 반영, API-042 24시간 잠금 해제,
+API-043 내 지급 내역. 나머지는 경로만 있고 501을 돌려준다.
 /internal API는 서버 내부 호출 전용 (X-Internal-Token, snapshot/internal.py).
 """
 
 import uuid
 
-from fastapi import APIRouter, Body, Depends, Header
+from fastapi import APIRouter, Body, Depends, Header, Query
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
 from app.core.errors import AppError
 from app.core.stub import not_implemented
+from app.modules.auth.dependencies import get_current_user
+from app.modules.auth.models import User
 from app.modules.reward import service
 from app.modules.reward.schemas import (
     AppliedRead,
@@ -21,6 +24,8 @@ from app.modules.reward.schemas import (
     ItemRef,
     ReleaseRequest,
     ReleaseResponse,
+    RewardEntryRead,
+    RewardList,
 )
 from app.modules.snapshot.internal import require_internal_token
 
@@ -110,11 +115,41 @@ def release_locks(
 @router.get(
     "/me/rewards",
     summary="[API-043] 내 지급 내역",
-    description="권한: PLAYER",
-    status_code=501,
+    description=(
+        "권한: PLAYER. 본인 지급 내역만, 최신 지급순(정렬은 제안). 수치는 스냅샷 값, "
+        "protectionEndsAt = rewardedAt + 24시간. cursor는 앞 응답의 nextCursor, limit 기본 20·최대 50."
+    ),
+    response_model=RewardList,
+    response_model_by_alias=True,
+    responses={
+        400: {"model": ErrorResponse, "description": "VALIDATION_FAILED 입력값이 올바르지 않습니다. (limit·cursor)"},
+        401: {"model": ErrorResponse, "description": "UNAUTHENTICATED Bearer 토큰이 필요하거나 유효하지 않습니다."},
+    },
 )
-def api_043() -> None:
-    not_implemented()
+def list_my_rewards(
+    cursor: str | None = Query(default=None, description="다음 페이지 커서"),
+    limit: int = Query(default=20, ge=1, le=50, description="기본 20, 최대 50"),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        page = service.list_my_rewards(db, user.id, cursor, limit)
+    except service.InvalidCursor:
+        raise AppError(400, "VALIDATION_FAILED", "입력값이 올바르지 않습니다.", {"reason": "INVALID_CURSOR"})
+    return RewardList(
+        items=[
+            RewardEntryRead(
+                submission_id=e.submission_id,
+                exp=e.exp,
+                items=[ItemRef(item_id=i.id, status=i.status) for i in e.items],
+                damage=e.damage,
+                rewarded_at=e.rewarded_at,
+                protection_ends_at=e.protection_ends_at,
+            )
+            for e in page.items
+        ],
+        next_cursor=page.next_cursor,
+    )
 
 
 @router.get(

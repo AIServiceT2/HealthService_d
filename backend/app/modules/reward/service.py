@@ -1,10 +1,11 @@
 """지급 규칙. 다른 모듈은 이 파일의 함수로만 지급 내역·아이템을 다룬다."""
 
+import base64
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
-from sqlalchemy import func, select, update
+from sqlalchemy import func, select, tuple_, update
 from sqlalchemy.orm import Session
 
 from app.modules.character.models import Character
@@ -156,6 +157,88 @@ def release_locks(db: Session, now: datetime | None = None) -> ReleaseResult:
         db.rollback()
         raise
     return ReleaseResult(released_items=result.rowcount, confirmed_stats=0)
+
+
+# ---- 내 지급 내역 (노션 API-043) ----
+
+
+class InvalidCursor(Exception):
+    pass
+
+
+@dataclass(frozen=True)
+class RewardEntry:
+    submission_id: uuid.UUID
+    exp: int
+    items: list[Item]
+    damage: int
+    rewarded_at: datetime
+
+    @property
+    def protection_ends_at(self) -> datetime:
+        return self.rewarded_at + PROTECTION_PERIOD
+
+
+@dataclass(frozen=True)
+class RewardPage:
+    items: list[RewardEntry]
+    next_cursor: str | None
+
+
+# 커서: 마지막 항목의 (rewarded_at, submission_id)를 base64url로 감싼 값
+def _encode_cursor(entry: RewardEntry) -> str:
+    raw = f"{entry.rewarded_at.isoformat()}|{entry.submission_id}"
+    return base64.urlsafe_b64encode(raw.encode()).decode()
+
+
+def _decode_cursor(cursor: str) -> tuple[datetime, uuid.UUID]:
+    try:
+        at_text, id_text = base64.urlsafe_b64decode(cursor.encode()).decode().split("|")
+        at = datetime.fromisoformat(at_text)
+        if at.tzinfo is None:
+            raise ValueError(at_text)
+        return at, uuid.UUID(id_text)
+    except ValueError:
+        raise InvalidCursor(cursor) from None
+
+
+def list_my_rewards(db: Session, user_id: uuid.UUID, cursor: str | None, limit: int) -> RewardPage:
+    """본인 지급 내역만, 최신 지급순(rewarded_at 내림차순, 같으면 제출 ID) (노션 API-043).
+
+    수치는 스냅샷 값이다 (지급 내역에는 시각만 저장, 노션 DB 11절). 정렬은 명세에 없어 최신순 [제안].
+    """
+    query = (
+        select(RewardLedger, SubmissionSnapshot)
+        .join(WorkoutSubmission, WorkoutSubmission.id == RewardLedger.submission_id)
+        .join(SubmissionSnapshot, SubmissionSnapshot.submission_id == RewardLedger.submission_id)
+        .where(WorkoutSubmission.user_id == user_id)
+    )
+    if cursor is not None:
+        after_at, after_id = _decode_cursor(cursor)
+        query = query.where(
+            tuple_(RewardLedger.rewarded_at, RewardLedger.submission_id) < tuple_(after_at, after_id)
+        )
+    rows = db.execute(
+        query.order_by(RewardLedger.rewarded_at.desc(), RewardLedger.submission_id.desc()).limit(limit + 1)
+    ).all()
+    page, more = rows[:limit], len(rows) > limit
+
+    ids = [ledger.submission_id for ledger, _ in page]
+    items_by_submission: dict[uuid.UUID, list[Item]] = {i: [] for i in ids}
+    if ids:
+        for item in db.scalars(select(Item).where(Item.submission_id.in_(ids)).order_by(Item.id)):
+            items_by_submission[item.submission_id].append(item)
+    entries = [
+        RewardEntry(
+            submission_id=ledger.submission_id,
+            exp=snapshot.exp,
+            items=items_by_submission[ledger.submission_id],
+            damage=snapshot.total_damage,
+            rewarded_at=ledger.rewarded_at,
+        )
+        for ledger, snapshot in page
+    ]
+    return RewardPage(entries, _encode_cursor(entries[-1]) if more else None)
 
 
 # ---- 다른 모듈용 (API-007 내 캐릭터·성장 조회) ----

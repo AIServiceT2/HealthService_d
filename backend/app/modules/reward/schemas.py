@@ -54,6 +54,25 @@ class ReleaseResponse(_CamelModel):
     confirmed_stats: int
 
 
+class RewardEntryRead(_CamelModel):
+    """API-043 항목: { submissionId, exp, items, damage, rewardedAt, protectionEndsAt }."""
+
+    submission_id: uuid.UUID
+    exp: int
+    items: list[ItemRef]
+    damage: int
+    rewarded_at: datetime
+    # rewardedAt + 24시간으로 계산한 값
+    protection_ends_at: datetime
+
+
+class RewardList(_CamelModel):
+    """API-043 응답 200: { items, nextCursor }. nextCursor null이면 마지막 쪽."""
+
+    items: list[RewardEntryRead]
+    next_cursor: str | None
+
+
 class ErrorResponse(BaseModel):
     """노션 API 명세서 공통 에러 본문: { code, message, details }."""
 
