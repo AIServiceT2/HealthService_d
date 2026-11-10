@@ -67,9 +67,9 @@
 | 2절 #2, #4~#7 (스냅샷 전체, LLM, 권한) | 미정 | 미정 |
 | 3절 실행 확인 (강준석·성민규·손범수·이시은) | 각 본인 | 미정 |
 | 화면에서 기능 확인 (폰에서 직접 열어 보기) | 김지은 | 미정 |
-| API 경로·`snapshot.hit_count` 키를 API.md에 확정 (지금은 코드에만 '제안'으로 있음) | PM, 개발자1·2 합의 | 미정 |
+| API 경로·`snapshot.hit_count` 키를 API.md에 확정 (지금은 코드에만 '제안'으로 있음) → **2026-11-10 반영:** `API.md` '항목 1'에 노션 API-031·032 기준으로 적음. 경로가 `POST /internal/submissions/{id}/snapshot`·`GET /submissions/{id}/reward-preview`로 바뀌었고(2절 #1의 `/prepare`는 지금 코드에 없음), 타격 수 키는 `hitCount` (테이블 `submission_snapshot.hit_count`) | PM, 개발자1·2 합의 | 반영함 (개발자1·2 확인 필요) |
 | 확인된 실행·테스트 명령을 CLAUDE.md·README에 반영 | 테크리더 | 미정 |
-| 테스트 DB를 개발 DB와 분리할지, 앱 테스트 도구(STACK.md Jest vs `tsx --test`) | 테크리더 | 미정 |
+| 테스트 DB를 개발 DB와 분리할지, 앱 테스트 도구(STACK.md Jest vs `tsx --test`) → **테스트 DB는 2026-11-10 분리함** (PR #133: docker-compose `db-test` 55432, `TEST_DATABASE_URL`). 앱 테스트 도구는 미정 | 테크리더 | 테스트 DB 반영함, 앱 테스트 도구 미정 |
 
 **임시 응답을 쓴 곳** (서버가 병합된 뒤 실제 주소로 바꿨는지)
 
