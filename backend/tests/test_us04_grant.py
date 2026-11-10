@@ -170,3 +170,35 @@ def test_us04_player_cannot_grant(client, db):
 
 def test_us04_unknown_submission_is_404(client):
     assert grant(client, str(uuid.uuid4())).status_code == 404
+
+
+def test_us04_my_character_reads_exp_and_pending_at_same_time(client, db):
+    """API-007이 캐릭터를 읽은 직후 다른 요청의 지급이 커밋돼도 confirmed가 음수가 되지 않는다.
+
+    검토에서 재현한 문제의 회귀 테스트: 경험치와 확정 대기 경험치를 따로 읽던 때는 {-150, 150}이 나왔다.
+    캐릭터를 읽는 SQL이 끝난 직후(같은 요청의 다음 SQL 전)에 다른 연결로 지급을 커밋해 그 상황을 만든다.
+    """
+    from sqlalchemy import event
+
+    from app.core.db import engine
+
+    submission_id, headers = approved_submission(client, db)
+    state = {"done": False}
+
+    def grant_right_after_character_read(conn, cursor, statement, params, context, executemany):
+        if state["done"] or not statement.lstrip().upper().startswith("SELECT") or "FROM character" not in statement:
+            return
+        state["done"] = True
+        assert grant(TestClient(app), submission_id).status_code == 200
+
+    event.listen(engine, "after_cursor_execute", grant_right_after_character_read)
+    try:
+        exp = _my_character(client, headers)["exp"]
+    finally:
+        event.remove(engine, "after_cursor_execute", grant_right_after_character_read)
+
+    assert state["done"]
+    assert exp["confirmed"] >= 0
+    # 지급 전 시점이든 후 시점이든 한 시점의 값이어야 한다
+    assert exp in ({"confirmed": 0, "pending": 0}, {"confirmed": 0, "pending": 150})
+    assert _my_character(client, headers)["exp"] == {"confirmed": 0, "pending": 150}

@@ -266,12 +266,14 @@ def my_inventory(db: Session, user_id: uuid.UUID) -> list[InventoryItem]:
 
 
 # ---- 다른 모듈용 (API-007 내 캐릭터·성장 조회) ----
+# 캐릭터 조회가 경험치와 같은 SQL 한 문장에 넣을 수 있게 '값'이 아니라 스칼라 하위 쿼리로 돌려준다.
+# 따로 읽으면 그 사이에 지급이 커밋될 때 confirmed(= exp - pending)가 음수가 된다 (검토에서 재현).
 
 
-def pending_exp(db: Session, user_id: uuid.UUID, now: datetime | None = None) -> int:
+def pending_exp_subquery(user_id: uuid.UUID, now: datetime | None = None):
     """지급 뒤 보호 기간(24시간)이 아직 안 지난 경험치 합계 = '확정 대기' 경험치."""
     now = now or datetime.now(UTC)
-    total = db.scalar(
+    return (
         select(func.coalesce(func.sum(SubmissionSnapshot.exp), 0))
         .join(RewardLedger, RewardLedger.submission_id == SubmissionSnapshot.submission_id)
         .join(WorkoutSubmission, WorkoutSubmission.id == SubmissionSnapshot.submission_id)
@@ -279,15 +281,14 @@ def pending_exp(db: Session, user_id: uuid.UUID, now: datetime | None = None) ->
             WorkoutSubmission.user_id == user_id,
             RewardLedger.rewarded_at > now - PROTECTION_PERIOD,
         )
+        .scalar_subquery()
     )
-    return int(total)
 
 
-def locked_item_count(db: Session, user_id: uuid.UUID) -> int:
-    return int(
-        db.scalar(
-            select(func.count())
-            .select_from(Item)
-            .where(Item.user_id == user_id, Item.status == ItemStatus.LOCKED)
-        )
+def locked_item_count_subquery(user_id: uuid.UUID):
+    return (
+        select(func.count())
+        .select_from(Item)
+        .where(Item.user_id == user_id, Item.status == ItemStatus.LOCKED)
+        .scalar_subquery()
     )
