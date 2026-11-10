@@ -15,7 +15,7 @@ from rep_engine.config import EngineConfig, SquatCfg
 from rep_engine.counters.base import ExerciseCounter, register_counter
 from rep_engine.features.extractor import FrameFeatures
 from rep_engine.rounding import r_angle, r_opt_angle, r_opt_ratio, r_ratio
-from rep_engine.schemas import RepEvent, RepReason
+from rep_engine.schemas import AnyRepEvent, RepEvent, RepReason
 
 STANDING = "STANDING"
 DESCENDING = "DESCENDING"
@@ -23,7 +23,7 @@ ASCENDING = "ASCENDING"
 WAIT_STAND = "WAIT_STAND"
 
 
-class SquatCounter(ExerciseCounter):
+class SquatCounter(ExerciseCounter[FrameFeatures]):
     """스쿼트 판정기."""
 
     def __init__(self, cfg: SquatCfg) -> None:
@@ -92,7 +92,7 @@ class SquatCounter(ExerciseCounter):
 
     def _close(
         self, end_t: int, out_of_frame: bool, require_attempt: bool = True
-    ) -> list[RepEvent]:
+    ) -> list[AnyRepEvent]:
         """렙을 끝낸다. 시도 각도에 못 미쳤으면(require_attempt) 아무것도 기록하지 않는다."""
         c = self._cfg
         if require_attempt and self._min_angle >= c.attempt_angle:
@@ -127,7 +127,7 @@ class SquatCounter(ExerciseCounter):
         ]
 
     # --- 공개 ----------------------------------------------------------------
-    def update(self, features: FrameFeatures) -> list[RepEvent]:
+    def update(self, features: FrameFeatures) -> list[AnyRepEvent]:
         """프레임 1개 처리. 이번 프레임에서 끝난 렙(0~1개)을 돌려준다."""
         c = self._cfg
         f = features
@@ -141,7 +141,7 @@ class SquatCounter(ExerciseCounter):
             return []
 
         if self._state == WAIT_STAND:
-            events: list[RepEvent] = []
+            events: list[AnyRepEvent] = []
             if angle is not None and self._pending_oof:
                 # 하강 중 화면 밖으로 나갔다가 시도 각도 아래로 앉은 채 다시 나타남 → 가려진 렙
                 self._pending_oof = False

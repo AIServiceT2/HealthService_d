@@ -259,4 +259,4 @@ def test_registry(cfg: EngineConfig) -> None:
     assert "SQUAT" in registered_exercises()
     assert isinstance(make_counter("SQUAT", cfg), SquatCounter)
     with pytest.raises(KeyError):
-        make_counter("PUSHUP", cfg)
+        make_counter("PLANK", cfg)

@@ -4,13 +4,16 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable
+from typing import Any, Generic, TypeVar
 
 from rep_engine.config import EngineConfig
-from rep_engine.features.extractor import FrameFeatures
-from rep_engine.schemas import RepEvent
+from rep_engine.schemas import AnyRepEvent
+
+#: 판정기가 받는 프레임 특징 (스쿼트: FrameFeatures, 푸시업·윗몸 일으키기: ChainFeatures)
+F_contra = TypeVar("F_contra", contravariant=True)
 
 
-class ExerciseCounter(ABC):
+class ExerciseCounter(ABC, Generic[F_contra]):
     """종목별 렙 판정기.
 
     스트리밍: 프레임 특징을 시각 순서대로 `update`에 넣으면 그 프레임에서 끝난 렙을 돌려준다.
@@ -18,7 +21,7 @@ class ExerciseCounter(ABC):
     """
 
     @abstractmethod
-    def update(self, features: FrameFeatures) -> list[RepEvent]:
+    def update(self, features: F_contra) -> list[AnyRepEvent]:
         """프레임 하나를 처리하고, 이번 프레임에서 확정된 렙 목록을 돌려준다."""
 
     @property
@@ -36,15 +39,15 @@ class ExerciseCounter(ABC):
     def accepted_count(self) -> int:
         """지금까지 인정된 렙 수."""
 
-    def run(self, features: Iterable[FrameFeatures]) -> list[RepEvent]:
+    def run(self, features: Iterable[F_contra]) -> list[AnyRepEvent]:
         """배치 처리 = 스트리밍 반복."""
-        events: list[RepEvent] = []
+        events: list[AnyRepEvent] = []
         for f in features:
             events.extend(self.update(f))
         return events
 
 
-CounterFactory = Callable[[EngineConfig], ExerciseCounter]
+CounterFactory = Callable[[EngineConfig], ExerciseCounter[Any]]
 _REGISTRY: dict[str, CounterFactory] = {}
 
 
@@ -53,7 +56,7 @@ def register_counter(exercise_type: str, factory: CounterFactory) -> None:
     _REGISTRY[exercise_type] = factory
 
 
-def make_counter(exercise_type: str, cfg: EngineConfig) -> ExerciseCounter:
+def make_counter(exercise_type: str, cfg: EngineConfig) -> ExerciseCounter[Any]:
     """등록된 판정기를 만든다. 없으면 KeyError."""
     if exercise_type not in _REGISTRY:
         raise KeyError(f"등록되지 않은 종목: {exercise_type}")

@@ -16,6 +16,7 @@ from rep_engine.rounding import r_ratio
 from rep_engine.schemas import (
     Anomaly,
     AnomalyCode,
+    AnyRepEvent,
     ApprovalDecision,
     ApprovalEvidence,
     ApprovalReason,
@@ -23,7 +24,6 @@ from rep_engine.schemas import (
     ClientSubmission,
     LivenessStatus,
     RecountComparison,
-    RepEvent,
     SessionResult,
     Severity,
 )
@@ -37,7 +37,7 @@ def interval_iou(a0: int, a1: int, b0: int, b1: int) -> float:
 
 
 def match_reps(
-    server: Sequence[RepEvent], client: Sequence[ClientRep], min_iou: float
+    server: Sequence[AnyRepEvent], client: Sequence[ClientRep], min_iou: float
 ) -> list[tuple[int, int]]:
     """서버·클라이언트 렙을 시간 겹침으로 1:1 매칭한다 (결정적 탐욕 매칭).
 

@@ -32,6 +32,10 @@ class UnknownModelError(ChunkValidationError):
     """device.modelVersion에 맞는 어댑터가 없을 때."""
 
 
+class UnsupportedExerciseError(ChunkValidationError):
+    """요청한 catalogVersion에 meta.exerciseType의 판정 기준이 없을 때 (요청 문제라 400)."""
+
+
 class ConfigError(EngineError):
     """카탈로그 설정 파일 누락·검증 실패."""
 

@@ -14,26 +14,25 @@ from __future__ import annotations
 import math
 from collections.abc import Iterable, Sequence
 from pathlib import Path
+from typing import Any
 
 from rep_engine import ENGINE_VERSION
 from rep_engine.adapters import PoseAdapter, SkeletonFrame, adapter_for_model_version
 from rep_engine.anomaly import detect_anomalies
 from rep_engine.confidence import compute_confidence
 from rep_engine.config import Catalog, EngineConfig, load_catalog
-from rep_engine.counters import base as counters
 from rep_engine.errors import ConfigError
-from rep_engine.features.extractor import FeatureExtractor, FrameFeatures
+from rep_engine.exercises import make_kit
 from rep_engine.liveness import LivenessEvaluator
 from rep_engine.schemas import (
+    AnyRepEvent,
     Chunk,
     Frame,
     LivenessResult,
     LivenessStatus,
-    RepEvent,
     SessionMeta,
     SessionResult,
 )
-from rep_engine.summary import pose_summary
 from rep_engine.validation import assemble_frames
 
 
@@ -50,8 +49,9 @@ class SessionRunner:
         self.meta = meta
         self.adapter = adapter or adapter_for_model_version(meta.device.model_version)
         self.cfg: EngineConfig = catalog.for_model(self.adapter.family)
-        self.counter = counters.make_counter(meta.exercise_type, self.cfg)
-        self._extractor = FeatureExtractor(self.cfg.features, self.cfg.squat.stand_angle)
+        self.kit = make_kit(meta.exercise_type, self.cfg)
+        self.counter = self.kit.counter
+        self._extractor = self.kit.extractor
         self._liveness = (
             LivenessEvaluator(meta.liveness, self.cfg.liveness, self.cfg.features.min_visibility)
             if meta.liveness is not None
@@ -61,16 +61,17 @@ class SessionRunner:
         self._count_after: int | None = None if meta.liveness is not None else -1
         self.skeletons: list[SkeletonFrame] = []
         self._count_frames: list[SkeletonFrame] = []
-        self._count_feats: list[FrameFeatures] = []
-        self.reps: list[RepEvent] = []
-        self.last_features: FrameFeatures | None = None
+        #: 종목별 특징 (스쿼트: FrameFeatures, 푸시업·윗몸 일으키기: ChainFeatures)
+        self._count_feats: list[Any] = []
+        self.reps: list[AnyRepEvent] = []
+        self.last_features: Any = None
 
     @property
     def liveness_result(self) -> LivenessResult | None:
         return self._liveness_result
 
     @property
-    def features(self) -> list[FrameFeatures]:
+    def features(self) -> list[Any]:
         """렙 판정 구간의 프레임 특징 (그래프·디버깅용, 읽기 전용으로 쓴다)."""
         return list(self._count_feats)
 
@@ -86,7 +87,7 @@ class SessionRunner:
         elif self.meta.liveness is not None:
             self._count_after = self.meta.liveness.expires_at_t
 
-    def push(self, frame: Frame) -> list[RepEvent]:
+    def push(self, frame: Frame) -> list[AnyRepEvent]:
         """프레임 1개 처리. 이번 프레임에서 확정된 렙을 돌려준다."""
         sk = self.adapter.to_skeleton(
             frame, self.meta.image_width, self.meta.image_height, self.meta.mirrored
@@ -117,9 +118,12 @@ class SessionRunner:
             self._liveness_result,
             cfg.confidence,
             cfg.features.min_visibility,
+            self.kit.quality,
         )
         diag = math.hypot(self.meta.image_width, self.meta.image_height)
-        anomalies = detect_anomalies(self._count_frames, self._count_feats, self.reps, cfg, diag)
+        anomalies = detect_anomalies(
+            self._count_frames, self._count_feats, self.reps, cfg, diag, self.kit.is_rest
+        )
         return SessionResult(
             engine_version=ENGINE_VERSION,
             catalog_version=cfg.catalog_version,
@@ -129,7 +133,7 @@ class SessionRunner:
             liveness=self._liveness_result,
             ai_confidence=conf.ai_confidence,
             confidence_components=conf.components,
-            pose_summary=pose_summary(self.reps, cfg.form_tags),
+            pose_summary=self.kit.summarize(self.reps),
             anomalies=anomalies,
         )
 

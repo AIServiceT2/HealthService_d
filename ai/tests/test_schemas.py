@@ -18,7 +18,7 @@ def test_meta_rejects_unknown_field_and_other_exercise() -> None:
     with pytest.raises(ValidationError):
         SessionMeta.model_validate(meta_dict(extra=1))
     with pytest.raises(ValidationError):
-        SessionMeta.model_validate(meta_dict(exerciseType="PUSHUP"))
+        SessionMeta.model_validate(meta_dict(exerciseType="PLANK"))
 
 
 def test_landmark_ranges() -> None:
