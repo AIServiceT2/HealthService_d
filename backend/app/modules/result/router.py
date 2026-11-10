@@ -1,6 +1,6 @@
 """result API. 노션 '전운시 API 명세서' API-047·048.
 
-구현: API-047 결과 카드·서사·교정 코멘트 조회. API-048은 경로만 있고 501을 돌려준다.
+구현: API-047 결과 카드·서사·교정 코멘트 조회, API-048 전투 리플레이 조회.
 """
 
 import uuid
@@ -10,11 +10,18 @@ from sqlalchemy.orm import Session
 
 from app.core.db import get_db
 from app.core.errors import AppError
-from app.core.stub import not_implemented
 from app.modules.auth.dependencies import get_current_user
 from app.modules.auth.models import User
 from app.modules.result import service
-from app.modules.result.schemas import CardRead, DropRead, ErrorResponse, ResultRead, TextRead
+from app.modules.result.schemas import (
+    CardRead,
+    DropRead,
+    ErrorResponse,
+    ReplayEventRead,
+    ReplayRead,
+    ResultRead,
+    TextRead,
+)
 
 # 입력 오류는 전역 처리기가 400으로 돌려주므로 Swagger에 실제와 다른 422가 보이지 않게 4XX를 선언한다
 router = APIRouter(
@@ -83,8 +90,38 @@ def read_result(
 @router.get(
     "/submissions/{id}/replay",
     summary="[API-048] 전투 리플레이 조회",
-    description="권한: OWNER",
-    status_code=501,
+    description=(
+        "권한: OWNER. REWARDED 건만. HIT 수 = hitCount(결과 카드 타격 수), HIT 피해 합 = 결과 카드 totalDamage. "
+        "t는 세션 시작부터의 초를 30초 안으로 줄인 재생 시각(제안). 상한을 넘은 인정 렙은 MISS(DAILY_CAP), "
+        "미인정 렙은 MISS(사유 null, 저장되지 않음). 타격 0(일일 상한 초과)이면 409 reason DAILY_CAP_EXCEEDED. "
+        "skeletonUrl은 자료 저장소가 없어 null. 길드원 공개 여부는 미정이라 본인만."
+    ),
+    response_model=ReplayRead,
+    response_model_by_alias=True,
+    responses=_OWNER_ERRORS
+    | {
+        409: {
+            "model": ErrorResponse,
+            "description": "INVALID_STATE 아직 보상이 지급되지 않았습니다. / 일일 상한 초과로 리플레이가 없습니다. (reason DAILY_CAP_EXCEEDED)",
+        }
+    },
 )
-def api_048(id: uuid.UUID) -> None:
-    not_implemented()
+def read_replay(
+    id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        replay = _owner_rewarded_errors(lambda: service.get_replay(db, user.id, id))
+    except service.DailyCapExceeded:
+        raise AppError(
+            409, "INVALID_STATE", "일일 상한 초과로 리플레이가 없습니다.", {"reason": "DAILY_CAP_EXCEEDED"}
+        )
+    return ReplayRead(
+        hit_count=replay.hit_count,
+        events=[
+            ReplayEventRead(rep_index=e.rep_index, t=e.t, type=e.type, damage=e.damage, reason=e.reason)
+            for e in replay.events
+        ],
+        skeleton_url=None,
+    )

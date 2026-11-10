@@ -2,6 +2,7 @@
 
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 from pydantic.alias_generators import to_camel
@@ -41,6 +42,26 @@ class ResultRead(_CamelModel):
     card: CardRead
     narrative: TextRead
     form_comment: TextRead
+
+
+class ReplayEventRead(_CamelModel):
+    """HIT이면 damage, MISS면 reason (상한 초과 DAILY_CAP, 미인정은 사유가 저장되지 않아 null)."""
+
+    rep_index: int
+    # 재생 시각(초), 30초 이하
+    t: float
+    type: Literal["HIT", "MISS"]
+    damage: int | None = None
+    reason: str | None = None
+
+
+class ReplayRead(_CamelModel):
+    """API-048 응답 200: { hitCount, events, skeletonUrl }."""
+
+    hit_count: int
+    events: list[ReplayEventRead]
+    # 관절 선 자료를 저장·제공하는 곳이 아직 없어 null
+    skeleton_url: str | None = None
 
 
 class ErrorResponse(BaseModel):
