@@ -1,12 +1,19 @@
 """길드 API 입출력. JSON 키는 노션 API 명세서대로 camelCase, 파이썬 안에서는 snake_case."""
 
 import uuid
+from datetime import datetime
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 from pydantic.alias_generators import to_camel
 
-from app.modules.guild.models import NAME_MAX_LENGTH, NAME_MIN_LENGTH
+from app.modules.guild.models import (
+    INVITE_DEFAULT_HOURS,
+    INVITE_MAX_HOURS,
+    INVITE_MIN_HOURS,
+    NAME_MAX_LENGTH,
+    NAME_MIN_LENGTH,
+)
 
 # 노션 API-009: name은 2~20자. 앞뒤 공백을 지운 뒤 센다
 GuildName = Annotated[
@@ -62,6 +69,23 @@ class GuildMemberList(_CamelModel):
 
     items: list[GuildMemberRead]
     next_cursor: str | None
+
+
+class InvitationCreate(_CamelModel):
+    """API-012 요청: { expiresInHours } (선택). 기본 72, 1~168 [제안·팀 확인 필요]."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    expires_in_hours: int = Field(
+        default=INVITE_DEFAULT_HOURS, ge=INVITE_MIN_HOURS, le=INVITE_MAX_HOURS, strict=True
+    )
+
+
+class InvitationCreated(_CamelModel):
+    """API-012 응답 201: { inviteCode, expiresAt }."""
+
+    invite_code: str
+    expires_at: datetime
 
 
 class ErrorResponse(BaseModel):

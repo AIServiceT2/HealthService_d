@@ -32,7 +32,7 @@ def _clean_tables():
     yield
     with engine.begin() as conn:
         conn.execute(
-            text("TRUNCATE workout_submission, character, guild, app_user, refresh_token CASCADE")
+            text("TRUNCATE workout_submission, character, guild_invitation, guild, app_user, refresh_token CASCADE")
         )
 
 

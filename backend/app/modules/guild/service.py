@@ -1,14 +1,22 @@
 """길드 규칙. 다른 모듈은 이 파일의 함수로만 길드를 다룬다."""
 
 import base64
+import secrets
 import uuid
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import case, func, select, tuple_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.modules.auth.models import User
-from app.modules.guild.models import Guild
+from app.modules.guild.models import (
+    INVITE_CODE_ALPHABET,
+    INVITE_CODE_LENGTH,
+    Guild,
+    GuildInvitation,
+)
 
 
 class AlreadyInGuild(Exception):
@@ -25,6 +33,13 @@ class NotGuildMember(Exception):
 
 class InvalidCursor(Exception):
     pass
+
+
+class NotGuildLeader(Exception):
+    pass
+
+
+_INVITE_CODE_ATTEMPTS = 5
 
 
 ROLE_LEADER = "LEADER"
@@ -149,3 +164,34 @@ def list_guild_members(
     ]
     next_cursor = _encode_cursor(page[-1].rank, page[-1].id) if more else None
     return GuildMemberPage(items=items, next_cursor=next_cursor)
+
+
+def _new_invite_code() -> str:
+    return "".join(secrets.choice(INVITE_CODE_ALPHABET) for _ in range(INVITE_CODE_LENGTH))
+
+
+def issue_invitation(
+    db: Session, user_id: uuid.UUID, guild_id: uuid.UUID, expires_in_hours: int
+) -> GuildInvitation:
+    """그 길드의 길드장만 초대 코드를 발급한다 (노션 API-012).
+
+    길드장이 아니면 NotGuildLeader (소속원이 아니거나 없는 길드도 같음 — 명세 에러는 403뿐).
+    코드가 이미 쓰인 값과 겹치면 새로 뽑아 다시 저장한다.
+    """
+    guild = db.get(Guild, guild_id)
+    if guild is None or guild.leader_user_id != user_id:
+        raise NotGuildLeader(str(user_id))
+
+    expires_at = datetime.now(UTC).replace(microsecond=0) + timedelta(hours=expires_in_hours)
+    for _ in range(_INVITE_CODE_ATTEMPTS):
+        invitation = GuildInvitation(
+            code=_new_invite_code(), guild_id=guild_id, created_by=user_id, expires_at=expires_at
+        )
+        db.add(invitation)
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            continue
+        return invitation
+    raise RuntimeError("초대 코드를 만들지 못했습니다 (겹침 반복).")

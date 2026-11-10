@@ -1,13 +1,14 @@
 """guild API. 노션 '전운시 API 명세서' API-009~017.
 
-구현: API-009 길드 생성, API-010 길드 정보 조회, API-011 길드원 목록. 나머지는 경로만 있고 501을 돌려준다.
+구현: API-009 길드 생성, API-010 길드 정보 조회, API-011 길드원 목록,
+API-012 길드 초대 코드 발급. 나머지는 경로만 있고 501을 돌려준다.
 로그인 확인은 auth 모듈의 get_current_user (Bearer access token, JWT).
 에러 본문 { code, message, details }은 전역 처리기(app/core/errors.py)가 만든다.
 """
 
 import uuid
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Body, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
@@ -24,6 +25,8 @@ from app.modules.guild.schemas import (
     GuildMemberList,
     GuildMemberRead,
     GuildRead,
+    InvitationCreate,
+    InvitationCreated,
 )
 
 # 입력 오류는 전역 처리기가 400 VALIDATION_FAILED로 돌려주므로, Swagger에 실제와 다른 422가
@@ -129,11 +132,31 @@ def list_guild_members(
 @router.post(
     "/guilds/{guild_id}/invitations",
     summary="[API-012] 길드 초대 코드 발급",
-    description="권한: GUILD_LEADER",
-    status_code=501,
+    description=(
+        "권한: GUILD_LEADER. 본문은 선택. expiresInHours 기본 72, 1~168 (명세는 기본값 미정 — 제안·팀 확인 필요). "
+        "초대 코드는 영문 대문자·숫자 6자."
+    ),
+    status_code=201,
+    response_model=InvitationCreated,
+    response_model_by_alias=True,
+    responses={
+        400: {"model": ErrorResponse, "description": "VALIDATION_FAILED 입력값이 올바르지 않습니다."},
+        401: _UNAUTHENTICATED,
+        403: {"model": ErrorResponse, "description": "FORBIDDEN 길드장만 초대 코드를 발급할 수 있습니다."},
+    },
 )
-def api_012(guild_id: uuid.UUID) -> None:
-    not_implemented()
+def issue_invitation(
+    guild_id: uuid.UUID,
+    body: InvitationCreate | None = Body(default=None),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    hours = (body or InvitationCreate()).expires_in_hours
+    try:
+        invitation = service.issue_invitation(db, user.id, guild_id, hours)
+    except service.NotGuildLeader:
+        raise AppError(403, "FORBIDDEN", "길드장만 초대 코드를 발급할 수 있습니다.")
+    return InvitationCreated(invite_code=invitation.code, expires_at=invitation.expires_at)
 
 
 @router.post(

@@ -6,14 +6,24 @@
 """
 
 import uuid
+from datetime import datetime
 
-from sqlalchemy import ForeignKey, String
+from sqlalchemy import DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.db import Base
 
 NAME_MIN_LENGTH = 2
 NAME_MAX_LENGTH = 20
+
+# 초대 코드: 영문 대문자·숫자 6자 (노션 API-012 예시 "A7K2QX"). [제안·팀 확인 필요]
+INVITE_CODE_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+INVITE_CODE_LENGTH = 6
+INVITE_CODE_PATTERN = rf"^[A-Z0-9]{{{INVITE_CODE_LENGTH}}}$"
+# 노션 API-012: expiresInHours는 선택, 기본값은 미정 → 명세 예시 72시간, 1시간~7일 [제안·팀 확인 필요]
+INVITE_DEFAULT_HOURS = 72
+INVITE_MIN_HOURS = 1
+INVITE_MAX_HOURS = 168
 
 
 class Guild(Base):
@@ -23,3 +33,14 @@ class Guild(Base):
     # 이름은 LLM·확인자 화면에 보내지 않는다 (노션 DB, backlog US-07 (권한))
     name: Mapped[str] = mapped_column(String(NAME_MAX_LENGTH))
     leader_user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("app_user.id"))
+
+
+class GuildInvitation(Base):
+    """길드 초대 코드. 노션 'DB (1)' 15. GUILD_INVITATION."""
+
+    __tablename__ = "guild_invitation"
+
+    code: Mapped[str] = mapped_column(String(INVITE_CODE_LENGTH), primary_key=True)
+    guild_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("guild.id", ondelete="CASCADE"), index=True)
+    created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("app_user.id"))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
