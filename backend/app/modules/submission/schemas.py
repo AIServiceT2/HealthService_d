@@ -79,3 +79,23 @@ class SubmissionList(_CamelModel):
 
     items: list[SubmissionDetailRead]
     next_cursor: str | None
+
+
+# ---- API-030 승인 전 제출 취소 ----
+
+
+class CancelRequest(_CamelModel):
+    """API-030 요청: { reason } (선택). 저장할 칼럼이 ERD에 없어 받기만 한다 [팀 확인 필요]."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    reason: str | None = Field(default=None, max_length=200)
+
+
+class CancelResponse(_CamelModel):
+    """API-030 응답 200: { submissionId, status, releasedReps, version }."""
+
+    submission_id: uuid.UUID
+    status: str
+    released_reps: int
+    version: int

@@ -33,3 +33,10 @@ BLOCKING_STATUSES = (
     SubmissionStatus.APPROVED,
     SubmissionStatus.REWARDED,
 )
+
+# 승인 전 취소가 가능한 상태 (노션 API-030, backlog US-06)
+CANCELABLE_STATUSES = (
+    SubmissionStatus.SUBMITTED,
+    SubmissionStatus.PREPARED,
+    SubmissionStatus.PENDING_REVIEW,
+)

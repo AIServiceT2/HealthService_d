@@ -4,14 +4,18 @@ import base64
 import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import date, datetime, time, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 
 from sqlalchemy import func, select, tuple_
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
 from app.modules.auth.models import User
-from app.modules.submission.constants import BLOCKING_STATUSES, SubmissionStatus
+from app.modules.submission.constants import (
+    BLOCKING_STATUSES,
+    CANCELABLE_STATUSES,
+    SubmissionStatus,
+)
 from app.modules.submission.models import DailyCapReservation, RepEvent, WorkoutSubmission
 from app.modules.workout_session import service as session_service
 from app.modules.workout_session.catalog import EXERCISES
@@ -302,3 +306,58 @@ def list_my_submissions(
     )
     page, more = rows[:limit], len(rows) > limit
     return SubmissionPage(details(db, page), _encode_cursor(page[-1]) if more else None)
+
+
+# ---- 승인 전 제출 취소 (노션 API-030) ----
+
+
+class VersionMismatch(Exception):
+    pass
+
+
+class NotCancelable(Exception):
+    pass
+
+
+@dataclass(frozen=True)
+class CancelResult:
+    submission: WorkoutSubmission
+    released_reps: int
+
+
+def cancel_submission(
+    db: Session, user_id: uuid.UUID, submission_id: uuid.UUID, expected_version: int
+) -> CancelResult:
+    """신청자 본인이 승인 전 제출건을 취소하고 상한 예약을 해제한다 (노션 API-030, backlog US-06).
+
+    행을 잠근 채 version을 비교하므로 승인·다른 취소와 동시에 와도 하나만 성공한다.
+    검사 순서: 없음 404 → 남의 건 403 → version 불일치 412 → 취소할 수 없는 상태 409.
+    """
+    try:
+        submission = db.scalars(
+            select(WorkoutSubmission)
+            .where(WorkoutSubmission.id == submission_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        ).one_or_none()
+        if submission is None:
+            raise SubmissionNotFound(str(submission_id))
+        if submission.user_id != user_id:
+            raise NotOwner(str(user_id))
+        if submission.version != expected_version:
+            raise VersionMismatch(submission.version)
+        if submission.status not in CANCELABLE_STATUSES:
+            raise NotCancelable(submission.status)
+
+        reservation = db.get(DailyCapReservation, submission_id)
+        released = 0
+        if reservation is not None and reservation.released_at is None:
+            reservation.released_at = datetime.now(UTC)
+            released = reservation.amount
+        submission.status = SubmissionStatus.CANCELED
+        submission.version += 1
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    return CancelResult(submission, released)

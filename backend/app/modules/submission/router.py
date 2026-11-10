@@ -4,20 +4,23 @@
 에러 본문 { code, message, details }은 전역 처리기(app/core/errors.py)가 만든다.
 """
 
+import re
 import uuid
 from datetime import date
 
-from fastapi import APIRouter, Depends, Header, Query, Response
+
+from fastapi import APIRouter, Body, Depends, Header, Query, Response
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
 from app.core.errors import AppError
-from app.core.stub import not_implemented
 from app.modules.auth.dependencies import get_current_user
 from app.modules.auth.models import User
 from app.modules.submission import service
 from app.modules.submission.constants import SubmissionStatus
 from app.modules.submission.schemas import (
+    CancelRequest,
+    CancelResponse,
     ErrorResponse,
     SubmissionDetailRead,
     SubmissionList,
@@ -179,11 +182,59 @@ def list_my_submissions(
     return SubmissionList(items=[to_read(d) for d in page.items], next_cursor=page.next_cursor)
 
 
+# If-Match 값: "3" 또는 3 (약한 ETag W/"3"도 받음)
+_IF_MATCH = re.compile(r'^(?:W/)?"?(\d+)"?$')
+
+
+def _parse_if_match(value: str) -> int:
+    match = _IF_MATCH.fullmatch(value.strip())
+    if match is None:
+        raise AppError(400, "VALIDATION_FAILED", "입력값이 올바르지 않습니다.", {"reason": "INVALID_IF_MATCH"})
+    return int(match.group(1))
+
+
 @stub_router.post(
     "/submissions/{id}/cancel",
     summary="[API-030] 승인 전 제출 취소",
-    description="권한: OWNER",
-    status_code=501,
+    description=(
+        "권한: OWNER. If-Match 필수(제출건 version, API-028의 ETag). SUBMITTED·PREPARED·PENDING_REVIEW만 "
+        "취소되고 상한 예약을 해제한다. 승인과 동시에 오면 하나만 성공한다. reason은 선택이며 저장하지 않는다."
+    ),
+    response_model=CancelResponse,
+    response_model_by_alias=True,
+    responses={
+        400: {"model": ErrorResponse, "description": "VALIDATION_FAILED If-Match 없음·형식 오류, reason 200자 초과"},
+        401: _UNAUTHENTICATED,
+        403: {"model": ErrorResponse, "description": "FORBIDDEN 신청자 본인만 취소할 수 있습니다."},
+        404: {"model": ErrorResponse, "description": "NOT_FOUND 제출건을 찾을 수 없습니다."},
+        409: {"model": ErrorResponse, "description": "INVALID_STATE 이미 승인되었거나 종료된 제출건입니다."},
+        412: {"model": ErrorResponse, "description": "CONCURRENT_UPDATE 다른 요청이 먼저 처리되었습니다. 최신 상태로 다시 시도하세요."},
+    },
 )
-def api_030(id: uuid.UUID) -> None:
-    not_implemented()
+def cancel_submission(
+    id: uuid.UUID,
+    body: CancelRequest | None = Body(default=None),
+    if_match: str = Header(alias="If-Match"),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    expected_version = _parse_if_match(if_match)
+    try:
+        result = service.cancel_submission(db, user.id, id, expected_version)
+    except service.SubmissionNotFound:
+        raise AppError(404, "NOT_FOUND", "제출건을 찾을 수 없습니다.")
+    except service.NotOwner:
+        raise AppError(403, "FORBIDDEN", "신청자 본인만 취소할 수 있습니다.")
+    except service.VersionMismatch as e:
+        raise AppError(
+            412, "CONCURRENT_UPDATE", "다른 요청이 먼저 처리되었습니다. 최신 상태로 다시 시도하세요.",
+            {"currentVersion": e.args[0]},
+        )
+    except service.NotCancelable:
+        raise AppError(409, "INVALID_STATE", "이미 승인되었거나 종료된 제출건입니다.")
+    return CancelResponse(
+        submission_id=result.submission.id,
+        status=result.submission.status,
+        released_reps=result.released_reps,
+        version=result.submission.version,
+    )
