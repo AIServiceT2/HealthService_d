@@ -73,6 +73,22 @@ class RewardList(_CamelModel):
     next_cursor: str | None
 
 
+class InventoryItemRead(_CamelModel):
+    """API-044 항목: { itemId, submissionId, status, unlockAt }."""
+
+    item_id: uuid.UUID
+    submission_id: uuid.UUID
+    status: str
+    # 지급 시각 + 24시간 (이미 풀린 아이템도 그 시각을 그대로 보여 줌)
+    unlock_at: datetime
+
+
+class InventoryRead(_CamelModel):
+    """API-044 응답 200: { items }."""
+
+    items: list[InventoryItemRead]
+
+
 class ErrorResponse(BaseModel):
     """노션 API 명세서 공통 에러 본문: { code, message, details }."""
 

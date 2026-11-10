@@ -1,7 +1,6 @@
 """reward API. 노션 '전운시 API 명세서' API-041~044.
 
-구현: API-041 보상·피해 1회 반영, API-042 24시간 잠금 해제,
-API-043 내 지급 내역. 나머지는 경로만 있고 501을 돌려준다.
+구현: API-041 보상·피해 1회 반영, API-042 24시간 잠금 해제, API-043 내 지급 내역, API-044 인벤토리 조회.
 /internal API는 서버 내부 호출 전용 (X-Internal-Token, snapshot/internal.py).
 """
 
@@ -12,7 +11,6 @@ from sqlalchemy.orm import Session
 
 from app.core.db import get_db
 from app.core.errors import AppError
-from app.core.stub import not_implemented
 from app.modules.auth.dependencies import get_current_user
 from app.modules.auth.models import User
 from app.modules.reward import service
@@ -21,6 +19,8 @@ from app.modules.reward.schemas import (
     DamageRead,
     ErrorResponse,
     GrantResponse,
+    InventoryItemRead,
+    InventoryRead,
     ItemRef,
     ReleaseRequest,
     ReleaseResponse,
@@ -155,8 +155,28 @@ def list_my_rewards(
 @router.get(
     "/me/inventory",
     summary="[API-044] 인벤토리 조회",
-    description="권한: PLAYER",
-    status_code=501,
+    description=(
+        "권한: PLAYER. 본인 아이템 전부(페이지 나눔 없음), 최신 지급순(제안). unlockAt = 지급 시각 + 24시간. "
+        "status는 LOCKED / UNLOCKED(해제 뒤 상태명은 제안). 아이템 카탈로그는 미정이라 종류·이름은 없다."
+    ),
+    response_model=InventoryRead,
+    response_model_by_alias=True,
+    responses={
+        401: {"model": ErrorResponse, "description": "UNAUTHENTICATED Bearer 토큰이 필요하거나 유효하지 않습니다."},
+    },
 )
-def api_044() -> None:
-    not_implemented()
+def my_inventory(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return InventoryRead(
+        items=[
+            InventoryItemRead(
+                item_id=i.item.id,
+                submission_id=i.item.submission_id,
+                status=i.item.status,
+                unlock_at=i.unlock_at,
+            )
+            for i in service.my_inventory(db, user.id)
+        ]
+    )

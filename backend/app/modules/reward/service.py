@@ -241,6 +241,30 @@ def list_my_rewards(db: Session, user_id: uuid.UUID, cursor: str | None, limit: 
     return RewardPage(entries, _encode_cursor(entries[-1]) if more else None)
 
 
+# ---- 인벤토리 (노션 API-044) ----
+
+
+@dataclass(frozen=True)
+class InventoryItem:
+    item: Item
+    unlock_at: datetime
+
+
+def my_inventory(db: Session, user_id: uuid.UUID) -> list[InventoryItem]:
+    """본인 아이템 전부 (노션 API-044). 명세에 페이지 나눔이 없어 한 번에 돌려준다.
+
+    unlockAt = 지급 시각 + 24시간. 정렬은 명세에 없어 최신 지급순 [제안].
+    아이템 카탈로그(종류·이름)는 미정이라 아직 없다.
+    """
+    rows = db.execute(
+        select(Item, RewardLedger.rewarded_at)
+        .join(RewardLedger, RewardLedger.submission_id == Item.submission_id)
+        .where(Item.user_id == user_id)
+        .order_by(RewardLedger.rewarded_at.desc(), Item.submission_id.desc(), Item.id)
+    ).all()
+    return [InventoryItem(item, rewarded_at + PROTECTION_PERIOD) for item, rewarded_at in rows]
+
+
 # ---- 다른 모듈용 (API-007 내 캐릭터·성장 조회) ----
 
 
