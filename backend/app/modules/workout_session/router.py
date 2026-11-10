@@ -23,6 +23,7 @@ from app.modules.workout_session.catalog import (
 )
 from app.modules.workout_session.schemas import (
     ChunkSpecOut,
+    ErrorResponse,
     DailyCapItem,
     DailyCapsResponse,
     ExerciseCriteria,
@@ -41,7 +42,12 @@ from app.modules.workout_session.schemas import (
     StartSessionResponse,
 )
 
-router = APIRouter(tags=["session"])
+# 입력 오류는 전역 처리기가 422가 아니라 400 VALIDATION_FAILED로 돌려준다 (API-021 LIVENESS_FAILED만 422).
+# FastAPI는 라우트에 4XX 응답이 없으면 Swagger에 422 검증 오류를 자동으로 넣으므로 공통 에러 본문을 4XX로 선언한다
+router = APIRouter(
+    tags=["session"],
+    responses={"4XX": {"model": ErrorResponse, "description": "공통 에러 본문 { code, message, details }"}},
+)
 
 
 async def _body_bytes(request: Request) -> int:

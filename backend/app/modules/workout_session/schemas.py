@@ -2,7 +2,7 @@
 
 import uuid
 from datetime import date, datetime
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
@@ -10,6 +10,14 @@ from pydantic.alias_generators import to_camel
 
 class _CamelModel(BaseModel):
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+
+class ErrorResponse(_CamelModel):
+    """공통 에러 본문 (app/core/errors.py). Swagger 표시용."""
+
+    code: str
+    message: str
+    details: Any = None
 
 
 # ---- API-018 운동 목록 ----
