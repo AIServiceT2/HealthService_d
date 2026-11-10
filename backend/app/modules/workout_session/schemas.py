@@ -152,3 +152,15 @@ class SessionStatusResponse(_CamelModel):
 
 class ResumeResponse(SessionStatusResponse):
     received_chunks: list[int]  # 빠진 seq부터 다시 보내면 된다
+
+
+# ---- API-025 세션 상태 조회 ----
+
+
+class SessionDetailResponse(_CamelModel):
+    session_id: uuid.UUID
+    status: str
+    exercise_code: str
+    liveness_passed: bool | None
+    received_chunks: list[int]
+    submission_id: uuid.UUID | None

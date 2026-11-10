@@ -381,3 +381,47 @@ def test_us01_api024_only_owner(client):
     pause(client, owner, sid)
 
     assert resume(client, other, sid).status_code == 403
+
+
+# ---- API-025 세션 상태 조회 ----
+
+
+def test_us01_api025_returns_session_state(client):
+    _, headers = new_player(client)
+    started = start_session(client, headers)
+    sid = started["sessionId"]
+    post_liveness(client, headers, started)
+    put_chunk(client, headers, sid, 1)
+
+    res = client.get(f"/workout-sessions/{sid}", headers=headers)
+
+    assert res.status_code == 200
+    assert res.json() == {
+        "sessionId": sid,
+        "status": "ACTIVE",
+        "exerciseCode": "SQUAT",
+        "livenessPassed": True,
+        "receivedChunks": [1],
+        "submissionId": None,
+    }
+
+
+def test_us01_api025_liveness_is_null_before_check(client):
+    _, headers = new_player(client)
+    sid = start_session(client, headers)["sessionId"]
+
+    assert client.get(f"/workout-sessions/{sid}", headers=headers).json()["livenessPassed"] is None
+
+
+def test_us01_api025_forbidden_for_other_user_and_404_for_missing(client):
+    _, owner = new_player(client)
+    _, other = new_player(client)
+    sid = start_session(client, owner)["sessionId"]
+
+    forbidden = client.get(f"/workout-sessions/{sid}", headers=other)
+    missing = client.get("/workout-sessions/00000000-0000-0000-0000-000000000000", headers=owner)
+
+    assert forbidden.status_code == 403
+    assert forbidden.json()["code"] == "FORBIDDEN"
+    assert missing.status_code == 404
+    assert missing.json()["code"] == "NOT_FOUND"

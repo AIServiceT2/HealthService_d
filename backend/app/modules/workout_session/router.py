@@ -36,6 +36,7 @@ from app.modules.workout_session.schemas import (
     PoseChunkRequest,
     PoseChunkResponse,
     ResumeResponse,
+    SessionDetailResponse,
     SessionStatusResponse,
     StartSessionRequest,
     StartSessionResponse,
@@ -216,11 +217,27 @@ def api_024(
 @router.get(
     "/workout-sessions/{id}",
     summary="[API-025] 세션 상태 조회",
-    description="권한: OWNER",
-    status_code=501,
+    description=(
+        "권한: OWNER. 응답을 잃었을 때 기존 접수 여부를 먼저 확인하는 데 쓴다. "
+        "남의 세션은 403 FORBIDDEN, 없으면 404 NOT_FOUND. "
+        "임시: submissionId는 제출(API-026)이 아직 없어 항상 null"
+    ),
+    response_model=SessionDetailResponse,
 )
-def api_025(id: uuid.UUID) -> None:
-    not_implemented()
+def api_025(
+    id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> SessionDetailResponse:
+    session = service.get_owned_session(db, user.id, id)
+    return SessionDetailResponse(
+        session_id=session.id,
+        status=session.status,
+        exercise_code=session.exercise_code,
+        liveness_passed=session.liveness_passed,
+        received_chunks=service.received_seqs(db, session.id),
+        submission_id=None,
+    )
 
 
 @router.delete(
