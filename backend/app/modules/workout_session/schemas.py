@@ -2,7 +2,7 @@
 
 import uuid
 from datetime import date, datetime
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
@@ -111,3 +111,23 @@ class LivenessRequest(_CamelModel):
 class LivenessResponse(_CamelModel):
     passed: bool
     retry_allowed: bool
+
+
+# ---- API-022 관절 좌표 청크 업로드 ----
+
+# [x, y, visibility]. 얼굴 랜드마크 자리와 안 보이는 관절은 null
+Keypoint = Annotated[list[float], Field(min_length=3, max_length=3)] | None
+
+
+class FrameIn(_CamelModel):
+    t: int = Field(ge=0)  # 프레임 시각 (epoch ms, 노션 예시)
+    kp: list[Keypoint]
+
+
+class PoseChunkRequest(_CamelModel):
+    seq: int = Field(ge=1)
+    frames: list[FrameIn] = Field(min_length=1)
+
+
+class PoseChunkResponse(_CamelModel):
+    received: list[int]

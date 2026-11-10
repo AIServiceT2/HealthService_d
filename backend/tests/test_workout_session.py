@@ -192,3 +192,108 @@ def test_us01_api021_only_owner(client):
     started = start_session(client, owner)
 
     assert post_liveness(client, other, started).status_code == 403
+
+
+# ---- API-022 관절 좌표 청크 업로드 ----
+
+
+def mediapipe_frame(t=1731128472123):
+    # 33개 중 얼굴(0~10번)은 null
+    return {"t": t, "kp": [None] * 11 + [[0.5, 0.5, 0.9]] * 22}
+
+
+def put_chunk(client, headers, session_id, seq, frames=None, body_seq=None):
+    return client.put(
+        f"/workout-sessions/{session_id}/pose-chunks/{seq}",
+        json={"seq": body_seq or seq, "frames": frames or [mediapipe_frame()]},
+        headers=headers,
+    )
+
+
+def test_us01_api022_stores_chunks_and_returns_received_seqs(client):
+    _, headers = new_player(client)
+    sid = start_session(client, headers)["sessionId"]
+
+    assert put_chunk(client, headers, sid, 2).json() == {"received": [2]}
+    res = put_chunk(client, headers, sid, 1)
+
+    assert res.status_code == 200
+    assert res.json() == {"received": [1, 2]}
+
+
+def test_us01_api022_same_seq_overwrites(client, db):
+    _, headers = new_player(client)
+    sid = start_session(client, headers)["sessionId"]
+    put_chunk(client, headers, sid, 1, [mediapipe_frame(t=1)])
+
+    res = put_chunk(client, headers, sid, 1, [mediapipe_frame(t=2), mediapipe_frame(t=3)])
+
+    assert res.json() == {"received": [1]}
+    frames = db.execute(
+        text("SELECT frames FROM pose_chunk WHERE session_id = :id AND seq = 1"), {"id": sid}
+    ).scalar_one()
+    assert [f["t"] for f in frames] == [2, 3]
+
+
+def test_us01_api022_accepts_movenet_17_keypoints(client):
+    _, headers = new_player(client)
+    sid = start_session(client, headers)["sessionId"]
+    frame = {"t": 1, "kp": [None] * 5 + [[0.5, 0.5, 0.9]] * 12}
+
+    assert put_chunk(client, headers, sid, 1, [frame]).status_code == 200
+
+
+def test_us01_api022_rejects_face_landmarks(client):
+    _, headers = new_player(client)
+    sid = start_session(client, headers)["sessionId"]
+    frame = mediapipe_frame()
+    frame["kp"][0] = [0.5, 0.2, 0.99]  # 코 좌표를 보냄
+
+    res = put_chunk(client, headers, sid, 1, [frame])
+
+    assert res.status_code == 400
+    assert res.json()["details"] == {"reason": "FACE_LANDMARK_INCLUDED"}
+
+
+def test_us01_api022_rejects_unknown_keypoint_count(client):
+    _, headers = new_player(client)
+    sid = start_session(client, headers)["sessionId"]
+
+    res = put_chunk(client, headers, sid, 1, [{"t": 1, "kp": [[0.5, 0.5, 0.9]] * 13}])
+
+    assert res.json()["details"] == {"reason": "UNKNOWN_KEYPOINT_LAYOUT"}
+
+
+def test_us01_api022_rejects_too_many_frames_and_too_large(client):
+    _, headers = new_player(client)
+    sid = start_session(client, headers)["sessionId"]
+    # 프레임 수를 먼저 검사한다 (짧은 좌표 301프레임은 약 130KB로 크기 제한 안쪽)
+    many = [mediapipe_frame(t=i) for i in range(301)]
+    res = put_chunk(client, headers, sid, 1, many)
+    assert res.status_code == 400
+    assert res.json()["details"] == {"reason": "TOO_MANY_FRAMES"}
+
+    # 300프레임이라도 본문이 256KB를 넘으면 거부 (긴 소수 좌표로 약 360KB)
+
+    long_floats = {"t": 1, "kp": [None] * 11 + [[0.123456789012345, 0.123456789012345, 0.99]] * 22}
+    big = [long_floats] * 300
+    res = put_chunk(client, headers, sid, 2, big)
+    assert res.status_code == 400
+    assert res.json()["details"] == {"reason": "CHUNK_TOO_LARGE"}
+
+
+def test_us01_api022_rejects_seq_mismatch(client):
+    _, headers = new_player(client)
+    sid = start_session(client, headers)["sessionId"]
+
+    res = put_chunk(client, headers, sid, 1, body_seq=2)
+
+    assert res.json()["details"] == {"reason": "SEQ_MISMATCH"}
+
+
+def test_us01_api022_only_owner(client):
+    _, owner = new_player(client)
+    _, other = new_player(client)
+    sid = start_session(client, owner)["sessionId"]
+
+    assert put_chunk(client, other, sid, 1).status_code == 403

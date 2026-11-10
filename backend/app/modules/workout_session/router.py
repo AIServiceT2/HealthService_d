@@ -6,7 +6,7 @@
 
 import uuid
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Path, Request
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
@@ -32,11 +32,18 @@ from app.modules.workout_session.schemas import (
     LivenessChallengeOut,
     LivenessRequest,
     LivenessResponse,
+    PoseChunkRequest,
+    PoseChunkResponse,
     StartSessionRequest,
     StartSessionResponse,
 )
 
 router = APIRouter(tags=["session"])
+
+
+async def _body_bytes(request: Request) -> int:
+    """요청 본문의 실제 바이트 수 (청크 크기 제한 검사용, 노션 API-022)."""
+    return len(await request.body())
 
 
 @router.get(
@@ -140,11 +147,29 @@ def api_021(
 @router.put(
     "/workout-sessions/{id}/pose-chunks/{seq}",
     summary="[API-022] 관절 좌표 청크 업로드",
-    description="권한: OWNER",
-    status_code=501,
+    description=(
+        "권한: OWNER. kp는 [x, y, visibility] 배열이고 얼굴 랜드마크 자리는 null. "
+        "관절 33개(MediaPipe)면 0~10번, 17개(MoveNet)면 0~4번이 얼굴. "
+        "청크 300프레임·256KB 초과, 얼굴 좌표 포함, 경로와 본문 seq가 다르면 400 VALIDATION_FAILED. "
+        "같은 seq는 덮어씀. 종료된 세션이면 409 INVALID_STATE"
+    ),
+    response_model=PoseChunkResponse,
 )
-def api_022(id: uuid.UUID, seq: int) -> None:
-    not_implemented()
+def api_022(
+    req: PoseChunkRequest,
+    id: uuid.UUID,
+    seq: int = Path(ge=1),
+    body_bytes: int = Depends(_body_bytes),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> PoseChunkResponse:
+    if req.seq != seq:
+        raise AppError(
+            400, "VALIDATION_FAILED", "입력값이 올바르지 않습니다.", {"reason": "SEQ_MISMATCH"}
+        )
+    frames = [f.model_dump() for f in req.frames]
+    received = service.upload_chunk(db, user.id, id, seq, frames, body_bytes)
+    return PoseChunkResponse(received=received)
 
 
 @router.post(

@@ -8,8 +8,10 @@ API-021에서 앱이 보낸 challengeId·동작이 세션 시작(API-020) 때 �
 import uuid
 from datetime import datetime
 from enum import StrEnum
+from typing import Any
 
 from sqlalchemy import DateTime, ForeignKey, Integer, String
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.db import Base
@@ -43,3 +45,19 @@ class WorkoutSession(Base):
     liveness_action: Mapped[str] = mapped_column(String(32))
     liveness_issued_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class PoseChunk(Base):
+    """관절 좌표 청크 (노션 ERD 14번 POSE_CHUNK). 같은 seq를 다시 보내면 덮어쓴다.
+
+    원본 좌표의 보관·삭제 기간은 미정 (노션 ERD '아직 정하지 못한 것'). 세션 폐기(API-027) 때는 지운다.
+    """
+
+    __tablename__ = "pose_chunk"
+
+    session_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("workout_session.id", ondelete="CASCADE"), primary_key=True
+    )
+    seq: Mapped[int] = mapped_column(Integer, primary_key=True)
+    frames: Mapped[list[dict[str, Any]]] = mapped_column(JSONB)
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

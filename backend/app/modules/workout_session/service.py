@@ -2,16 +2,23 @@
 
 import secrets
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
-from app.modules.workout_session.catalog import EXERCISES, Exercise
-from app.modules.workout_session.models import SessionStatus, WorkoutSession
+from app.modules.workout_session.catalog import (
+    CHUNK_MAX_BYTES,
+    CHUNK_MAX_FRAMES,
+    EXERCISES,
+    Exercise,
+)
+from app.modules.workout_session.models import PoseChunk, SessionStatus, WorkoutSession
 
 KST = ZoneInfo("Asia/Seoul")  # 일일 상한 날짜는 KST (노션 API 명세서 공통 규칙)
 
@@ -174,3 +181,72 @@ def submit_liveness(
         db.rollback()
         raise
     return passed
+
+
+# ---- 관절 좌표 청크 업로드 (API-022) ----
+
+# 관절 개수 → 얼굴 랜드마크 인덱스. 얼굴 좌표는 서버로 받지 않는다 (backlog US-01 (정상) 3번째, 03 R11).
+# 값은 STACK.md '앱 안 자세 인식' 표와 ai/docs/DECISIONS.md D-07(얼굴 인덱스에 값이 있으면 거부)을 따른다
+FACE_INDEXES_BY_KEYPOINT_COUNT = {
+    33: range(0, 11),  # MediaPipe Pose: 0~10번 (코·눈·귀·입)
+    17: range(0, 5),  # MoveNet(COCO 17): 0~4번 (코·눈·귀)
+}
+
+_ENDED = (SessionStatus.SUBMITTED, SessionStatus.DISCARDED)
+
+
+def _check_frames(frames: Sequence[dict], body_bytes: int) -> None:
+    if len(frames) > CHUNK_MAX_FRAMES:
+        raise _validation_failed("TOO_MANY_FRAMES")
+    if body_bytes > CHUNK_MAX_BYTES:
+        raise _validation_failed("CHUNK_TOO_LARGE")
+    for frame in frames:
+        kp = frame["kp"]
+        face = FACE_INDEXES_BY_KEYPOINT_COUNT.get(len(kp))
+        if face is None:
+            raise _validation_failed("UNKNOWN_KEYPOINT_LAYOUT")
+        if any(kp[i] is not None for i in face):
+            raise _validation_failed("FACE_LANDMARK_INCLUDED")
+
+
+def received_seqs(db: Session, session_id: uuid.UUID) -> list[int]:
+    return list(
+        db.scalars(
+            select(PoseChunk.seq).where(PoseChunk.session_id == session_id).order_by(PoseChunk.seq)
+        )
+    )
+
+
+def upload_chunk(
+    db: Session,
+    user_id: uuid.UUID,
+    session_id: uuid.UUID,
+    seq: int,
+    frames: Sequence[dict],
+    body_bytes: int,
+) -> list[int]:
+    """좌표 청크를 저장하고(같은 seq면 덮어씀) 받은 seq 목록을 돌려준다 (노션 API-022).
+
+    일시중지(PAUSED) 중에도 받는다: 재개(API-024) 뒤 빠진 seq를 다시 보내는 흐름이 있고,
+    명세의 409는 '이미 종료된 세션'만이다. 끝난 세션(SUBMITTED·DISCARDED)이면 409.
+    """
+    try:
+        session = get_owned_session(db, user_id, session_id, lock=True)
+        if session.status in _ENDED:
+            raise _invalid_state("이미 종료된 세션입니다.")
+        _check_frames(frames, body_bytes)
+
+        stmt = insert(PoseChunk).values(
+            session_id=session_id, seq=seq, frames=list(frames), received_at=_now()
+        )
+        db.execute(
+            stmt.on_conflict_do_update(
+                index_elements=[PoseChunk.session_id, PoseChunk.seq],
+                set_={"frames": stmt.excluded.frames, "received_at": stmt.excluded.received_at},
+            )
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    return received_seqs(db, session_id)
