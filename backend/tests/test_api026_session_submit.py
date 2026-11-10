@@ -4,6 +4,7 @@
 """
 
 import uuid
+from datetime import UTC, datetime, timedelta
 
 from app.modules.submission.models import DailyCapReservation, RepEvent, WorkoutSubmission
 from tests.character_helpers import new_player
@@ -148,17 +149,56 @@ def test_us01_api026_partial_cap_reserves_remaining_only(client, db):
 
 
 def test_us01_api026_duplicate_time_range_is_409(client):
+    """두 세션을 같은 시간대에 함께 진행하면(첫 세션이 끝나기 전에 두 번째 시작) 두 번째 제출은 409."""
     _, headers = new_player(client)
     first = start_session(client, headers)
-    upload_chunks(client, headers, first)
-    assert submit(client, headers, first).status_code == 202
     second = start_session(client, headers)
+    upload_chunks(client, headers, first)
     upload_chunks(client, headers, second)
+    assert submit(client, headers, first).status_code == 202
 
     res = submit(client, headers, second)
 
     assert res.status_code == 409
     assert res.json()["code"] == "DUPLICATE_SUBMISSION"
+
+
+def test_us01_api026_back_to_back_sessions_are_not_duplicates(client):
+    """한 운동을 끝내고 바로 다음 운동을 해도 시간대가 겹치지 않아 둘 다 접수된다."""
+    _, headers = new_player(client)
+    for _ in range(2):
+        session_id = start_session(client, headers)
+        upload_chunks(client, headers, session_id)
+        assert submit(client, headers, session_id).status_code == 202
+
+
+def test_us01_api026_future_ended_at_is_clamped_to_server_time(client, db):
+    """endedAt이 미래(폰 시계가 빠름·먼 미래 값)면 서버 현재 시각으로 저장한다. 그대로 받으면 이후 정상 제출이
+    모두 중복(409)으로 막혔고, 거부하면 시계가 빠른 폰은 아예 제출하지 못했다 (검토에서 찾은 문제)."""
+    _, headers = new_player(client)
+
+    for ended in (datetime.now(UTC) + timedelta(minutes=5), datetime(2099, 1, 1, tzinfo=UTC)):
+        session_id = start_session(client, headers)
+        upload_chunks(client, headers, session_id)
+        before = datetime.now(UTC)
+        res = submit(client, headers, session_id, submit_body() | {"endedAt": ended.isoformat()})
+        # 앞 제출건이 미래로 끝났다면 이 두 번째 제출이 409가 됐을 것
+        assert res.status_code == 202, (ended, res.json())
+        saved = db.get(WorkoutSubmission, uuid.UUID(res.json()["submissionId"]))
+        db.refresh(saved)
+        assert before <= saved.ended_at <= datetime.now(UTC)
+
+
+def test_us01_api026_too_many_reps_is_400(client, db):
+    """reps는 최대 500개 (제안값). 넘으면 400이고 아무것도 저장하지 않는다."""
+    session_id, headers = _ready_session(client)
+
+    res = submit(client, headers, session_id, submit_body(counted=501))
+
+    assert res.status_code == 400
+    assert res.json()["code"] == "VALIDATION_FAILED"
+    assert db.query(RepEvent).count() == 0
+    assert submit(client, headers, session_id, submit_body(counted=500)).status_code == 202
 
 
 def test_us01_api026_other_users_session_is_403(client):

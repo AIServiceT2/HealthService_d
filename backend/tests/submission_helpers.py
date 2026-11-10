@@ -26,14 +26,16 @@ def upload_chunks(client, headers, session_id: str, count: int = 1) -> None:
 
 
 def submit_body(counted: int = 30, uncounted: int = 0, client_count: int | None = None, chunks: int = 1) -> dict:
+    # 끝난 시각은 제출하는 지금 (서버 현재 시각보다 미래면 400, API-026)
     now = datetime.now(UTC)
+    total = counted + uncounted
     reps = [
-        {"repNo": i + 1, "ts": (now + timedelta(seconds=i)).isoformat(), "counted": i < counted}
-        for i in range(counted + uncounted)
+        {"repNo": i + 1, "ts": (now - timedelta(seconds=total - i)).isoformat(), "counted": i < counted}
+        for i in range(total)
     ]
     return {
         "totalChunks": chunks,
-        "endedAt": (now + timedelta(minutes=10)).isoformat(),
+        "endedAt": now.isoformat(),
         "clientRepCount": counted if client_count is None else client_count,
         "reps": reps,
         "aiConfidence": 0.94,

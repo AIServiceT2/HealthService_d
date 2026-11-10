@@ -157,6 +157,7 @@ def submit_session(
     """세션을 끝내고 제출건(SUBMITTED)을 만든다 (노션 API-026).
 
     - 청크 1..totalChunks가 모두 있어야 한다 (없으면 400, details.missingSeq)
+    - endedAt이 서버 현재 시각보다 미래면 서버 현재 시각으로 저장한다
     - 서버 재계산 값보다 앱 렙 수가 크면 422 SERVER_RECOUNT_MISMATCH
     - 같은 사용자·운동의 활성 제출건과 시간이 겹치면 409 DUPLICATE_SUBMISSION
     - 그날 남은 상한만큼 원자적으로 예약한다. 다 찼으면 제출건은 만들고 예약 0
@@ -172,6 +173,10 @@ def submit_session(
         if session.status == SessionStatus.DISCARDED:
             raise AppError(409, "INVALID_STATE", "이미 제출했거나 폐기된 세션입니다.")
 
+        # 앱이 보낸 endedAt이 서버 현재 시각보다 미래면 서버 현재 시각으로 자른다 [제안·팀 확인 필요].
+        # 그대로 믿으면 폰 시계가 빠르거나 먼 미래 값이 오면 시간대 중복 검사가 이후 정상 제출까지 막고,
+        # 거부(400)하면 시계가 빠른 폰은 아예 제출하지 못한다
+        ended_at = min(ended_at, datetime.now(UTC))
         if ended_at <= session.started_at:
             raise _validation_failed("ENDED_BEFORE_START")
         rep_nos = [rep.rep_no for rep in reps]

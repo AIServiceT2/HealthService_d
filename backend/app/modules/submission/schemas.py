@@ -5,6 +5,8 @@ from datetime import datetime
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
+from app.modules.submission.constants import MAX_REPS_PER_SUBMISSION
+
 
 class _CamelModel(BaseModel):
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True, from_attributes=True)
@@ -38,7 +40,7 @@ class SubmitRequest(_CamelModel):
     total_chunks: int = Field(ge=1)
     ended_at: AwareDatetime
     client_rep_count: int = Field(ge=0)
-    reps: list[RepIn]
+    reps: list[RepIn] = Field(max_length=MAX_REPS_PER_SUBMISSION)
     ai_confidence: float = Field(ge=0, le=1)
 
 

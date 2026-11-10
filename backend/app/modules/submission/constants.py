@@ -40,3 +40,6 @@ CANCELABLE_STATUSES = (
     SubmissionStatus.PREPARED,
     SubmissionStatus.PENDING_REVIEW,
 )
+
+# 한 번에 받는 렙 기록(reps) 최대 개수 [제안·팀 확인 필요]. 일일 상한(스쿼트 200회)보다 넉넉하게 둔다
+MAX_REPS_PER_SUBMISSION = 500

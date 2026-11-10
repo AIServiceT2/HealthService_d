@@ -100,7 +100,9 @@ stub_router = APIRouter(tags=["submission"], responses=_ERRORS_4XX)
     summary="[API-026] 세션 종료·운동 제출",
     description=(
         "권한: OWNER. Idempotency-Key 필수, 같은 키로 다시 보내면 첫 결과를 돌려준다. "
-        "청크 1..totalChunks가 모두 있어야 한다. 그날 상한이 다 찼으면 제출건은 만들고 reservedReps는 0. "
+        "청크 1..totalChunks가 모두 있어야 한다. endedAt이 서버 현재 시각보다 미래면 서버 시각으로 저장, "
+        "reps는 최대 500개 (둘 다 제안). "
+        "그날 상한이 다 찼으면 제출건은 만들고 reservedReps는 0. "
         "임시: 서버 재계산은 ai/ 엔진 연결 전이라 reps 중 counted=true 수를 쓰고, "
         "confidence는 앱이 보낸 aiConfidence를 저장한다."
     ),
