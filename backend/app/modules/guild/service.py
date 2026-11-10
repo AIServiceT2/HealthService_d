@@ -96,9 +96,18 @@ class GuildInfo:
     member_count: int
 
 
+def _locked(stmt):
+    """행 잠금 + 이미 읽어 둔 객체도 DB 값으로 다시 채움 (잠근 뒤 최신 값을 보장)."""
+    return stmt.with_for_update().execution_options(populate_existing=True)
+
+
 def _lock_user(db: Session, user_id: uuid.UUID) -> User:
-    """사용자 행을 잠근다. 같은 사용자의 길드 요청이 동시에 와도 하나씩 처리된다."""
-    return db.scalars(select(User).where(User.id == user_id).with_for_update()).one()
+    """사용자 행을 잠근다. 같은 사용자의 길드 요청이 동시에 와도 하나씩 처리된다.
+
+    로그인 확인(get_current_user)이 같은 세션에서 User를 이미 읽어 두었으므로 populate_existing으로
+    잠근 뒤 DB 값을 다시 채운다. 없으면 다른 요청이 커밋한 guild_id를 못 보고 예전 값을 쓴다.
+    """
+    return db.scalars(_locked(select(User).where(User.id == user_id))).one()
 
 
 def _lock_guild(db: Session, guild_id: uuid.UUID) -> Guild | None:
@@ -106,7 +115,7 @@ def _lock_guild(db: Session, guild_id: uuid.UUID) -> Guild | None:
 
     잠그는 순서는 항상 길드 → 사용자 (교착 상태를 피하려고).
     """
-    return db.scalars(select(Guild).where(Guild.id == guild_id).with_for_update()).one_or_none()
+    return db.scalars(_locked(select(Guild).where(Guild.id == guild_id))).one_or_none()
 
 
 def create_guild(db: Session, user_id: uuid.UUID, name: str) -> Guild:
@@ -285,7 +294,7 @@ def kick_member(db: Session, leader_id: uuid.UUID, guild_id: uuid.UUID, target_i
             raise NotGuildLeader(str(leader_id))
         if target_id == leader_id:
             raise CannotTargetSelf(str(target_id))
-        target = db.scalars(select(User).where(User.id == target_id).with_for_update()).one_or_none()
+        target = db.scalars(_locked(select(User).where(User.id == target_id))).one_or_none()
         if target is None or target.guild_id != guild.id:
             raise MemberNotFound(str(target_id))
         target.guild_id = None
@@ -308,7 +317,7 @@ def delegate_leader(db: Session, leader_id: uuid.UUID, guild_id: uuid.UUID, targ
             raise NotGuildLeader(str(leader_id))
         if target_id == leader_id:
             raise AlreadyLeader(str(target_id))
-        target = db.scalars(select(User).where(User.id == target_id).with_for_update()).one_or_none()
+        target = db.scalars(_locked(select(User).where(User.id == target_id))).one_or_none()
         if target is None or target.guild_id != guild.id:
             raise MemberNotFound(str(target_id))
         guild.leader_user_id = target.id

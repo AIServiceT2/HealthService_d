@@ -23,3 +23,23 @@ EXERCISE_SQUAT = "SQUAT"
 
 # 타격 단위: 스쿼트 1회 = 1타 (user-flows.md 4단계, 03 R9)
 HIT_UNIT = {EXERCISE_SQUAT: 1}
+
+# '같은 시간대 활성 제출건'(노션 API-026 DUPLICATE_SUBMISSION, 03 R3)에서 '활성'으로 보는 상태 [가정·팀 확인 필요].
+# 취소·반려·종료·회수된 건은 겹쳐도 새 제출을 막지 않는다
+BLOCKING_STATUSES = (
+    SubmissionStatus.SUBMITTED,
+    SubmissionStatus.PREPARED,
+    SubmissionStatus.PENDING_REVIEW,
+    SubmissionStatus.APPROVED,
+    SubmissionStatus.REWARDED,
+)
+
+# 승인 전 취소가 가능한 상태 (노션 API-030, backlog US-06)
+CANCELABLE_STATUSES = (
+    SubmissionStatus.SUBMITTED,
+    SubmissionStatus.PREPARED,
+    SubmissionStatus.PENDING_REVIEW,
+)
+
+# 한 번에 받는 렙 기록(reps) 최대 개수 [제안·팀 확인 필요]. 일일 상한(스쿼트 200회)보다 넉넉하게 둔다
+MAX_REPS_PER_SUBMISSION = 500

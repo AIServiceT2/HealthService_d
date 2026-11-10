@@ -14,6 +14,7 @@ from app.core.errors import AppError
 
 from app.modules.auth.dependencies import get_current_user
 from app.modules.auth.models import User
+from app.modules.submission.service import submission_for_session
 from app.modules.workout_session import service
 from app.modules.workout_session.catalog import (
     CATALOG_VERSION,
@@ -77,11 +78,14 @@ def api_018(_: User = Depends(get_current_user)) -> ExercisesResponse:
     "/me/daily-caps",
     summary="[API-019] 내 일일 상한 조회",
     description=(
-        "권한: PLAYER. date는 KST. 임시: reserved는 제출(API-026)이 아직 없어 항상 0"
+        "권한: PLAYER. date는 KST. reserved는 그날 해제되지 않은 상한 예약 합계(API-026에서 생김)"
     ),
     response_model=DailyCapsResponse,
 )
-def api_019(user: User = Depends(get_current_user)) -> DailyCapsResponse:
+def api_019(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> DailyCapsResponse:
     day = service.today_kst()
     return DailyCapsResponse(
         date=day,
@@ -92,7 +96,7 @@ def api_019(user: User = Depends(get_current_user)) -> DailyCapsResponse:
                 reserved=c.reserved,
                 remaining=c.remaining,
             )
-            for c in service.daily_caps(user.id, day)
+            for c in service.daily_caps(db, user.id, day)
         ],
     )
 
@@ -225,7 +229,7 @@ def api_024(
     description=(
         "권한: OWNER. 응답을 잃었을 때 기존 접수 여부를 먼저 확인하는 데 쓴다. "
         "남의 세션은 403 FORBIDDEN, 없으면 404 NOT_FOUND. "
-        "임시: submissionId는 제출(API-026)이 아직 없어 항상 null"
+        "submissionId는 제출(API-026) 전이면 null"
     ),
     response_model=SessionDetailResponse,
 )
@@ -241,7 +245,7 @@ def api_025(
         exercise_code=session.exercise_code,
         liveness_passed=session.liveness_passed,
         received_chunks=service.received_seqs(db, session.id),
-        submission_id=None,
+        submission_id=submission_for_session(db, session.id),
     )
 
 

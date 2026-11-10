@@ -114,3 +114,31 @@ def test_api009_docs_error_details_allow_list(client):
     details = doc["components"]["schemas"][name]["properties"]["details"]
     allowed = {option.get("type") for option in details["anyOf"]}
     assert {"object", "array", "null"} <= allowed
+
+
+def test_api009_lock_reads_latest_guild_id_even_if_user_was_loaded(db):
+    """요청이 로그인 확인에서 User를 먼저 읽어 둔 뒤 다른 요청이 길드를 만들어도, 잠근 뒤에는 최신
+    guild_id를 봐야 한다 (동시 생성이 여러 번 성공하던 버그의 회귀 테스트, 타이밍과 무관하게 재현)."""
+    import uuid as _uuid
+    from datetime import date
+
+    import pytest
+
+    from app.core.db import SessionLocal
+    from app.modules.auth.models import User
+    from app.modules.guild import service
+
+    user = User(email=f"{_uuid.uuid4().hex}@example.com", password_hash="x", nickname="a",
+                birth_date=date(2010, 1, 1))
+    db.add(user)
+    db.commit()
+
+    request = SessionLocal()
+    loaded = request.get(User, user.id)  # get_current_user처럼 먼저 읽어 두고 붙잡아 둔다
+    assert loaded.guild_id is None
+    with SessionLocal() as other:  # 그 사이 다른 요청이 길드를 만들고 커밋
+        service.create_guild(other, user.id, "먼저 만든 길드")
+
+    with pytest.raises(service.AlreadyInGuild):
+        service.create_guild(request, user.id, "두 번째 길드")
+    request.close()

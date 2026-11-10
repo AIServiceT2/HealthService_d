@@ -1,16 +1,103 @@
-"""화면과 주고받는 형식. 필드 이름은 DATA-MODEL.md와 같다."""
+"""제출건 API 입출력. JSON 키는 노션 API 명세서대로 camelCase, 파이썬 안에서는 snake_case."""
 
 import uuid
-from typing import Any
+from datetime import datetime
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
+from pydantic.alias_generators import to_camel
 
-from pydantic import BaseModel, ConfigDict
+from app.modules.submission.constants import MAX_REPS_PER_SUBMISSION
 
 
-class SubmissionRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class _CamelModel(BaseModel):
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True, from_attributes=True)
+
+
+class ErrorResponse(BaseModel):
+    """노션 API 명세서 공통 에러 본문: { code, message, details }."""
+
+    code: str
+    message: str
+    # 입력 오류(400)는 항목 목록(list), 그 밖의 에러는 객체이거나 null (app/core/errors.py)
+    details: dict | list | None = None
+
+
+# ---- API-026 세션 종료·운동 제출 ----
+
+
+class RepIn(_CamelModel):
+    model_config = ConfigDict(extra="forbid")
+
+    rep_no: int = Field(ge=1)
+    ts: AwareDatetime
+    counted: bool
+
+
+class SubmitRequest(_CamelModel):
+    """{ totalChunks, endedAt, clientRepCount, reps, aiConfidence }."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    total_chunks: int = Field(ge=1)
+    ended_at: AwareDatetime
+    client_rep_count: int = Field(ge=0)
+    reps: list[RepIn] = Field(max_length=MAX_REPS_PER_SUBMISSION)
+    ai_confidence: float = Field(ge=0, le=1)
+
+
+class SubmitResponse(_CamelModel):
+    """API-026 응답 202: { submissionId, status, countedReps, reservedReps, version }."""
+
+    submission_id: uuid.UUID
+    status: str
+    counted_reps: int
+    reserved_reps: int
+    version: int
+
+
+# ---- API-028 제출 상태 조회 ----
+
+
+class SubmissionDetailRead(_CamelModel):
+    """API-028 응답 200 (API-029 목록 항목도 같은 형식)."""
 
     id: uuid.UUID
+    session_id: uuid.UUID
+    exercise_code: str
+    # SUBMITTED~REVOKED 9개 상태
     status: str
-    exercise_type: str
+    version: int
+    # AI_AUTO | REVIEWER, 승인 전 null
+    approval_path: str | None
+    started_at: datetime
+    ended_at: datetime
     counted_reps: int
-    snapshot: dict[str, Any] | None
+    reserved_reps: int
+    confidence: float
+    liveness_passed: bool | None
+
+
+class SubmissionList(_CamelModel):
+    """API-029 응답 200: { items, nextCursor }. 항목은 API-028과 같은 형식, nextCursor null이면 마지막 쪽."""
+
+    items: list[SubmissionDetailRead]
+    next_cursor: str | None
+
+
+# ---- API-030 승인 전 제출 취소 ----
+
+
+class CancelRequest(_CamelModel):
+    """API-030 요청: { reason } (선택). 저장할 칼럼이 ERD에 없어 받기만 한다 [팀 확인 필요]."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    reason: str | None = Field(default=None, max_length=200)
+
+
+class CancelResponse(_CamelModel):
+    """API-030 응답 200: { submissionId, status, releasedReps, version }."""
+
+    submission_id: uuid.UUID
+    status: str
+    released_reps: int
+    version: int

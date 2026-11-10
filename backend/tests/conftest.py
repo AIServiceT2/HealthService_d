@@ -12,6 +12,8 @@ os.environ["DATABASE_URL"] = os.environ.get(
 
 # 테스트 전용 서명 키 (실제 키가 아님). 셸에 JWT_SECRET이 있으면 그 값을 쓴다
 os.environ.setdefault("JWT_SECRET", "test-only-jwt-secret-not-for-production")
+# 서버 내부 호출(/internal) 테스트 전용 토큰 (실제 값이 아님, tests/submission_helpers.py와 같은 값)
+os.environ["INTERNAL_API_TOKEN"] = "test-only-internal-token"
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient
