@@ -14,18 +14,60 @@ from app.modules.submission.constants import BLOCKING_STATUSES, SubmissionStatus
 from app.modules.submission.models import DailyCapReservation, RepEvent, WorkoutSubmission
 from app.modules.workout_session import service as session_service
 from app.modules.workout_session.catalog import EXERCISES
-from app.modules.workout_session.models import SessionStatus
+from app.modules.workout_session.models import SessionStatus, WorkoutSession
 
 
 class SubmissionNotFound(Exception):
     pass
 
 
-def get_submission(db: Session, submission_id: uuid.UUID) -> WorkoutSubmission:
+class NotOwner(Exception):
+    pass
+
+
+@dataclass(frozen=True)
+class SubmissionDetail:
+    """API-028 제출 상태 조회 결과 (API-029 목록 항목도 같은 형식)."""
+
+    submission: WorkoutSubmission
+    reserved_reps: int
+    liveness_passed: bool | None
+
+
+def get_owned_submission(db: Session, user_id: uuid.UUID, submission_id: uuid.UUID) -> WorkoutSubmission:
+    """없으면 SubmissionNotFound, 남의 건이면 NotOwner (노션 API-028 Error Code)."""
     submission = db.get(WorkoutSubmission, submission_id)
     if submission is None:
         raise SubmissionNotFound(str(submission_id))
+    if submission.user_id != user_id:
+        raise NotOwner(str(user_id))
     return submission
+
+
+def details(db: Session, submissions: Sequence[WorkoutSubmission]) -> list[SubmissionDetail]:
+    """예약량·무작위 동작 확인 결과를 붙인다. reservedReps는 해제되지 않은 예약만 센다
+    (취소·반려로 해제되면 0) [제안·팀 확인 필요]."""
+    ids = [s.id for s in submissions]
+    if not ids:
+        return []
+    reserved = {
+        r.submission_id: (r.amount if r.released_at is None else 0)
+        for r in db.scalars(select(DailyCapReservation).where(DailyCapReservation.submission_id.in_(ids)))
+    }
+    liveness = dict(
+        db.execute(
+            select(WorkoutSession.id, WorkoutSession.liveness_passed).where(
+                WorkoutSession.id.in_([s.session_id for s in submissions])
+            )
+        ).all()
+    )
+    return [
+        SubmissionDetail(s, reserved.get(s.id, 0), liveness.get(s.session_id)) for s in submissions
+    ]
+
+
+def get_submission_detail(db: Session, user_id: uuid.UUID, submission_id: uuid.UUID) -> SubmissionDetail:
+    return details(db, [get_owned_submission(db, user_id, submission_id)])[0]
 
 
 # ---- 일일 상한 예약 (노션 DB 9절) ----

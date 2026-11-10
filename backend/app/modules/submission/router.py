@@ -1,41 +1,92 @@
-"""제출건 API. 경로는 API.md에서 '미정' — 아래 경로는 제안이며 개발자2와 합의 필요."""
+"""submission API. 노션 '전운시 API 명세서' API-026·028·029·030.
+
+로그인 확인은 auth 모듈의 get_current_user (Bearer access token, JWT).
+에러 본문 { code, message, details }은 전역 처리기(app/core/errors.py)가 만든다.
+"""
 
 import uuid
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, Response
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
+from app.core.errors import AppError
 from app.core.stub import not_implemented
 from app.modules.auth.dependencies import get_current_user
 from app.modules.auth.models import User
 from app.modules.submission import service
 from app.modules.submission.schemas import (
     ErrorResponse,
-    SubmissionRead,
+    SubmissionDetailRead,
     SubmitRequest,
     SubmitResponse,
 )
 
-router = APIRouter(prefix="/submissions", tags=["submission"])
+_ERRORS_4XX = {"4XX": {"model": ErrorResponse, "description": "공통 에러 본문 { code, message, details }"}}
+_UNAUTHENTICATED = {"model": ErrorResponse, "description": "UNAUTHENTICATED 로그인이 필요합니다."}
+
+router = APIRouter(prefix="/submissions", tags=["submission"], responses=_ERRORS_4XX)
 
 
-@router.get("/{submission_id}", response_model=SubmissionRead)
-def read_submission(submission_id: uuid.UUID, db: Session = Depends(get_db)):
+def to_read(detail: service.SubmissionDetail) -> SubmissionDetailRead:
+    s = detail.submission
+    return SubmissionDetailRead(
+        id=s.id,
+        session_id=s.session_id,
+        exercise_code=s.exercise_code,
+        status=s.status,
+        version=s.version,
+        approval_path=s.approval_path,
+        started_at=s.started_at,
+        ended_at=s.ended_at,
+        counted_reps=s.counted_reps,
+        reserved_reps=detail.reserved_reps,
+        confidence=s.confidence,
+        liveness_passed=detail.liveness_passed,
+    )
+
+
+def owner_errors(fn):
+    """SubmissionNotFound → 404, NotOwner → 403 으로 바꿔 던진다."""
     try:
-        return service.get_submission(db, submission_id)
+        return fn()
     except service.SubmissionNotFound:
-        raise HTTPException(status_code=404, detail="submission not found")
+        raise AppError(404, "NOT_FOUND", "제출건을 찾을 수 없습니다.")
+    except service.NotOwner:
+        raise AppError(403, "FORBIDDEN", "본인 제출건만 조회할 수 있습니다.")
+
+
+@router.get(
+    "/{submission_id}",
+    summary="[API-028] 제출 상태 조회",
+    description=(
+        "권한: OWNER. 응답 헤더 ETag에 제출건 version (취소·확인 요청 때 If-Match에 넣음). "
+        "reservedReps는 해제되지 않은 상한 예약량 (취소·반려로 해제되면 0)."
+    ),
+    response_model=SubmissionDetailRead,
+    response_model_by_alias=True,
+    responses={
+        401: _UNAUTHENTICATED,
+        403: {"model": ErrorResponse, "description": "FORBIDDEN 본인 제출건만 조회할 수 있습니다."},
+        404: {"model": ErrorResponse, "description": "NOT_FOUND 제출건을 찾을 수 없습니다."},
+    },
+)
+def read_submission(
+    submission_id: uuid.UUID,
+    response: Response,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    detail = owner_errors(lambda: service.get_submission_detail(db, user.id, submission_id))
+    response.headers["ETag"] = f'"{detail.submission.version}"'
+    return to_read(detail)
 
 
 # ---- 노션 API 명세서 API-026·029·030 ----
 # 경로가 /submissions로 시작하지 않는 것도 있어 prefix 없는 라우터를 따로 둔다.
 # 입력 오류는 전역 처리기가 400으로 돌려주므로, Swagger에 실제와 다른 422가 보이지 않게
 # 공통 에러 본문을 4XX로 선언한다 (API-026의 422 SERVER_RECOUNT_MISMATCH는 따로 적음)
-stub_router = APIRouter(
-    tags=["submission"],
-    responses={"4XX": {"model": ErrorResponse, "description": "공통 에러 본문 { code, message, details }"}},
-)
+stub_router = APIRouter(tags=["submission"], responses=_ERRORS_4XX)
 
 
 @stub_router.post(
@@ -52,7 +103,7 @@ stub_router = APIRouter(
     response_model_by_alias=True,
     responses={
         400: {"model": ErrorResponse, "description": "VALIDATION_FAILED 누락된 청크가 있거나 입력값이 올바르지 않습니다."},
-        401: {"model": ErrorResponse, "description": "UNAUTHENTICATED 로그인이 필요합니다."},
+        401: _UNAUTHENTICATED,
         403: {"model": ErrorResponse, "description": "FORBIDDEN 본인 세션만 제출할 수 있습니다."},
         404: {"model": ErrorResponse, "description": "NOT_FOUND 세션을 찾을 수 없습니다."},
         409: {

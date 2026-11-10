@@ -1,4 +1,4 @@
-"""제출건 API 입출력. 노션 API 명세서의 API는 camelCase, 첫 기능(US-02)의 SubmissionRead는 기존 형식."""
+"""제출건 API 입출력. JSON 키는 노션 API 명세서대로 camelCase, 파이썬 안에서는 snake_case."""
 
 import uuid
 from datetime import datetime
@@ -8,17 +8,6 @@ from pydantic.alias_generators import to_camel
 
 class _CamelModel(BaseModel):
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True, from_attributes=True)
-
-
-class SubmissionRead(BaseModel):
-    """첫 기능(US-02)의 임시 응답. API-028로 바꿀 때 지운다."""
-
-    model_config = ConfigDict(from_attributes=True)
-
-    id: uuid.UUID
-    status: str
-    exercise_type: str = Field(validation_alias="exercise_code")
-    counted_reps: int
 
 
 class ErrorResponse(BaseModel):
@@ -61,3 +50,25 @@ class SubmitResponse(_CamelModel):
     counted_reps: int
     reserved_reps: int
     version: int
+
+
+# ---- API-028 제출 상태 조회 ----
+
+
+class SubmissionDetailRead(_CamelModel):
+    """API-028 응답 200 (API-029 목록 항목도 같은 형식)."""
+
+    id: uuid.UUID
+    session_id: uuid.UUID
+    exercise_code: str
+    # SUBMITTED~REVOKED 9개 상태
+    status: str
+    version: int
+    # AI_AUTO | REVIEWER, 승인 전 null
+    approval_path: str | None
+    started_at: datetime
+    ended_at: datetime
+    counted_reps: int
+    reserved_reps: int
+    confidence: float
+    liveness_passed: bool | None
