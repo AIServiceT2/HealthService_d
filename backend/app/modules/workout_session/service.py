@@ -48,24 +48,25 @@ class DailyCap:
         return max(self.exercise.daily_cap - self.reserved, 0)
 
 
-def _reserved_today(user_id: uuid.UUID, exercise_code: str, day: date) -> int:
-    """그날(KST) 해제되지 않은 상한 예약 합계 (노션 API-019).
+def _reserved_today(db: Session, user_id: uuid.UUID, exercise_code: str, day: date) -> int:
+    """그날(KST) 해제되지 않은 상한 예약 합계 (노션 API-019). 예약은 제출(API-026) 때 만들어진다."""
+    # submission 모듈이 이 모듈을 쓰므로 순환 import를 피하려고 함수 안에서 가져온다
+    from app.modules.submission.service import reserved_amount
 
-    예약(DAILY_CAP_RESERVATION)은 제출(API-026) 때 만들어지는데 제출이 아직 없어 항상 0이다.
-    제출을 구현할 때 이 함수만 실제 합계로 바꾼다.
-    """
-    return 0
+    return reserved_amount(db, user_id, exercise_code, day)
 
 
-def daily_caps(user_id: uuid.UUID, day: date | None = None) -> list[DailyCap]:
+def daily_caps(db: Session, user_id: uuid.UUID, day: date | None = None) -> list[DailyCap]:
     day = day or today_kst()
-    return [DailyCap(e, _reserved_today(user_id, e.code, day)) for e in EXERCISES.values()]
+    return [DailyCap(e, _reserved_today(db, user_id, e.code, day)) for e in EXERCISES.values()]
 
 
-def daily_cap(user_id: uuid.UUID, exercise_code: str, day: date | None = None) -> DailyCap:
+def daily_cap(
+    db: Session, user_id: uuid.UUID, exercise_code: str, day: date | None = None
+) -> DailyCap:
     day = day or today_kst()
     exercise = EXERCISES[exercise_code]
-    return DailyCap(exercise, _reserved_today(user_id, exercise_code, day))
+    return DailyCap(exercise, _reserved_today(db, user_id, exercise_code, day))
 
 
 # ---- 세션 시작 (API-020) ----
@@ -119,7 +120,7 @@ def start_session(
     )
     db.add(session)
     db.commit()
-    return session, daily_cap(user_id, exercise_code)
+    return session, daily_cap(db, user_id, exercise_code)
 
 
 # ---- 본인 세션 확인 (API-021~027 공통) ----
