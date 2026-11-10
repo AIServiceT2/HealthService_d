@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -289,3 +289,24 @@ def resume_session(db: Session, user_id: uuid.UUID, session_id: uuid.UUID) -> Wo
         db, user_id, session_id, SessionStatus.PAUSED, SessionStatus.ACTIVE,
         "일시중지(PAUSED) 상태가 아니거나 재개 허용 시간이 지났습니다.",
     )
+
+
+# ---- 세션 폐기 (API-027) ----
+
+
+def discard_session(db: Session, user_id: uuid.UUID, session_id: uuid.UUID) -> None:
+    """세션을 DISCARDED로 바꾸고 받은 좌표 청크를 지운다 (노션 API-027).
+
+    이미 제출된(SUBMITTED) 세션이면 409. 이미 폐기된 세션은 바꿀 것이 없어 그대로 성공으로 끝낸다
+    (같은 폐기 요청을 다시 보내도 결과가 같음).
+    """
+    try:
+        session = get_owned_session(db, user_id, session_id, lock=True)
+        if session.status == SessionStatus.SUBMITTED:
+            raise _invalid_state("이미 제출된 세션입니다.")
+        session.status = SessionStatus.DISCARDED
+        db.execute(delete(PoseChunk).where(PoseChunk.session_id == session_id))
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise

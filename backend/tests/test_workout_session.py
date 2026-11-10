@@ -425,3 +425,61 @@ def test_us01_api025_forbidden_for_other_user_and_404_for_missing(client):
     assert forbidden.json()["code"] == "FORBIDDEN"
     assert missing.status_code == 404
     assert missing.json()["code"] == "NOT_FOUND"
+
+
+# ---- API-027 세션 폐기 ----
+
+
+def discard(client, headers, sid):
+    return client.delete(f"/workout-sessions/{sid}", headers=headers)
+
+
+def test_us01_api027_discards_session_and_deletes_chunks(client, db):
+    _, headers = new_player(client)
+    sid = start_session(client, headers)["sessionId"]
+    put_chunk(client, headers, sid, 1)
+    put_chunk(client, headers, sid, 2)
+
+    res = discard(client, headers, sid)
+
+    assert res.status_code == 204
+    detail = client.get(f"/workout-sessions/{sid}", headers=headers).json()
+    assert detail["status"] == "DISCARDED"
+    assert detail["receivedChunks"] == []
+    count = db.execute(
+        text("SELECT count(*) FROM pose_chunk WHERE session_id = :id"), {"id": sid}
+    ).scalar_one()
+    assert count == 0
+
+
+def test_us01_api027_discarded_session_rejects_further_changes(client):
+    _, headers = new_player(client)
+    started = start_session(client, headers)
+    sid = started["sessionId"]
+    discard(client, headers, sid)
+
+    assert discard(client, headers, sid).status_code == 204  # 다시 보내도 같은 결과
+    assert put_chunk(client, headers, sid, 1).status_code == 409
+    assert pause(client, headers, sid).status_code == 409
+    assert post_liveness(client, headers, started).status_code == 409
+
+
+def test_us01_api027_rejects_submitted_session(client, db):
+    _, headers = new_player(client)
+    sid = start_session(client, headers)["sessionId"]
+    # 제출(API-026)이 아직 없어 DB에서 상태만 바꿔 둔다
+    db.execute(text("UPDATE workout_session SET status = 'SUBMITTED' WHERE id = :id"), {"id": sid})
+    db.commit()
+
+    res = discard(client, headers, sid)
+
+    assert res.status_code == 409
+    assert res.json()["code"] == "INVALID_STATE"
+
+
+def test_us01_api027_only_owner(client):
+    _, owner = new_player(client)
+    _, other = new_player(client)
+    sid = start_session(client, owner)["sessionId"]
+
+    assert discard(client, other, sid).status_code == 403

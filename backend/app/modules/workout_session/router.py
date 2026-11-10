@@ -1,18 +1,17 @@
 """session API. 노션 '전운시 API 명세서' API-018~027.
 
-구현한 것: API-018~025. API-027(세션 폐기)은 아직 501.
+API-026(제출)은 submission 모듈에 있다 (submission/router.py stub_router).
 로그인 확인은 auth 모듈의 get_current_user (Bearer access token).
 """
 
 import uuid
 
-from fastapi import APIRouter, Depends, Path, Request
+from fastapi import APIRouter, Depends, Path, Request, Response
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
 from app.core.errors import AppError
 
-from app.core.stub import not_implemented
 from app.modules.auth.dependencies import get_current_user
 from app.modules.auth.models import User
 from app.modules.workout_session import service
@@ -243,8 +242,16 @@ def api_025(
 @router.delete(
     "/workout-sessions/{id}",
     summary="[API-027] 세션 폐기",
-    description="권한: OWNER",
-    status_code=501,
+    description=(
+        "권한: OWNER. 세션을 DISCARDED로 바꾸고 받은 좌표 청크를 지운다. "
+        "이미 제출된 세션은 409 INVALID_STATE. 이미 폐기된 세션은 다시 보내도 204"
+    ),
+    status_code=204,
 )
-def api_027(id: uuid.UUID) -> None:
-    not_implemented()
+def api_027(
+    id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Response:
+    service.discard_session(db, user.id, id)
+    return Response(status_code=204)
