@@ -333,3 +333,13 @@ def test_f01_api001_concurrent_duplicate_email_is_400_not_500(client, monkeypatc
 
     assert res.status_code == 400
     assert res.json()["details"] == {"reason": "EMAIL_ALREADY_USED"}
+
+
+def test_f01_api001_nickname_is_trimmed_and_blank_rejected(client):
+    assert _signup(client, nickname="  ").status_code == 400
+    assert _signup(client, nickname=" 가 ").status_code == 400  # 지우고 나면 1자
+
+    res = _signup(client, nickname="  민규  ")
+    assert res.status_code == 201
+    access = _login(client).json()["accessToken"]
+    assert client.get("/me", headers=_bearer(access)).json()["nickname"] == "민규"

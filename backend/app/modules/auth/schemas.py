@@ -2,9 +2,9 @@
 
 import uuid
 from datetime import date
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 from pydantic.alias_generators import to_camel
 
 # email-validator 패키지 없이 기본 형식만 검사한다
@@ -19,7 +19,8 @@ class SignupRequest(CamelModel):
     provider: Literal["EMAIL"]
     email: str = Field(pattern=EMAIL_PATTERN, max_length=254)
     password: str = Field(min_length=8, max_length=64)
-    nickname: str = Field(min_length=2, max_length=12)
+    # 앞뒤 공백을 지운 뒤 2~12자 (캐릭터·길드 이름과 같은 방식). 공백만 있으면 400
+    nickname: Annotated[str, StringConstraints(strip_whitespace=True, min_length=2, max_length=12)]
     birth_date: date
 
 
