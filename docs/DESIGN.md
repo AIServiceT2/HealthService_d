@@ -5,6 +5,7 @@
 - 기존 기준: **PRD 9절의 검정·형광 라임 다크 테마를 그대로 적용**한다. PRD 자체는 v0.1 검토 전이므로 이 문서에서 최종 합의 완료로 바꾸지 않는다.
 - 표기: **[기존 기준]**은 저장소 문서에 명시된 내용, **[제안]**은 이를 화면으로 구체화한 내용, **미정**은 근거 또는 팀 결정이 없는 내용이다.
 - 대상: React Native + Expo Android 앱, NativeWind 사용. (출처: [PRD](PRD.md) 4·9절, [STACK](STACK.md) 최종 선택)
+- 화면 시안: [design/screens-draft.html](design/screens-draft.html) (브라우저에서 열어 확인. 팀 검토 전 [제안])
 
 ## 1. 방향과 근거
 
