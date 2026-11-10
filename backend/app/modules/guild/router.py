@@ -2,7 +2,7 @@
 
 구현: API-009 길드 생성, API-010 길드 정보 조회, API-011 길드원 목록,
 API-012 길드 초대 코드 발급, API-013 초대 코드로 길드 가입,
-API-014 길드 탈퇴. 나머지는 경로만 있고 501을 돌려준다.
+API-014 길드 탈퇴, API-015 길드원 내보내기. 나머지는 경로만 있고 501을 돌려준다.
 로그인 확인은 auth 모듈의 get_current_user (Bearer access token, JWT).
 에러 본문 { code, message, details }은 전역 처리기(app/core/errors.py)가 만든다.
 """
@@ -226,11 +226,30 @@ def leave_guild(
 @router.delete(
     "/guilds/{guild_id}/members/{user_id}",
     summary="[API-015] 길드원 내보내기",
-    description="권한: GUILD_LEADER",
-    status_code=501,
+    description="권한: GUILD_LEADER. 본문 없음, 성공 시 204. 길드장 본인은 지정할 수 없다.",
+    status_code=204,
+    response_class=Response,
+    responses={
+        401: _UNAUTHENTICATED,
+        403: {"model": ErrorResponse, "description": "FORBIDDEN 길드장만 내보낼 수 있으며 본인은 지정할 수 없습니다."},
+        404: {"model": ErrorResponse, "description": "NOT_FOUND 해당 길드원을 찾을 수 없습니다."},
+    },
 )
-def api_015(guild_id: uuid.UUID, user_id: uuid.UUID) -> None:
-    not_implemented()
+def kick_member(
+    guild_id: uuid.UUID,
+    user_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        service.kick_member(db, user.id, guild_id, user_id)
+    except service.NotGuildLeader:
+        raise AppError(403, "FORBIDDEN", "길드장만 내보낼 수 있습니다.")
+    except service.CannotTargetSelf:
+        raise AppError(403, "FORBIDDEN", "본인은 내보낼 수 없습니다.")
+    except service.MemberNotFound:
+        raise AppError(404, "NOT_FOUND", "해당 길드원을 찾을 수 없습니다.")
+    return Response(status_code=204)
 
 
 @router.post(

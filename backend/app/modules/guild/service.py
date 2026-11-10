@@ -51,6 +51,14 @@ class LeaderCannotLeave(Exception):
     pass
 
 
+class CannotTargetSelf(Exception):
+    pass
+
+
+class MemberNotFound(Exception):
+    pass
+
+
 _INVITE_CODE_ATTEMPTS = 5
 
 
@@ -253,6 +261,28 @@ def leave_guild(db: Session, user_id: uuid.UUID, guild_id: uuid.UUID) -> None:
         if guild.leader_user_id == user.id:
             raise LeaderCannotLeave(str(user_id))
         user.guild_id = None
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+
+def kick_member(db: Session, leader_id: uuid.UUID, guild_id: uuid.UUID, target_id: uuid.UUID) -> None:
+    """길드장이 길드원을 내보낸다 (노션 API-015).
+
+    요청한 사람이 그 길드의 길드장이 아니면 NotGuildLeader, 본인을 지정하면 CannotTargetSelf,
+    대상이 그 길드원이 아니면 MemberNotFound.
+    """
+    try:
+        guild = _lock_guild(db, guild_id)
+        if guild is None or guild.leader_user_id != leader_id:
+            raise NotGuildLeader(str(leader_id))
+        if target_id == leader_id:
+            raise CannotTargetSelf(str(target_id))
+        target = db.scalars(select(User).where(User.id == target_id).with_for_update()).one_or_none()
+        if target is None or target.guild_id != guild.id:
+            raise MemberNotFound(str(target_id))
+        target.guild_id = None
         db.commit()
     except Exception:
         db.rollback()

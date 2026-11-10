@@ -7,14 +7,8 @@
 import uuid
 
 from tests.character_helpers import new_player
-from tests.guild_helpers import issue_code, new_guild
-
-
-def _join(client, guild_id, leader_headers):
-    code = issue_code(client, guild_id, leader_headers)
-    user_id, headers = new_player(client)
-    assert client.post("/guilds/join", json={"inviteCode": code}, headers=headers).status_code == 200
-    return user_id, headers
+from tests.guild_helpers import join_with_code as _join
+from tests.guild_helpers import new_guild
 
 
 def test_api014_member_leaves_204(client):

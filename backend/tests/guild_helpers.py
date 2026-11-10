@@ -29,3 +29,12 @@ def issue_code(client, guild_id: uuid.UUID, leader_headers: dict[str, str], hour
     res = client.post(f"/guilds/{guild_id}/invitations", json={"expiresInHours": hours}, headers=leader_headers)
     assert res.status_code == 201, res.json()
     return res.json()["inviteCode"]
+
+
+def join_with_code(client, guild_id: uuid.UUID, leader_headers: dict[str, str]) -> tuple[uuid.UUID, dict[str, str]]:
+    """새 사용자가 길드장이 발급한 초대 코드로 가입한다 (API-012 → API-013)."""
+    code = issue_code(client, guild_id, leader_headers)
+    user_id, headers = new_player(client)
+    res = client.post("/guilds/join", json={"inviteCode": code}, headers=headers)
+    assert res.status_code == 200, res.json()
+    return user_id, headers
