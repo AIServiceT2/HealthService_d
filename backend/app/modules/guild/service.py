@@ -248,6 +248,51 @@ def issue_invitation(
     raise RuntimeError("초대 코드를 만들지 못했습니다 (겹침 반복).")
 
 
+# 추천 길드 개수 (시안 'F-01 길드 가입'에 3개) [제안·팀 확인 필요]
+RECOMMENDED_LIMIT = 3
+
+
+@dataclass(frozen=True)
+class RecommendedGuild:
+    guild_id: uuid.UUID
+    name: str
+    member_count: int
+
+
+def list_recommended_guilds(db: Session, limit: int = RECOMMENDED_LIMIT) -> list[RecommendedGuild]:
+    """가입 화면의 추천 길드. 길드원이 많은 순, 같으면 이름·ID 순 [제안: 추천 기준 미정, 노션 명세에 없는 API]."""
+    count = func.count(User.id)
+    rows = db.execute(
+        select(Guild.id, Guild.name, count)
+        .join(User, User.guild_id == Guild.id, isouter=True)
+        .group_by(Guild.id, Guild.name)
+        .order_by(count.desc(), Guild.name, Guild.id)
+        .limit(limit)
+    ).all()
+    return [RecommendedGuild(guild_id=r[0], name=r[1], member_count=r[2]) for r in rows]
+
+
+def join_guild(db: Session, user_id: uuid.UUID, guild_id: uuid.UUID) -> uuid.UUID:
+    """추천 길드에서 골라 초대 코드 없이 가입한다 [제안: 노션 명세에 없는 API].
+
+    없는 길드면 GuildNotFound, 이미 길드에 소속되어 있으면 AlreadyInGuild.
+    잠그는 순서는 길드 → 사용자 (탈퇴·내보내기와 같음).
+    """
+    try:
+        guild = _lock_guild(db, guild_id)
+        if guild is None:
+            raise GuildNotFound(str(guild_id))
+        user = _lock_user(db, user_id)
+        if user.guild_id is not None:
+            raise AlreadyInGuild(str(user_id))
+        user.guild_id = guild.id
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    return guild_id
+
+
 def join_by_invitation(db: Session, user_id: uuid.UUID, code: str) -> uuid.UUID:
     """초대 코드로 길드에 가입하고 길드 ID를 돌려준다 (노션 API-013).
 
