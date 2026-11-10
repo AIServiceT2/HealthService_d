@@ -15,6 +15,7 @@ from tools import angle_study, calibrate_confidence, evaluate, make_sample_data,
 from tools.common import load_session, save_session, split_chunks
 from tools.extract_keypoints import Downsampler, landmarks_to_frame
 from tools.synth import SynthConfig, synth_frames, synth_meta, varied_squats
+from tools.synth_floor import FloorExercise
 
 
 @dataclass
@@ -172,3 +173,66 @@ def test_bottom_snapshot_rules() -> None:
     assert b.take(make_rep(start=0, dur=400)) is None  # bottom_t 200 ≠ 166 → 저장 안 함
     b.observe(False, 400, 170.0, np.array([400]), fr)  # 렙 밖 → 후보 버림
     assert b.image is None and b.take(make_rep(start=0, dur=332)) is None
+
+
+# --- webcam_demo 푸시업·윗몸 일으키기 (D-66) ------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("exercise", "angles", "name"),
+    [
+        ("PUSHUP", [75.0, 80.0, 110.0, 78.0], "elbow"),  # 110 = 가동범위 미달
+        ("SITUP", [110.0, 112.0, 135.0, 108.0], "torso"),  # 135 = 상체 45°만 들림
+    ],
+)
+def test_us01_demo_floor_exercise_counts_and_snapshots(
+    tmp_path: Path, exercise: FloorExercise, angles: list[float], name: str
+) -> None:
+    from tools.synth_floor import FloorRep, FloorSynthConfig
+    from tools.synth_floor import synth_frames as floor_frames
+    from tools.webcam_demo import Demo, default_catalog
+
+    saved: list[tuple[Path, int, int]] = []
+
+    def writer(path: Path, image: Any, frame: Frame, event: Any) -> None:
+        saved.append((path, int(image[0]), frame.t))
+
+    catalog = default_catalog(exercise)
+    assert catalog == "cat_2026-11-10"
+    demo = Demo(
+        720,
+        1280,
+        "lite",
+        "test",
+        False,
+        catalog,
+        tmp_path,
+        writer,
+        exercise,
+    )
+    sc = FloorSynthConfig(exercise, [FloorRep(a) for a in angles], noise_px=1.0)
+    events: list[Any] = []
+    for f in floor_frames(sc):
+        events += demo.push(f, np.array([f.t]))
+    accepted = [e for e in events if e.accepted]
+    assert demo.meta.exercise_type == exercise
+    assert len(events) == 4 and len(accepted) == 3
+    assert len(saved) == 3
+    for (path, image_t, frame_t), e in zip(saved, accepted, strict=True):
+        assert image_t == frame_t == e.bottom_t  # 엔진이 정한 최저점 프레임
+        assert path.name == f"rep{e.index:02d}_{e.depth_angle:.1f}deg.jpg"
+    assert demo.status_lines(15.0)[0].startswith(f"{exercise} {name} ")
+    sec = demo.runner.cfg.pushup if exercise == "PUSHUP" else demo.runner.cfg.situp
+    assert sec is not None
+    assert demo.threshold_angles() == (sec.rest_angle, sec.attempt_angle, sec.depth_accept_angle)
+
+
+def test_us01_demo_squat_defaults_unchanged() -> None:
+    from tools.webcam_demo import Demo, default_catalog
+
+    assert default_catalog("SQUAT") == "cat_2026-11-01"
+    demo = Demo(720, 1280, "lite", "test", False, "cat_2026-11-01")
+    sq = demo.runner.cfg.squat
+    assert demo.meta.exercise_type == "SQUAT"
+    assert demo.threshold_angles() == (sq.stand_angle, sq.attempt_angle, sq.depth_accept_angle)
+    assert demo.status_lines(15.0)[0] == "SQUAT knee -"

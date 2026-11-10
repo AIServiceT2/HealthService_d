@@ -1,13 +1,20 @@
 """웹캠 실시간 데모. 판정은 rep_engine의 SessionRunner를 그대로 호출한다 (데모 전용 판정 로직 없음).
 
-화면: 스켈레톤, 현재 kneeAngle, 상태, 인정/시도 수, 마지막 미인정 사유, 최근 5초 각도 그래프, FPS.
+화면: 스켈레톤, 현재 판정 각도, 상태, 인정/시도 수, 마지막 미인정 사유, 최근 5초 각도 그래프, FPS.
 키: L 무작위 동작 확인 시작 · R 리셋 · S 세션 JSON 저장 · Q 종료
 
-    python -m tools.webcam_demo                       # 카메라 0번
+    python -m tools.webcam_demo                       # 카메라 0번, 스쿼트
+    python -m tools.webcam_demo --exercise PUSHUP     # 푸시업 (카탈로그 cat_2026-11-10)
+    python -m tools.webcam_demo --exercise SITUP      # 윗몸 일으키기
     python -m tools.webcam_demo --snapshots           # 인정 렙마다 최저점 사진 저장
     python -m tools.webcam_demo --source data/videos/a.mp4 --headless   # 화면 없이 확인
 
-`--snapshots`: 인정된 렙마다 가장 깊이 앉은 순간(엔진의 bottomT 프레임) 사진 1장을
+판정 각도: 스쿼트 = 무릎(knee), 푸시업 = 팔꿈치(elbow),
+윗몸 일으키기 = 상체(torso, 어깨–엉덩이–발목).
+푸시업·윗몸 일으키기 기준은 측면 촬영 가정이다.
+카메라를 몸 옆에 두고 머리부터 발끝까지 화면에 담는다.
+
+`--snapshots`: 인정된 렙마다 판정 각도가 가장 작았던 순간(엔진의 bottomT 프레임) 사진 1장을
 `~/Downloads/jeonunsi_snapshots/<세션ID>/`에 저장한다 (흐림 없음, 얼굴이 나올 수 있음).
 PC 개발 도구 전용이다. 앱은 영상을 저장하지 않는다 (PRD 2절, US-01, DECISIONS D-65).
 
@@ -25,14 +32,18 @@ from pathlib import Path
 from typing import Any
 
 from rep_engine.config import load_catalog
+from rep_engine.counters.flexion import EXTENDING, FLEXING
 from rep_engine.counters.squat import ASCENDING, DESCENDING
+from rep_engine.features.chain import ChainFeatures
+from rep_engine.features.extractor import FrameFeatures
 from rep_engine.liveness import issue_challenge
 from rep_engine.schemas import (
+    AnyRepEvent,
     Device,
+    ExerciseType,
     Frame,
     LivenessChallenge,
     Platform,
-    RepEvent,
     SessionMeta,
 )
 from rep_engine.session import SessionRunner
@@ -44,7 +55,12 @@ GRAPH_WINDOW_MS = 5000
 LIVENESS_WINDOW_MS = 10000
 SNAPSHOT_DIR = Path.home() / "Downloads" / "jeonunsi_snapshots"
 #: 렙이 진행 중인 상태 (이 동안 최저점 후보 프레임을 들고 있음)
-IN_REP_STATES = frozenset({DESCENDING, ASCENDING})
+IN_REP_STATES = frozenset({DESCENDING, ASCENDING, FLEXING, EXTENDING})
+EXERCISES: tuple[ExerciseType, ...] = ("SQUAT", "PUSHUP", "SITUP")
+#: 푸시업·윗몸 일으키기 기준이 있는 카탈로그 (D-67)
+FLOOR_CATALOG = "cat_2026-11-10"
+#: 화면·사진에 쓰는 판정 각도 이름 (OpenCV가 한글을 못 그려 영문)
+ANGLE_NAME: dict[ExerciseType, str] = {"SQUAT": "knee", "PUSHUP": "elbow", "SITUP": "torso"}
 # 화면 그리기용 (판정과 무관)
 GREEN, RED, WHITE, YELLOW, GRAY = (
     (80, 220, 80),
@@ -73,11 +89,25 @@ BONES = [
 ]
 
 
-SnapshotWriter = Callable[[Path, Any, Frame, RepEvent], None]
+SnapshotWriter = Callable[[Path, Any, Frame, AnyRepEvent], None]
+
+
+def default_catalog(exercise: ExerciseType) -> str:
+    """종목별 기본 카탈로그. 옛 카탈로그(cat_2026-11-01)에는 푸시업·윗몸 일으키기 기준이 없다."""
+    return DEFAULT_CATALOG if exercise == "SQUAT" else FLOOR_CATALOG
+
+
+def judged_angle(f: FrameFeatures | ChainFeatures | None) -> float | None:
+    """판정 상태 머신이 쓰는 각도 (필터 적용). 무효 프레임이면 None."""
+    if isinstance(f, ChainFeatures):
+        return f.angle
+    if isinstance(f, FrameFeatures):
+        return f.knee_angle
+    return None
 
 
 class BottomSnapshot:
-    """렙 진행 중 무릎 각도가 가장 작았던 프레임 1장(이미지 + 관절)만 들고 있다.
+    """렙 진행 중 판정 각도가 가장 작았던 프레임 1장(이미지 + 관절)만 들고 있다.
 
     렙은 일어선 뒤에야 인정으로 확정되므로, 확정될 때까지 최저점 후보를 하나만 보관한다.
     판정 엔진과 같은 규칙(더 작을 때만 갱신)을 써서 엔진의 bottomT와 같은 프레임을 고른다.
@@ -107,16 +137,16 @@ class BottomSnapshot:
             self.t = t
             self.angle = angle
 
-    def take(self, event: RepEvent) -> tuple[Any, Frame] | None:
+    def take(self, event: AnyRepEvent) -> tuple[Any, Frame] | None:
         """인정 렙의 최저점(bottomT) 사진. 보관 중인 프레임과 시각이 다르면 None."""
         if self.image is None or self.frame is None or self.t != event.bottom_t:
             return None
         return self.image, self.frame
 
 
-def snapshot_path(directory: Path, session_id: str, event: RepEvent) -> Path:
-    """`<폴더>/<세션ID>/rep03_86.2deg.jpg`"""
-    return directory / session_id / f"rep{event.index:02d}_{event.min_knee_angle:.1f}deg.jpg"
+def snapshot_path(directory: Path, session_id: str, event: AnyRepEvent) -> Path:
+    """`<폴더>/<세션ID>/rep03_86.2deg.jpg` (각도 = 그 렙의 최저 판정 각도)"""
+    return directory / session_id / f"rep{event.index:02d}_{event.depth_angle:.1f}deg.jpg"
 
 
 def draw_skeleton(img: Any, frame: Frame, min_visibility: float) -> None:
@@ -140,14 +170,19 @@ def draw_skeleton(img: Any, frame: Frame, min_visibility: float) -> None:
 
 
 def write_snapshot(
-    path: Path, image: Any, frame: Frame, event: RepEvent, min_visibility: float
+    path: Path,
+    image: Any,
+    frame: Frame,
+    event: AnyRepEvent,
+    min_visibility: float,
+    angle_name: str = "knee",
 ) -> None:
-    """최저점 사진에 스켈레톤과 렙 번호·최저 무릎 각도를 그려 JPEG로 저장한다."""
+    """최저점 사진에 스켈레톤과 렙 번호·최저 판정 각도를 그려 JPEG로 저장한다."""
     import cv2
 
     out = image.copy()
     draw_skeleton(out, frame, min_visibility)
-    label = f"rep {event.index} | min knee {event.min_knee_angle:.1f} deg | accepted"
+    label = f"rep {event.index} | min {angle_name} {event.depth_angle:.1f} deg | accepted"
     cv2.putText(out, label, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 4)
     cv2.putText(out, label, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, YELLOW, 2)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -168,12 +203,15 @@ class Demo:
         catalog_version: str,
         snapshot_dir: Path | None = None,
         snapshot_writer: SnapshotWriter | None = None,
+        exercise: ExerciseType = "SQUAT",
     ) -> None:
+        self.exercise: ExerciseType = exercise
+        self.angle_name = ANGLE_NAME[exercise]
         self.catalog = load_catalog(catalog_version)
         self.snapshot_dir = snapshot_dir
         self._writer: SnapshotWriter = snapshot_writer or (
             lambda path, img, fr, ev: write_snapshot(
-                path, img, fr, ev, self.runner.cfg.features.min_visibility
+                path, img, fr, ev, self.runner.cfg.features.min_visibility, self.angle_name
             )
         )
         self.snapshots: list[Path] = []
@@ -187,7 +225,7 @@ class Demo:
     def _meta(self, liveness: LivenessChallenge | None) -> SessionMeta:
         return SessionMeta(
             session_id=f"demo-{int(time.time())}",
-            exercise_type="SQUAT",
+            exercise_type=self.exercise,
             catalog_version=self.catalog.version,
             fps=15,
             image_width=self.width,
@@ -216,7 +254,7 @@ class Demo:
         self.t_offset = start_t
         self._bottom.reset()
 
-    def push(self, frame: Frame, image: Any | None = None) -> list[RepEvent]:
+    def push(self, frame: Frame, image: Any | None = None) -> list[AnyRepEvent]:
         """프레임을 엔진에 넣는다. 세션 시각은 리셋 시점부터 다시 0에서 시작한다.
 
         `image`(BGR)를 주고 사진 저장이 켜져 있으면, 인정 렙의 최저점 사진을 저장한다.
@@ -226,9 +264,9 @@ class Demo:
             return []
         self.frames.append(local)
         events = self.runner.push(local)
-        f = self.runner.last_features
-        if f is not None and f.knee_angle is not None:
-            self.angles.append((local.t, f.knee_angle))
+        angle = judged_angle(self.runner.last_features)
+        if angle is not None:
+            self.angles.append((local.t, angle))
         while self.angles and local.t - self.angles[0][0] > GRAPH_WINDOW_MS:
             self.angles.popleft()
         for e in events:
@@ -239,17 +277,16 @@ class Demo:
                 e.index,
                 "인정" if e.accepted else "미인정",
                 e.reason.value if e.reason else "",
-                e.min_knee_angle,
+                e.depth_angle,
             )
             if e.accepted and self.snapshot_dir is not None:
                 self._save_snapshot(e)
         # 렙 확정(위)을 먼저 처리한 뒤 다음 최저점 후보를 갱신한다
-        knee = f.knee_angle if f is not None else None
         in_rep = self.runner.counting and self.runner.counter.state in IN_REP_STATES
-        self._bottom.observe(in_rep, local.t, knee, image, local)
+        self._bottom.observe(in_rep, local.t, angle, image, local)
         return events
 
-    def _save_snapshot(self, event: RepEvent) -> None:
+    def _save_snapshot(self, event: AnyRepEvent) -> None:
         picked = self._bottom.take(event)
         if picked is None or self.snapshot_dir is None:
             self.log.warning("렙 %d: 최저점 프레임을 찾지 못해 사진을 저장하지 않음", event.index)
@@ -265,6 +302,16 @@ class Demo:
         self.log.info("저장: %s (프레임 %d)", out, len(self.frames))
         return out
 
+    def threshold_angles(self) -> tuple[float, float, float]:
+        """그래프 기준선: (렙 끝 각도, 시도 각도, 인정 각도)."""
+        cfg = self.runner.cfg
+        if self.exercise == "SQUAT":
+            sq = cfg.squat
+            return sq.stand_angle, sq.attempt_angle, sq.depth_accept_angle
+        sec = cfg.pushup if self.exercise == "PUSHUP" else cfg.situp
+        assert sec is not None  # SessionRunner가 기준 없는 카탈로그를 이미 거부함
+        return sec.rest_angle, sec.attempt_angle, sec.depth_accept_angle
+
     def status_lines(self, fps: float) -> list[str]:
         r = self.runner
         angle = r.counter.current_angle
@@ -275,7 +322,9 @@ class Demo:
             else (lv.status.value if lv else f"WAIT {self.meta.liveness.action.value}")
         )
         return [
-            f"knee {angle:.1f} deg" if angle is not None else "knee -",
+            f"{self.exercise} {self.angle_name} {angle:.1f} deg"
+            if angle is not None
+            else f"{self.exercise} {self.angle_name} -",
             f"state {r.counter.state}{'' if r.counting else ' (liveness)'}",
             f"accepted {r.counter.accepted_count} / attempted {len(r.reps)}",
             f"last reason {self.last_reason}",
@@ -294,12 +343,8 @@ def _draw(img: Any, frame: Frame, demo: Demo, fps: float) -> None:
     # 최근 5초 각도 그래프 (0~180°)
     gx, gy, gw, gh = 10, h - 130, min(360, w - 20), 120
     cv2.rectangle(img, (gx, gy), (gx + gw, gy + gh), GRAY, 1)
-    sq = demo.runner.cfg.squat
-    for ang, color in (
-        (sq.stand_angle, WHITE),
-        (sq.attempt_angle, YELLOW),
-        (sq.depth_accept_angle, GREEN),
-    ):
+    rest, attempt, accept = demo.threshold_angles()
+    for ang, color in ((rest, WHITE), (attempt, YELLOW), (accept, GREEN)):
         y = int(gy + gh - ang / 180.0 * gh)
         cv2.line(img, (gx, y), (gx + gw, y), color, 1)
     if len(demo.angles) >= 2:
@@ -321,6 +366,7 @@ def run(
     max_frames: int | None,
     out_dir: Path,
     snapshot_dir: Path | None = None,
+    exercise: ExerciseType = "SQUAT",
 ) -> Demo:
     import cv2
     import mediapipe as mp
@@ -351,7 +397,10 @@ def run(
                 bgr = cv2.flip(bgr, 1)
             h, w = bgr.shape[:2]
             if demo is None:
-                demo = Demo(w, h, variant, mp.__version__, mirrored, catalog, snapshot_dir)
+                demo = Demo(
+                    w, h, variant, mp.__version__, mirrored, catalog, snapshot_dir, None, exercise
+                )
+                log.info("종목 %s, 카탈로그 %s", exercise, demo.catalog.version)
             t_ms = (
                 round((time.perf_counter() - t_start) * 1000)
                 if is_camera
@@ -408,7 +457,12 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="카메라 화면을 거울처럼 뒤집어 보여 주고 meta.mirrored=true로 저장",
     )
-    p.add_argument("--catalog", default=DEFAULT_CATALOG)
+    p.add_argument("--exercise", choices=EXERCISES, default="SQUAT", help="종목 (기본 SQUAT)")
+    p.add_argument(
+        "--catalog",
+        default=None,
+        help=f"카탈로그 버전 (기본: SQUAT은 {DEFAULT_CATALOG}, 그 외는 {FLOOR_CATALOG})",
+    )
     p.add_argument("--headless", action="store_true", help="창 없이 실행 (확인용)")
     p.add_argument("--max-frames", type=int, default=None)
     p.add_argument("--save", action="store_true", help="끝날 때 세션 JSON 저장")
@@ -424,11 +478,12 @@ def main(argv: list[str] | None = None) -> int:
         a.source,
         a.model,
         a.mirrored,
-        a.catalog,
+        a.catalog or default_catalog(a.exercise),
         a.headless,
         a.max_frames,
         a.out,
         a.snapshot_dir if a.snapshots else None,
+        a.exercise,
     )
     if a.save:
         demo.save(a.out)
