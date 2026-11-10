@@ -18,7 +18,7 @@ from app.modules.review import rules
 from app.modules.review.models import ReviewRequest
 from app.modules.submission import service as submission_service
 from app.modules.submission.constants import SubmissionStatus
-from app.modules.submission.models import WorkoutSubmission
+from app.modules.submission.models import DailyCapReservation, WorkoutSubmission
 
 
 class SubmissionNotFound(Exception):
@@ -370,3 +370,50 @@ def approve_review(
         db.rollback()
         raise
     return submission
+
+
+# ---- 확인자 반려 (API-039) ----
+
+
+@dataclass(frozen=True)
+class RejectResult:
+    submission: WorkoutSubmission
+    released_reps: int
+
+
+def reject_review(
+    db: Session,
+    reviewer_id: uuid.UUID,
+    submission_id: uuid.UUID,
+    expected_version: int,
+    reason_code: str,
+    reason_text: str,
+) -> RejectResult:
+    """PENDING_REVIEW → REJECTED → CLOSED, 상한 예약을 해제한다 (노션 API-039, backlog US-08).
+
+    - 사유 코드·설명은 둘 다 있어야 한다 (라우터에서 검사, US-08 (실패·거절))
+    - 카메라 세션 건은 재제출할 수 없어 REJECTED를 거쳐 바로 CLOSED (03 3-2). MVP 제출건은 모두 카메라 세션
+    - 상태가 두 번 바뀌므로 version도 2 오른다 (노션 예시 4 → 6)
+    - 반려는 확인자의 요청으로만 일어난다. AI 판정·ai_flags로 반려하는 경로는 없다 (US-08)
+    """
+    try:
+        submission, review = _lock_for_reviewer(db, reviewer_id, submission_id, expected_version)
+        review.reason_code = reason_code
+        review.reason_text = reason_text
+
+        reservation = db.get(DailyCapReservation, submission_id)
+        released = 0
+        if reservation is not None and reservation.released_at is None:
+            reservation.released_at = datetime.now(UTC)
+            released = reservation.amount
+
+        submission.status = SubmissionStatus.REJECTED
+        submission.version += 1
+        db.flush()
+        submission.status = SubmissionStatus.CLOSED
+        submission.version += 1
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    return RejectResult(submission, released)

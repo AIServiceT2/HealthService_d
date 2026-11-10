@@ -84,3 +84,12 @@ def approve(client, submission_id: str, reviewer_headers, version: int):
     return client.post(
         f"/review-requests/{submission_id}/approve", headers=reviewer_headers | {"If-Match": f'"{version}"'}
     )
+
+
+def reject(client, submission_id: str, reviewer_headers, version: int, body=None):
+    """확인자 반려 (API-039)."""
+    return client.post(
+        f"/review-requests/{submission_id}/reject",
+        json=body if body is not None else {"reasonCode": "RECORD_ANOMALY", "reasonText": "12~15회가 너무 빠름"},
+        headers=reviewer_headers | {"If-Match": f'"{version}"'},
+    )

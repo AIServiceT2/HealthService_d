@@ -27,7 +27,9 @@ from app.modules.review.schemas import (
     RequesterNickname,
     RequesterRead,
     ReviewMaterial,
+    RejectRequest,
     ReviewApproved,
+    ReviewRejected,
     ReviewerRead,
     ReviewRequestCreate,
     ReviewRequestCreated,
@@ -284,11 +286,43 @@ def api_038(
 @router.post(
     "/review-requests/{id}/reject",
     summary="[API-039] 확인자 반려",
-    description="권한: REVIEWER",
-    status_code=501,
+    description=(
+        "권한: REVIEWER(요청받은 확인자만). If-Match 필수(제출건 version). reasonCode(API-040 목록)와 "
+        "reasonText 둘 다 필수(설명 최대 500자, 제안). PENDING_REVIEW → REJECTED → CLOSED, 상한 예약 해제. "
+        "PENDING_REVIEW가 아니면 409, version 불일치 412"
+    ),
+    response_model=ReviewRejected,
 )
-def api_039(id: uuid.UUID) -> None:
-    not_implemented()
+def api_039(
+    id: uuid.UUID,
+    req: RejectRequest,
+    if_match: str = Header(alias="If-Match"),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ReviewRejected:
+    expected_version = _parse_if_match(if_match)
+    reason_text = (req.reason_text or "").strip()
+    if req.reason_code not in rules.REJECT_REASONS or not reason_text:
+        reason = "MISSING_REASON" if not req.reason_code or not reason_text else "UNKNOWN_REASON_CODE"
+        raise AppError(400, "VALIDATION_FAILED", "반려 사유 코드와 설명이 필요합니다.", {"reason": reason})
+    try:
+        result = service.reject_review(db, user.id, id, expected_version, req.reason_code, reason_text)
+    except service.ReviewNotFound:
+        raise AppError(404, "NOT_FOUND", "확인 요청을 찾을 수 없습니다.")
+    except service.NotReviewer:
+        raise AppError(403, "FORBIDDEN", "요청받은 확인자만 반려할 수 있습니다.")
+    except service.VersionMismatch as e:
+        raise _concurrent_update(e.args[0])
+    except service.InvalidState:
+        raise AppError(409, "INVALID_STATE", "PENDING_REVIEW 상태가 아닙니다.")
+    s = result.submission
+    return ReviewRejected(
+        submission_id=s.id,
+        submission_status=s.status,
+        released_reps=result.released_reps,
+        camera_session_closed=True,  # MVP 제출건은 모두 카메라 세션이라 재제출 없이 닫힘
+        version=s.version,
+    )
 
 
 @router.get(

@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
 
@@ -125,4 +125,25 @@ class ReviewApproved(_CamelModel):
     submission_id: uuid.UUID
     submission_status: str
     approval_path: str
+    version: int
+
+
+# ---- API-039 확인자 반려 ----
+
+# 반려 설명 최대 길이 [제안·팀 확인 필요]
+REASON_TEXT_MAX_LENGTH = 500
+
+
+class RejectRequest(_CamelModel):
+    # 둘 다 필수지만, 빠졌을 때 명세 문구('반려 사유 코드와 설명이 필요합니다.')로 답하려고
+    # 스키마에서는 선택으로 받고 라우터에서 검사한다
+    reason_code: str | None = Field(default=None, max_length=32)
+    reason_text: str | None = Field(default=None, max_length=REASON_TEXT_MAX_LENGTH)
+
+
+class ReviewRejected(_CamelModel):
+    submission_id: uuid.UUID
+    submission_status: str
+    released_reps: int
+    camera_session_closed: bool
     version: int
