@@ -4,6 +4,7 @@ import { ScrollView, Text, TextInput, StyleSheet } from 'react-native';
 import { ActionButton } from '../src/components/ActionButton';
 import { COLORS, FONT, RADIUS, SPACE, TOUCH_MIN } from '../src/theme/tokens';
 import { IS_MOCK_MODE, isSubmissionId } from '../src/api/submissions';
+import { logout } from '../src/auth/session';
 export default function Home() {
   const [id, setId] = useState(''); const router = useRouter();
   const valid = isSubmissionId(id.trim());
@@ -19,6 +20,7 @@ export default function Home() {
     {id.length === 0 && <Text style={styles.hint}>제출건 ID를 입력하면 버튼을 누를 수 있어요.</Text>}
     {id.length > 0 && !valid && <Text style={styles.error}>UUID 형식의 제출건 ID를 입력해 주세요.</Text>}
     <ActionButton title="보상 미리보기" disabled={!valid} onPress={open} />
+    <ActionButton title="로그아웃" secondary onPress={async () => { await logout(); router.replace('/'); }} />
     <Text style={styles.note}>첫 기능 시연 · US-02{'\n'}{IS_MOCK_MODE ? '목데이터 모드입니다. UUID로 예시 기록을 조회하며 서버에는 저장되지 않아요.' : '서버 시드로 만든 기록을 조회합니다. 아직 전투 결과가 지급된 상태는 아닙니다.'}</Text>
   </ScrollView>;
 }
