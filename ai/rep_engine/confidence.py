@@ -4,7 +4,8 @@
 - c_vis: 활성 구간 유효 프레임의 핵심 관절 평균 가시도
 - c_valid: 활성 구간 유효 프레임 비율
 - c_track: 1 − (무효 연속 구간 총 시간 / 활성 구간 시간)
-- c_consistency: 인정 렙의 렙 시간 변동계수(CV)와 최저 각도 표준편차를 각각 exp(−k·x)로 바꿔 평균.
+- c_consistency: 인정 렙의 렙 시간 변동계수(CV)와 최저 판정 각도(`depth_angle`) 표준편차를
+  각각 exp(−k·x)로 바꿔 평균.
   인정 렙이 `min_reps_for_consistency` 미만이면 `neutral_score`.
 - c_unaccepted: 1 − (시도 렙 중 OUT_OF_FRAME 비율). 시도 렙 0개면 `neutral_score`.
 
@@ -18,18 +19,18 @@ raw = Σ wᵢ·cᵢ. 무작위 동작 확인이 PASSED가 아니면(없는 경�
 from __future__ import annotations
 
 import math
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 
 from rep_engine.adapters import SkeletonFrame
 from rep_engine.config import ConfidenceCfg
 from rep_engine.features.extractor import frame_quality
 from rep_engine.rounding import r_ratio
 from rep_engine.schemas import (
+    AnyRepEvent,
     ConfidenceComponents,
     ConfidenceResult,
     LivenessResult,
     LivenessStatus,
-    RepEvent,
     RepReason,
 )
 from rep_engine.stats import mean, pstdev
@@ -59,11 +60,15 @@ def _tracking(frames: Sequence[SkeletonFrame], valid: Sequence[bool], end_t: int
     return float(total)
 
 
-def _consistency(accepted: Sequence[RepEvent], cfg: ConfidenceCfg) -> float:
+#: (프레임, min_visibility) → (유효 프레임 여부, 판정 관절 평균 가시도). 종목마다 판정 관절이 다르다
+QualityFn = Callable[[SkeletonFrame, float], tuple[bool, float | None]]
+
+
+def _consistency(accepted: Sequence[AnyRepEvent], cfg: ConfidenceCfg) -> float:
     if len(accepted) < cfg.min_reps_for_consistency:
         return cfg.neutral_score
     durations = [float(e.end_t - e.start_t) for e in accepted]
-    depths = [e.min_knee_angle for e in accepted]
+    depths = [e.depth_angle for e in accepted]
     m = mean(durations)
     cv = pstdev(durations) / m if m > 0 else 0.0
     s_dur = math.exp(-cfg.consistency_k.duration_cv * cv)
@@ -73,12 +78,16 @@ def _consistency(accepted: Sequence[RepEvent], cfg: ConfidenceCfg) -> float:
 
 def compute_confidence(
     frames: Sequence[SkeletonFrame],
-    reps: Sequence[RepEvent],
+    reps: Sequence[AnyRepEvent],
     liveness: LivenessResult | None,
     cfg: ConfidenceCfg,
     min_visibility: float,
+    quality_fn: QualityFn = frame_quality,
 ) -> ConfidenceResult:
-    """세션 확신도를 계산한다. `frames`는 세션 전체 공통 골격 프레임(시각순)."""
+    """세션 확신도를 계산한다. `frames`는 세션 전체 공통 골격 프레임(시각순).
+
+    `quality_fn`의 기본값은 스쿼트(다리 관절) 기준이다.
+    """
     passed = liveness is not None and liveness.status is LivenessStatus.PASSED
     start_t: int | None = None
     end_t: int | None = None
@@ -95,7 +104,7 @@ def compute_confidence(
         else []
     )
 
-    quality = [frame_quality(f, min_visibility) for f in window]
+    quality = [quality_fn(f, min_visibility) for f in window]
     valid = [q[0] for q in quality]
     vis_vals = [q[1] for q in quality if q[1] is not None]
     c_vis = mean(vis_vals) if vis_vals else 0.0

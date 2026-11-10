@@ -10,7 +10,7 @@ import copy
 import math
 import re
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, Self
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
@@ -65,6 +65,54 @@ class SquatCfg(_Cfg):
         if not (self.min_descent_ms < self.min_rep_ms < self.max_rep_ms):
             raise ValueError("min_descent_ms < min_rep_ms < max_rep_ms 이어야 함")
         return self
+
+
+class FlexionCfg(_Cfg):
+    """굽혔다 펴는 렙 판정 기준 (푸시업·윗몸 일으키기 공통). 각도는 판정 각도(내각, 도), 시간은 ms.
+
+    판정 각도는 쉬는 자세에서 크고(`rest_angle` 이상) 굽힐수록 작아진다.
+    `flex_start_angle` 아래로 내려가면 렙 시작, `attempt_angle` 아래까지 가야 시도로 기록,
+    `depth_accept_angle` 이하까지 가야 인정, 다시 `rest_angle` 이상이면 렙 끝.
+    """
+
+    flex_start_angle: float = Field(gt=0, lt=180)
+    attempt_angle: float = Field(gt=0, lt=180)
+    depth_accept_angle: float = Field(gt=0, lt=180)
+    rest_angle: float = Field(gt=0, le=180)
+    bottom_hysteresis_deg: float = Field(gt=0)
+    min_rep_ms: int = Field(gt=0)
+    min_descent_ms: int = Field(gt=0)
+    max_rep_ms: int = Field(gt=0)
+    max_invalid_ratio_in_rep: float = Field(ge=0, le=1)
+    max_gap_in_rep_ms: int = Field(gt=0)
+
+    @model_validator(mode="after")
+    def _order(self) -> Self:
+        if not (self.depth_accept_angle < self.attempt_angle < self.flex_start_angle):
+            raise ValueError("depth_accept_angle < attempt_angle < flex_start_angle 이어야 함")
+        if self.rest_angle < self.flex_start_angle:
+            raise ValueError("rest_angle >= flex_start_angle 이어야 함")
+        if not (self.min_descent_ms < self.min_rep_ms < self.max_rep_ms):
+            raise ValueError("min_descent_ms < min_rep_ms < max_rep_ms 이어야 함")
+        return self
+
+
+class PushupCfg(FlexionCfg):
+    """푸시업. 판정 각도 = 팔꿈치 내각(어깨–팔꿈치–손목)."""
+
+    #: 인정 렙 평균 몸통 이탈(180 − 어깨–엉덩이–발목 내각)이 이 값을 넘으면 BODY_LINE_BROKEN
+    body_line_dev_deg: float = Field(ge=0)
+
+
+class SitupCfg(FlexionCfg):
+    """윗몸 일으키기. 판정 각도 = 상체 각도(어깨–엉덩이–발목 내각, 180 − 상체가 들린 각도).
+
+    상체 각도 기준(`depth_accept_angle`)과 엉덩이 각도 기준(`hip_accept_angle`)을 **둘 다** 넘어야
+    인정한다 (D-70).
+    """
+
+    #: 렙 동안 엉덩이 내각(어깨–엉덩이–무릎) 최저값이 이 값 이하여야 인정
+    hip_accept_angle: float = Field(gt=0, lt=180)
 
 
 class LivenessCfg(_Cfg):
@@ -160,9 +208,13 @@ class EngineConfig(_Cfg):
     """모델 덮어쓰기까지 적용된, 엔진이 실제로 쓰는 설정."""
 
     catalog_version: str
-    exercise: Literal["SQUAT"]
+    #: 옛 카탈로그(cat_2026-11-01) 호환용. 종목별 기준은 아래 squat/pushup/situp 섹션이 정한다
+    exercise: Literal["SQUAT"] | None = None
     features: FeaturesCfg
     squat: SquatCfg
+    #: 없으면 그 카탈로그 버전으로는 해당 종목을 판정할 수 없다 (ConfigError)
+    pushup: PushupCfg | None = None
+    situp: SitupCfg | None = None
     liveness: LivenessCfg
     confidence: ConfidenceCfg
     form_tags: FormTagsCfg
