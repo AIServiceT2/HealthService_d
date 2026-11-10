@@ -125,3 +125,14 @@ def test_us02_api049_internal_only(client):
     sid, headers = new_prepared(client)
     assert client.post(PATH, json={"submissionId": sid}).status_code == 401
     assert client.post(PATH, json={"submissionId": sid}, headers=headers).status_code == 401
+
+
+def test_us05_api049_korean_number_words_are_rejected_but_ordinary_words_pass():
+    """서사의 숫자 검사는 한글 수사도 본다 (backlog US-05). 단위가 붙을 때만 숫자로 본다."""
+    from app.modules.llm.service import is_valid_narrative
+
+    with_numbers = ["충격파가 서른 번 꽂혔다.", "세 번의 일격!", "삼십 회 공격", "열 개의 상자", "스물두 번 몰아쳤다", "한 번 더 내리쳤다"]
+    ordinary = ["이번에는 더 깊게 앉았다.", "둘러싼 적을 쓰러뜨렸다.", "열정적인 일격이 터졌다.", "하나의 충격파가 땅을 갈랐다.", "세차게 내리쳤다.", "한계를 넘었다."]
+
+    assert [t for t in with_numbers if is_valid_narrative(t, "충격파 스톰프")] == []
+    assert [t for t in ordinary if not is_valid_narrative(t, "충격파 스톰프")] == []
