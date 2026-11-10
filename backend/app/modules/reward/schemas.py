@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import AwareDatetime, BaseModel, ConfigDict
 from pydantic.alias_generators import to_camel
 
 
@@ -37,6 +37,21 @@ class GrantResponse(_CamelModel):
     already_granted: bool
     applied: AppliedRead
     rewarded_at: datetime
+
+
+class ReleaseRequest(_CamelModel):
+    """API-042 요청: { now } (선택, 테스트용 기준 시각). 없으면 서버 현재 시각."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    now: AwareDatetime | None = None
+
+
+class ReleaseResponse(_CamelModel):
+    """API-042 응답 200: { releasedItems, confirmedStats }."""
+
+    released_items: int
+    confirmed_stats: int
 
 
 class ErrorResponse(BaseModel):

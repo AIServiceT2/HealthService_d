@@ -124,6 +124,40 @@ def grant(db: Session, submission_id: uuid.UUID, idempotency_key: uuid.UUID) -> 
     return result
 
 
+# ---- 24시간 잠금 해제 (노션 API-042) ----
+
+
+@dataclass(frozen=True)
+class ReleaseResult:
+    released_items: int
+    confirmed_stats: int
+
+
+def release_locks(db: Session, now: datetime | None = None) -> ReleaseResult:
+    """지급 뒤 24시간이 지난 LOCKED 아이템을 UNLOCKED로 바꾼다 (노션 API-042).
+
+    - 경계: rewarded_at + 24시간 '이후'(같은 시각 포함)부터 해제 [제안 — 명세 '24시간 경계 처리 미정']
+    - UPDATE 한 문장이라 배치가 동시에 두 번 돌아도 같은 아이템을 두 번 세지 않는다
+    - 능력치 확정은 능력치 모델이 미정이라 0. 캐릭터 경험치의 '확정 대기'는 시간으로 계산하므로
+      (pending_exp) 배치가 바꿀 것이 없다
+    """
+    now = now or datetime.now(UTC)
+    unlockable = select(RewardLedger.submission_id).where(
+        RewardLedger.rewarded_at <= now - PROTECTION_PERIOD
+    )
+    try:
+        result = db.execute(
+            update(Item)
+            .where(Item.status == ItemStatus.LOCKED, Item.submission_id.in_(unlockable))
+            .values(status=ItemStatus.UNLOCKED)
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    return ReleaseResult(released_items=result.rowcount, confirmed_stats=0)
+
+
 # ---- 다른 모듈용 (API-007 내 캐릭터·성장 조회) ----
 
 

@@ -1,12 +1,12 @@
 """reward API. 노션 '전운시 API 명세서' API-041~044.
 
-구현: API-041 보상·피해 1회 반영. 나머지는 경로만 있고 501을 돌려준다.
+구현: API-041 보상·피해 1회 반영, API-042 24시간 잠금 해제. 나머지는 경로만 있고 501을 돌려준다.
 /internal API는 서버 내부 호출 전용 (X-Internal-Token, snapshot/internal.py).
 """
 
 import uuid
 
-from fastapi import APIRouter, Depends, Header
+from fastapi import APIRouter, Body, Depends, Header
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
@@ -19,6 +19,8 @@ from app.modules.reward.schemas import (
     ErrorResponse,
     GrantResponse,
     ItemRef,
+    ReleaseRequest,
+    ReleaseResponse,
 )
 from app.modules.snapshot.internal import require_internal_token
 
@@ -87,11 +89,22 @@ def grant(
 @router.post(
     "/internal/reward-locks/release",
     summary="[API-042] 24시간 잠금 해제·능력치 확정 (배치)",
-    description="권한: SYSTEM",
-    status_code=501,
+    description=(
+        "권한: SYSTEM (서버 내부 호출 전용, X-Internal-Token). 본문 선택: now(테스트용 기준 시각). "
+        "지급 뒤 24시간이 지난(같은 시각 포함, 제안) LOCKED 아이템을 UNLOCKED로 바꾼다. "
+        "confirmedStats는 능력치 모델이 미정이라 0. 해제 뒤 상태명 UNLOCKED는 제안, 실행 방식(스케줄)은 미정."
+    ),
+    response_model=ReleaseResponse,
+    response_model_by_alias=True,
+    responses={401: _INTERNAL_401},
+    dependencies=[Depends(require_internal_token)],
 )
-def api_042() -> None:
-    not_implemented()
+def release_locks(
+    body: ReleaseRequest | None = Body(default=None),
+    db: Session = Depends(get_db),
+):
+    result = service.release_locks(db, body.now if body else None)
+    return ReleaseResponse(released_items=result.released_items, confirmed_stats=result.confirmed_stats)
 
 
 @router.get(
