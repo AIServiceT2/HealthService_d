@@ -108,6 +108,7 @@ def reward_preview(
         narrative=NarrativeRead(
             level="L3",
             text=preview.narrative_text or rules.FALLBACK_NARRATIVE,
-            is_fallback=preview.narrative_text is None,
+            # 서사가 아직 없거나(NULL) L3 생성(API-049)이 실패해 기본 문구를 저장한 경우
+            is_fallback=preview.narrative_text in (None, rules.FALLBACK_NARRATIVE),
         ),
     )
