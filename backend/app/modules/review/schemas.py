@@ -147,3 +147,15 @@ class ReviewRejected(_CamelModel):
     released_reps: int
     camera_session_closed: bool
     version: int
+
+
+# ---- API-040 반려 사유 코드 목록 ----
+
+
+class RejectReasonItem(_CamelModel):
+    code: str
+    label: str
+
+
+class RejectReasonList(_CamelModel):
+    items: list[RejectReasonItem]

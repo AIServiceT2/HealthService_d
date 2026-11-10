@@ -14,7 +14,6 @@ from sqlalchemy.orm import Session
 
 from app.core.db import get_db
 from app.core.errors import AppError
-from app.core.stub import not_implemented
 from app.modules.review import rules, service
 from app.modules.auth.dependencies import get_current_user
 from app.modules.auth.models import User
@@ -27,6 +26,8 @@ from app.modules.review.schemas import (
     RequesterNickname,
     RequesterRead,
     ReviewMaterial,
+    RejectReasonItem,
+    RejectReasonList,
     RejectRequest,
     ReviewApproved,
     ReviewRejected,
@@ -328,8 +329,10 @@ def api_039(
 @router.get(
     "/reject-reasons",
     summary="[API-040] 반려 사유 코드 목록",
-    description="권한: NONE",
-    status_code=501,
+    description="권한: NONE (로그인 없이 조회). 반려(API-039)의 reasonCode로 쓰는 값",
+    response_model=RejectReasonList,
 )
-def api_040() -> None:
-    not_implemented()
+def api_040() -> RejectReasonList:
+    return RejectReasonList(
+        items=[RejectReasonItem(code=c, label=label) for c, label in rules.REJECT_REASONS.items()]
+    )
