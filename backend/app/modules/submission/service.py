@@ -172,6 +172,10 @@ def submit_session(
             return result
         if session.status == SessionStatus.DISCARDED:
             raise AppError(409, "INVALID_STATE", "이미 제출했거나 폐기된 세션입니다.")
+        if session.status == SessionStatus.PAUSED:
+            # 중단된 동안의 불완전 기록은 제출하지 않는다 (노션 API-023, STACK.md '추가 검증 항목').
+            # 재개(API-024)한 뒤 제출한다
+            raise AppError(409, "INVALID_STATE", "일시중지된 세션은 재개한 뒤 제출할 수 있습니다.")
 
         # 앱이 보낸 endedAt이 서버 현재 시각보다 미래면 서버 현재 시각으로 자른다 [제안·팀 확인 필요].
         # 그대로 믿으면 폰 시계가 빠르거나 먼 미래 값이 오면 시간대 중복 검사가 이후 정상 제출까지 막고,

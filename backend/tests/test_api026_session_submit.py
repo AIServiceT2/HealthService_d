@@ -220,3 +220,20 @@ def test_us01_api026_requires_idempotency_key_and_valid_body(client):
 
 def test_us01_api026_without_token_is_401(client):
     assert client.post(f"/workout-sessions/{uuid.uuid4()}/submit", json=submit_body()).status_code == 401
+
+
+def test_us01_api026_paused_session_is_409_until_resumed(client):
+    """중단된 동안의 불완전 기록은 제출하지 않는다 (노션 API-023). 재개하면 제출된다."""
+    _, headers = new_player(client)
+    session_id = start_session(client, headers)
+    upload_chunks(client, headers, session_id)
+    pause = {"reason": "APP_BACKGROUND", "at": datetime.now(UTC).isoformat()}
+    assert client.post(f"/workout-sessions/{session_id}/pause", json=pause, headers=headers).status_code == 200
+
+    res = submit(client, headers, session_id)
+
+    assert res.status_code == 409
+    assert res.json()["code"] == "INVALID_STATE"
+    assert client.get(f"/workout-sessions/{session_id}", headers=headers).json()["status"] == "PAUSED"
+    assert client.post(f"/workout-sessions/{session_id}/resume", headers=headers).status_code == 200
+    assert submit(client, headers, session_id).status_code == 202
