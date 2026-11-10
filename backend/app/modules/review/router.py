@@ -7,7 +7,9 @@
 import re
 import uuid
 
-from fastapi import APIRouter, Depends, Header
+from typing import Literal
+
+from fastapi import APIRouter, Depends, Header, Query
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
@@ -20,6 +22,9 @@ from app.modules.review.schemas import (
     Anomaly,
     AutoApprovalResponse,
     ErrorResponse,
+    ReceivedReviewItem,
+    ReceivedReviewList,
+    RequesterRead,
     ReviewerRead,
     ReviewRequestCreate,
     ReviewRequestCreated,
@@ -169,11 +174,38 @@ def api_035(
 @router.get(
     "/me/review-requests",
     summary="[API-036] 받은 확인 요청 목록",
-    description="권한: REVIEWER",
-    status_code=501,
+    description=(
+        "권한: REVIEWER(로그인한 사용자 본인에게 온 요청만). status=PENDING(기본, 아직 처리 전) | ALL [제안: "
+        "명세에 값 목록이 없음]. 최신순, cursor·limit(기본 20, 최대 50)"
+    ),
+    response_model=ReceivedReviewList,
 )
-def api_036() -> None:
-    not_implemented()
+def api_036(
+    status: Literal["PENDING", "ALL"] = Query(default="PENDING"),
+    cursor: str | None = Query(default=None, max_length=200),
+    limit: int = Query(default=20, ge=1, le=50),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ReceivedReviewList:
+    try:
+        page = service.list_received(
+            db, user.id, pending_only=status == "PENDING", cursor=cursor, limit=limit
+        )
+    except service.InvalidCursor:
+        raise _validation_failed("INVALID_CURSOR")
+    return ReceivedReviewList(
+        items=[
+            ReceivedReviewItem(
+                submission_id=i.submission.id,
+                requester=RequesterRead(user_id=i.requester.id, nickname=i.requester.nickname),
+                exercise_code=i.submission.exercise_code,
+                counted_reps=i.submission.counted_reps,
+                requested_at=i.review.requested_at,
+            )
+            for i in page.items
+        ],
+        next_cursor=page.next_cursor,
+    )
 
 
 @router.get(

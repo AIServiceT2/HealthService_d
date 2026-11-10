@@ -72,3 +72,24 @@ class ReviewRequestCreated(_CamelModel):
     version: int
     reviewer: ReviewerRead
     requested_at: datetime
+
+
+# ---- API-036 받은 확인 요청 목록 ----
+
+
+class RequesterRead(_CamelModel):
+    user_id: uuid.UUID
+    nickname: str
+
+
+class ReceivedReviewItem(_CamelModel):
+    submission_id: uuid.UUID
+    requester: RequesterRead
+    exercise_code: str
+    counted_reps: int
+    requested_at: datetime
+
+
+class ReceivedReviewList(_CamelModel):
+    items: list[ReceivedReviewItem]
+    next_cursor: str | None

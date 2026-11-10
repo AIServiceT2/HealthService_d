@@ -4,11 +4,12 @@
 version을 1 올린다 (취소 API-030과 같은 방식). 그래서 취소·승인·반려가 동시에 와도 하나만 성공한다.
 """
 
+import base64
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
-from sqlalchemy import select
+from sqlalchemy import select, tuple_
 from sqlalchemy.orm import Session
 
 from app.modules.auth.models import User
@@ -221,3 +222,70 @@ def request_review(
         db.rollback()
         raise
     return RequestResult(submission, review, db.get(User, reviewer_user_id))
+
+
+# ---- 받은 확인 요청 목록 (API-036) ----
+
+
+class InvalidCursor(Exception):
+    pass
+
+
+@dataclass(frozen=True)
+class ReceivedItem:
+    review: ReviewRequest
+    submission: WorkoutSubmission
+    requester: User
+
+
+@dataclass(frozen=True)
+class ReceivedPage:
+    items: list[ReceivedItem]
+    next_cursor: str | None
+
+
+# 커서: 마지막 항목의 (requested_at, submission_id)를 base64url로 감싼 값 (제출 목록 API-029와 같은 방식)
+def _encode_cursor(review: ReviewRequest) -> str:
+    raw = f"{review.requested_at.isoformat()}|{review.submission_id}"
+    return base64.urlsafe_b64encode(raw.encode()).decode()
+
+
+def _decode_cursor(cursor: str) -> tuple[datetime, uuid.UUID]:
+    try:
+        at_text, id_text = base64.urlsafe_b64decode(cursor.encode()).decode().split("|")
+        at = datetime.fromisoformat(at_text)
+        if at.tzinfo is None:
+            raise ValueError(at_text)
+        return at, uuid.UUID(id_text)
+    except ValueError:
+        raise InvalidCursor(cursor) from None
+
+
+def list_received(
+    db: Session, reviewer_id: uuid.UUID, *, pending_only: bool, cursor: str | None, limit: int
+) -> ReceivedPage:
+    """나에게 온 확인 요청만, 최신순 (노션 API-036). 요청받지 않은 건은 보이지 않는다 (US-07 (권한)).
+
+    pending_only=True면 아직 처리하지 않은(PENDING_REVIEW) 건만. 정렬은 명세에 없어 최신순으로 정함 [제안].
+    """
+    query = (
+        select(ReviewRequest, WorkoutSubmission, User)
+        .join(WorkoutSubmission, WorkoutSubmission.id == ReviewRequest.submission_id)
+        .join(User, User.id == WorkoutSubmission.user_id)
+        .where(ReviewRequest.reviewer_user_id == reviewer_id)
+    )
+    if pending_only:
+        query = query.where(WorkoutSubmission.status == SubmissionStatus.PENDING_REVIEW)
+    if cursor is not None:
+        after_at, after_id = _decode_cursor(cursor)
+        query = query.where(
+            tuple_(ReviewRequest.requested_at, ReviewRequest.submission_id) < tuple_(after_at, after_id)
+        )
+    rows = db.execute(
+        query.order_by(ReviewRequest.requested_at.desc(), ReviewRequest.submission_id.desc()).limit(
+            limit + 1
+        )
+    ).all()
+    page, more = rows[:limit], len(rows) > limit
+    items = [ReceivedItem(r, s, u) for r, s, u in page]
+    return ReceivedPage(items, _encode_cursor(items[-1].review) if more else None)
