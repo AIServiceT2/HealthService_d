@@ -50,6 +50,11 @@ COORD_MIN = -1.0
 COORD_MAX = 2.0
 
 
+#: 엔진이 판정하는 종목. 영문 값 표기는 제안·팀 확인 필요 (DATA-MODEL.md '아직 정하지 못한 것',
+#: DECISIONS D-66). MVP 범위(mvp-scope.md)는 스쿼트뿐이며 PUSHUP·SITUP은 엔진에만 있다.
+ExerciseType = Literal["SQUAT", "PUSHUP", "SITUP"]
+
+
 # --- 입력 --------------------------------------------------------------------
 
 
@@ -128,7 +133,7 @@ class SessionMeta(ApiModel):
     """세션 메타."""
 
     session_id: str = Field(min_length=1)
-    exercise_type: Literal["SQUAT"]
+    exercise_type: ExerciseType
     catalog_version: str = Field(min_length=1)
     fps: int = Field(gt=0)
     image_width: int = Field(gt=0)
@@ -142,7 +147,11 @@ class SessionMeta(ApiModel):
 
 
 class RepReason(StrEnum):
-    """렙 미인정 사유 (우선순위: OUT_OF_FRAME > TOO_FAST > SHALLOW_DEPTH)."""
+    """렙 미인정 사유 (우선순위: OUT_OF_FRAME > TOO_FAST > SHALLOW_DEPTH).
+
+    `SHALLOW_DEPTH`는 모든 종목에서 "가동범위 기준 미달"이다 (푸시업: 덜 내려감,
+    윗몸 일으키기: 덜 일어남).
+    """
 
     OUT_OF_FRAME = "OUT_OF_FRAME"
     TOO_FAST = "TOO_FAST"
@@ -167,6 +176,67 @@ class RepEvent(ApiModel):
     trunk_lean_at_bottom: float | None
     knee_asymmetry_at_bottom: float | None
     invalid_ratio: float
+
+    @property
+    def depth_angle(self) -> float:
+        """가동범위 판정 각도의 최저값 (종목 공통 이름, 직렬화되지 않음)."""
+        return self.min_knee_angle
+
+
+class PushupRepEvent(ApiModel):
+    """푸시업 렙 1개 (인정·미인정 모두). 판정 각도는 팔꿈치 내각(어깨–팔꿈치–손목, 도).
+
+    - `bottomT`: 팔꿈치 각도가 가장 작은 시각.
+    - `bodyLineDevAtBottom`: 180 − (어깨–엉덩이–발목 내각). 몸이 일직선이면 0°, 허리가 처지거나
+      엉덩이가 들리면 커진다. 해당 관절이 안 보이면 null.
+    - `elbowAsymmetryAtBottom`: 좌우 팔꿈치 각도 차. 양팔이 모두 보일 때만.
+    """
+
+    index: int = Field(ge=1)
+    start_t: int
+    bottom_t: int
+    end_t: int
+    accepted: bool
+    reason: RepReason | None
+    min_elbow_angle: float
+    body_line_dev_at_bottom: float | None
+    elbow_asymmetry_at_bottom: float | None
+    invalid_ratio: float
+
+    @property
+    def depth_angle(self) -> float:
+        return self.min_elbow_angle
+
+
+class SitupRepEvent(ApiModel):
+    """윗몸 일으키기 렙 1개. 두 각도가 모두 기준을 넘어야 인정한다 (DECISIONS D-70).
+
+    - `minTorsoAngle`: 상체 각도(어깨–엉덩이–발목 내각)의 최저값. 누우면 약 180°,
+      상체가 바닥에서 x° 들리면 180 − x.
+    - `minHipAngle`: 렙 동안 엉덩이 각도(어깨–엉덩이–무릎 내각)의 최저값.
+      무릎이 한 번도 안 보였으면 null (그 렙은 OUT_OF_FRAME).
+    - `bottomT`: 상체 각도가 가장 작은 시각 (가장 많이 일어난 시점).
+    - `kneeAngleAtBottom`: 그때의 무릎 내각(엉덩이–무릎–발목). 무릎이 안 보이면 null.
+    """
+
+    index: int = Field(ge=1)
+    start_t: int
+    bottom_t: int
+    end_t: int
+    accepted: bool
+    reason: RepReason | None
+    min_torso_angle: float
+    min_hip_angle: float | None
+    knee_angle_at_bottom: float | None
+    invalid_ratio: float
+
+    @property
+    def depth_angle(self) -> float:
+        return self.min_torso_angle
+
+
+#: 세션 결과의 렙 (종목별 모양). 필드 이름이 서로 달라 JSON만으로 구별된다.
+AnyRepEvent = RepEvent | PushupRepEvent | SitupRepEvent
 
 
 class LivenessStatus(StrEnum):
@@ -252,6 +322,10 @@ class FormTag(StrEnum):
     KNEE_ASYMMETRY = "KNEE_ASYMMETRY"
     TEMPO_TOO_FAST = "TEMPO_TOO_FAST"
     FREQUENT_OUT_OF_FRAME = "FREQUENT_OUT_OF_FRAME"
+    #: 푸시업: 몸이 일직선에서 벗어남 (허리 처짐·엉덩이 들림). 제안·팀 합의 필요 (D-66)
+    BODY_LINE_BROKEN = "BODY_LINE_BROKEN"
+    #: 푸시업: 좌우 팔꿈치 각도 차가 큼. 제안·팀 합의 필요 (D-66)
+    ELBOW_ASYMMETRY = "ELBOW_ASYMMETRY"
 
 
 class PoseSummary(ApiModel):
@@ -266,6 +340,38 @@ class PoseSummary(ApiModel):
     rep_duration_ms: AvgStd | None
     depth_consistency_deg: float | None
     form_tags: list[FormTag]
+
+
+class PushupPoseSummary(ApiModel):
+    """푸시업 자세 요약 (L4 입력). 인정 렙 최저점 기준, 인정 렙이 0개면 수치 필드는 null.
+
+    `elbowFlexionDeg` = 180 − minElbowAngle (팔을 펴면 0°).
+    """
+
+    elbow_flexion_deg: AvgMinMax | None
+    body_line_dev_deg: AvgMax | None
+    elbow_asymmetry_deg: AvgOnly | None
+    rep_duration_ms: AvgStd | None
+    depth_consistency_deg: float | None
+    form_tags: list[FormTag]
+
+
+class SitupPoseSummary(ApiModel):
+    """윗몸 일으키기 자세 요약 (L4 입력). 인정 렙이 0개면 수치 필드는 null.
+
+    - `torsoRaiseDeg` = 180 − minTorsoAngle (상체가 바닥에서 들린 각도).
+    - `hipFlexionDeg` = 180 − minHipAngle (상체를 무릎 쪽으로 접은 정도).
+    """
+
+    torso_raise_deg: AvgMinMax | None
+    hip_flexion_deg: AvgMinMax | None
+    knee_angle_deg: AvgOnly | None
+    rep_duration_ms: AvgStd | None
+    depth_consistency_deg: float | None
+    form_tags: list[FormTag]
+
+
+AnyPoseSummary = PoseSummary | PushupPoseSummary | SitupPoseSummary
 
 
 class Severity(StrEnum):
@@ -297,13 +403,13 @@ class SessionResult(ApiModel):
 
     engine_version: str
     catalog_version: str
-    reps: list[RepEvent]
+    reps: list[AnyRepEvent]
     recognized_reps: int
     attempted_reps: int
     liveness: LivenessResult | None
     ai_confidence: float
     confidence_components: ConfidenceComponents
-    pose_summary: PoseSummary
+    pose_summary: AnyPoseSummary
     anomalies: list[Anomaly]
 
 

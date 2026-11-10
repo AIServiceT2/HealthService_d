@@ -8,7 +8,8 @@
 - LANDMARKS_FROZEN (HIGH): motion ≤ frozen_motion_ratio 인 연속 구간 > frozen_ms
 - ZERO_JITTER (MEDIUM): 정지 구간(speed < stationary_speed_ratio, 길이 ≥ zero_jitter_min_ms)의
   motion 중앙값 < zero_jitter_ratio. LANDMARKS_FROZEN이 이미 잡히면 중복으로 내지 않는다
-- BODY_PROPORTION_SHIFT (HIGH): 서 있는 프레임의 상체/하체 비율이, 첫 기준 구간 중앙값 대비
+- BODY_PROPORTION_SHIFT (HIGH): 쉬는 자세 프레임(스쿼트: 서 있음, 푸시업: 팔을 폄,
+  윗몸 일으키기: 누움)의 상체/하체 비율이, 첫 기준 구간 중앙값 대비
   proportion_shift_ratio 넘게 바뀐 구간이 있음 (구간 길이 = features.calibration_window_ms)
 - MULTIPLE_RESETS (LOW): reset_gap_ms 이상 무효 구간 후 재등장이 reset_count 회 이상
 - UNREALISTIC_PACE (MEDIUM): 인정 렙 평균 시간 < min_avg_rep_ms
@@ -16,18 +17,44 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
+from typing import Protocol, TypeVar
 
 from rep_engine.adapters import SkeletonFrame
 from rep_engine.config import EngineConfig
 from rep_engine.features.extractor import FrameFeatures
 from rep_engine.rounding import r_ms, r_ratio
-from rep_engine.schemas import Anomaly, AnomalyCode, RepEvent, Severity
+from rep_engine.schemas import Anomaly, AnomalyCode, AnyRepEvent, Severity
 from rep_engine.stats import mean, median, pstdev
 
 _MS_PER_S = 1000.0
 #: 비율 비교에 필요한 최소 표본 수 (구간 중앙값이 프레임 1~2개에 흔들리지 않게)
 MIN_WINDOW_SAMPLES = 3
+
+
+class FeatureLike(Protocol):
+    """이상 징후 검사에 필요한 프레임 특징 (FrameFeatures·ChainFeatures 공통)."""
+
+    @property
+    def t(self) -> int: ...
+
+    @property
+    def valid(self) -> bool: ...
+
+    @property
+    def torso_leg_ratio(self) -> float | None: ...
+
+
+F = TypeVar("F", bound=FeatureLike)
+
+
+def squat_rest(stand_angle: float) -> Callable[[FrameFeatures], bool]:
+    """스쿼트의 쉬는 자세 = 필터 전 무릎 각도가 서기 각도 이상."""
+
+    def is_rest(f: FrameFeatures) -> bool:
+        return f.knee_angle_raw is not None and f.knee_angle_raw >= stand_angle
+
+    return is_rest
 
 
 def _motions(
@@ -75,16 +102,13 @@ def _runs(
 
 
 def _proportion_shift(
-    feats: Sequence[FrameFeatures], stand_angle: float, window_ms: int, limit: float
+    feats: Sequence[F], is_rest: Callable[[F], bool], window_ms: int
 ) -> float | None:
     """기준 대비 최대 상대 변화량. 비교할 표본이 부족하면 None."""
     samples = [
         (f.t, f.torso_leg_ratio)
         for f in feats
-        if f.valid
-        and f.torso_leg_ratio is not None
-        and f.knee_angle_raw is not None
-        and f.knee_angle_raw >= stand_angle
+        if f.valid and f.torso_leg_ratio is not None and is_rest(f)
     ]
     if not samples:
         return None
@@ -106,12 +130,16 @@ def _proportion_shift(
 
 def detect_anomalies(
     frames: Sequence[SkeletonFrame],
-    feats: Sequence[FrameFeatures],
-    reps: Sequence[RepEvent],
+    feats: Sequence[F],
+    reps: Sequence[AnyRepEvent],
     cfg: EngineConfig,
     image_diag_px: float,
+    is_rest: Callable[[F], bool] | None = None,
 ) -> list[Anomaly]:
-    """이상 징후 목록 (AnomalyCode 정의 순서)."""
+    """이상 징후 목록 (AnomalyCode 정의 순서).
+
+    `is_rest`(쉬는 자세 판별)를 주지 않으면 스쿼트 기준(`squat_rest`)을 쓴다.
+    """
     a = cfg.anomaly
     out: list[Anomaly] = []
     acc = [e for e in reps if e.accepted]
@@ -153,9 +181,8 @@ def detect_anomalies(
             )
         )
 
-    shift = _proportion_shift(
-        feats, cfg.squat.stand_angle, cfg.features.calibration_window_ms, a.proportion_shift_ratio
-    )
+    rest: Callable[[F], bool] = is_rest or squat_rest(cfg.squat.stand_angle)  # type: ignore[assignment]
+    shift = _proportion_shift(feats, rest, cfg.features.calibration_window_ms)
     if shift is not None and shift > a.proportion_shift_ratio:
         out.append(
             Anomaly(
