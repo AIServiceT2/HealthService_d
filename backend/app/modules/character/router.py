@@ -65,7 +65,8 @@ def create_character(
     summary="[API-007] 내 캐릭터·성장 조회",
     description=(
         "권한: PLAYER. 본인 캐릭터만 조회. "
-        "임시: level은 저장값(성장 공식 미정), exp.pending·lockedItemCount는 0(지급 내역·아이템 미구현), stats는 빈 배열(능력치 축 미정)."
+        "exp.pending은 지급 뒤 24시간 안의 경험치, confirmed는 나머지. lockedItemCount는 LOCKED 아이템 수. "
+        "임시: level은 저장값(성장 공식 미정), stats는 빈 배열(능력치 축 미정)."
     ),
     response_model=MyCharacterRead,
     response_model_by_alias=True,
