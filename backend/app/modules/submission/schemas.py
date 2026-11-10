@@ -2,8 +2,6 @@
 
 import uuid
 from datetime import datetime
-from typing import Any
-
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
@@ -21,7 +19,6 @@ class SubmissionRead(BaseModel):
     status: str
     exercise_type: str = Field(validation_alias="exercise_code")
     counted_reps: int
-    snapshot: dict[str, Any] | None
 
 
 class ErrorResponse(BaseModel):

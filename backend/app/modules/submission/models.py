@@ -2,7 +2,7 @@
 
 - idempotency_key는 ERD에 없다 [추가·팀 확인 필요]. 노션 API-026의 Idempotency-Key로 같은 요청을
   다시 보냈는지 가리려면 서버가 기억해야 해서 넣었다.
-- snapshot(JSON)은 첫 기능(US-02)의 임시 칸이다. API-031에서 SUBMISSION_SNAPSHOT 테이블로 옮긴다.
+- 보상 수치는 snapshot 모듈의 SUBMISSION_SNAPSHOT 테이블에 있다 (노션 DB 8절).
 """
 
 import uuid
@@ -46,7 +46,6 @@ class WorkoutSubmission(Base):
     ai_form_tip: Mapped[str | None] = mapped_column(Text, default=None)
     ai_summary: Mapped[str | None] = mapped_column(Text, default=None)
     ai_flags: Mapped[str | None] = mapped_column(Text, default=None)
-    snapshot: Mapped[dict[str, Any] | None] = mapped_column(JSONB, default=None)
 
 
 class RepEvent(Base):

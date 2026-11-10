@@ -57,3 +57,16 @@ def new_submission(client, counted: int = 30, headers=None) -> tuple[str, dict[s
     res = submit(client, headers, session_id, submit_body(counted=counted))
     assert res.status_code == 202, res.json()
     return res.json()["submissionId"], headers
+
+
+# 서버 내부 호출(/internal) 테스트 전용 토큰 (실제 값이 아님)
+TEST_INTERNAL_TOKEN = "test-only-internal-token"
+
+
+def internal_headers() -> dict[str, str]:
+    return {"X-Internal-Token": TEST_INTERNAL_TOKEN, "Idempotency-Key": str(uuid.uuid4())}
+
+
+def prepare(client, submission_id: str):
+    """보상 스냅샷 계산·고정 (API-031)."""
+    return client.post(f"/internal/submissions/{submission_id}/snapshot", headers=internal_headers())

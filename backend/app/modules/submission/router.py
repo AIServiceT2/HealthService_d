@@ -28,22 +28,6 @@ def read_submission(submission_id: uuid.UUID, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="submission not found")
 
 
-@router.post("/{submission_id}/prepare", response_model=SubmissionRead)
-def prepare_submission(submission_id: uuid.UUID, db: Session = Depends(get_db)):
-    """보상 계산. 원래는 시스템이 실행하지만 오늘은 수동 호출로 대신한다 (API.md 항목 1 ①).
-
-    오류 본문 형식은 API.md에서 미정이라 FastAPI 기본 형식({"detail": ...})을 쓴다.
-    """
-    try:
-        return service.prepare_submission(db, submission_id)
-    except service.SubmissionNotFound:
-        raise HTTPException(status_code=404, detail="submission not found")
-    except service.InvalidTransition as e:
-        raise HTTPException(status_code=409, detail=str(e))
-    except service.CalculationError as e:
-        raise HTTPException(status_code=500, detail=f"calculation failed: {e}")
-
-
 # ---- 노션 API 명세서 API-026·029·030 ----
 # 경로가 /submissions로 시작하지 않는 것도 있어 prefix 없는 라우터를 따로 둔다.
 # 입력 오류는 전역 처리기가 400으로 돌려주므로, Swagger에 실제와 다른 422가 보이지 않게
