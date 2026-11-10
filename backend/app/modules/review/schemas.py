@@ -1,5 +1,7 @@
 """review API 입출력. JSON 키는 노션 API 명세서대로 camelCase, 파이썬 안에서는 snake_case."""
 
+import uuid
+from datetime import datetime
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict
@@ -48,3 +50,25 @@ class SharePreviewResponse(_CamelModel):
     anomalies: list[Anomaly]
     # 통증 안내 고정 문구는 미정 (노션 API-034)이라 null
     pain_notice: str | None
+
+
+# ---- API-035 확인 요청 ----
+
+
+class ReviewRequestCreate(_CamelModel):
+    reviewer_user_id: uuid.UUID
+    # API-034 미리보기를 확인했는가. true여야 보낸다 (backlog US-07 (정상) 2번째)
+    share_preview_confirmed: bool
+
+
+class ReviewerRead(_CamelModel):
+    user_id: uuid.UUID
+    nickname: str
+
+
+class ReviewRequestCreated(_CamelModel):
+    submission_id: uuid.UUID
+    submission_status: str
+    version: int
+    reviewer: ReviewerRead
+    requested_at: datetime

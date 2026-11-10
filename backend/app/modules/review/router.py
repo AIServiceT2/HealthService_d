@@ -4,9 +4,10 @@
 /internal 경로는 snapshot 모듈의 require_internal_token(X-Internal-Token)을 같이 쓴다.
 """
 
+import re
 import uuid
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Header
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
@@ -19,6 +20,9 @@ from app.modules.review.schemas import (
     Anomaly,
     AutoApprovalResponse,
     ErrorResponse,
+    ReviewerRead,
+    ReviewRequestCreate,
+    ReviewRequestCreated,
     SharePreviewResponse,
 )
 from app.modules.snapshot.internal import require_internal_token
@@ -32,6 +36,27 @@ router = APIRouter(
 
 def _not_found() -> AppError:
     return AppError(404, "NOT_FOUND", "제출건을 찾을 수 없습니다.")
+
+
+def _validation_failed(reason: str) -> AppError:
+    return AppError(400, "VALIDATION_FAILED", "입력값이 올바르지 않습니다.", {"reason": reason})
+
+
+def _concurrent_update(current_version: int) -> AppError:
+    return AppError(
+        412, "CONCURRENT_UPDATE", "다른 요청이 먼저 처리되었습니다.", {"currentVersion": current_version}
+    )
+
+
+# If-Match 값: "3" 또는 3 (약한 ETag W/"3"도 받음). 취소(API-030, submission/router.py)와 같은 형식
+_IF_MATCH = re.compile(r'^(?:W/)?"?(\d+)"?$')
+
+
+def _parse_if_match(value: str) -> int:
+    match = _IF_MATCH.fullmatch(value.strip())
+    if match is None:
+        raise _validation_failed("INVALID_IF_MATCH")
+    return int(match.group(1))
 
 
 @router.post(
@@ -98,11 +123,47 @@ def api_034(
 @router.post(
     "/submissions/{id}/review-requests",
     summary="[API-035] 지인·길드장에게 확인 요청",
-    description="권한: OWNER",
-    status_code=501,
+    description=(
+        "권한: OWNER. If-Match 필수(제출건 version). PREPARED이고 자동 승인 대상이 아닌 건만, 제출건당 1건. "
+        "확인자는 지금은 내 길드의 길드장만 고를 수 있다('지인' 정의 미정). "
+        "본인 지정·미리보기 미확인은 400, 고를 수 없는 사람은 403, 이미 보냈거나 PREPARED가 아니면 409, version 불일치 412"
+    ),
+    status_code=201,
+    response_model=ReviewRequestCreated,
 )
-def api_035(id: uuid.UUID) -> None:
-    not_implemented()
+def api_035(
+    id: uuid.UUID,
+    req: ReviewRequestCreate,
+    if_match: str = Header(alias="If-Match"),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ReviewRequestCreated:
+    expected_version = _parse_if_match(if_match)
+    try:
+        result = service.request_review(
+            db, user.id, id, req.reviewer_user_id, req.share_preview_confirmed, expected_version
+        )
+    except service.InvalidRequest as e:
+        raise AppError(
+            400, "VALIDATION_FAILED", "본인을 지정했거나 미리보기를 확인하지 않았습니다.", {"reason": e.args[0]}
+        )
+    except service.SubmissionNotFound:
+        raise _not_found()
+    except service.NotOwner:
+        raise AppError(403, "FORBIDDEN", "신청자 본인만 확인 요청을 보낼 수 있습니다.")
+    except service.VersionMismatch as e:
+        raise _concurrent_update(e.args[0])
+    except service.InvalidState:
+        raise AppError(409, "INVALID_STATE", "이미 확인 요청을 보냈거나 PREPARED 상태가 아닙니다.")
+    except service.NotAllowedReviewer:
+        raise AppError(403, "FORBIDDEN", "지인이나 길드장이 아닌 사람에게는 요청할 수 없습니다.")
+    return ReviewRequestCreated(
+        submission_id=result.submission.id,
+        submission_status=result.submission.status,
+        version=result.submission.version,
+        reviewer=ReviewerRead(user_id=result.reviewer.id, nickname=result.reviewer.nickname),
+        requested_at=result.review.requested_at,
+    )
 
 
 @router.get(

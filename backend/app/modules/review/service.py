@@ -6,11 +6,15 @@ version을 1 올린다 (취소 API-030과 같은 방식). 그래서 취소·승�
 
 import uuid
 from dataclasses import dataclass
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.modules.auth.models import User
+from app.modules.guild import service as guild_service
 from app.modules.review import rules
+from app.modules.review.models import ReviewRequest
 from app.modules.submission import service as submission_service
 from app.modules.submission.constants import SubmissionStatus
 from app.modules.submission.models import WorkoutSubmission
@@ -139,3 +143,81 @@ def share_preview(db: Session, user_id: uuid.UUID, submission_id: uuid.UUID) -> 
         raise NotOwner(str(user_id)) from None
     _check_reviewable(db, submission)
     return _share_content(submission)
+
+
+# ---- 확인 요청 (API-035) ----
+
+
+class InvalidRequest(Exception):
+    """본인을 지정했거나 미리보기를 확인하지 않음 (400)."""
+
+
+class VersionMismatch(Exception):
+    pass
+
+
+class NotAllowedReviewer(Exception):
+    """지인이나 길드장이 아닌 사람 (403)."""
+
+
+def allowed_reviewers(db: Session, user_id: uuid.UUID) -> set[uuid.UUID]:
+    """확인자로 고를 수 있는 사람. 지금은 '내 길드의 길드장'뿐이다 [가정·팀 확인 필요].
+
+    "지인"을 어떻게 정할지(친구 목록 등)는 미정이라 아직 넣지 않았다 (PRD 미정 표, backlog US-07 미확정).
+    길드가 없거나 본인이 길드장이면 고를 사람이 없다.
+    """
+    user = db.get(User, user_id)
+    if user is None or user.guild_id is None:
+        return set()
+    leader = guild_service.get_guild_info(db, user_id, user.guild_id).leader_user_id
+    return {leader} - {user_id}
+
+
+@dataclass(frozen=True)
+class RequestResult:
+    submission: WorkoutSubmission
+    review: ReviewRequest
+    reviewer: User
+
+
+def request_review(
+    db: Session,
+    user_id: uuid.UUID,
+    submission_id: uuid.UUID,
+    reviewer_user_id: uuid.UUID,
+    share_preview_confirmed: bool,
+    expected_version: int,
+) -> RequestResult:
+    """PREPARED → PENDING_REVIEW, 확인 요청 1건을 만든다 (노션 API-035, backlog US-07).
+
+    검사 순서: 입력 400 → 없음 404 → 남의 건 403 → version 412 → 상태·이미 요청함 409 → 확인자 자격 403.
+    """
+    if not share_preview_confirmed:
+        raise InvalidRequest("SHARE_PREVIEW_NOT_CONFIRMED")
+    if reviewer_user_id == user_id:
+        raise InvalidRequest("SELF_REVIEWER")
+    try:
+        submission = _lock_submission(db, submission_id)
+        if submission.user_id != user_id:
+            raise NotOwner(str(user_id))
+        if submission.version != expected_version:
+            raise VersionMismatch(submission.version)
+        if db.get(ReviewRequest, submission_id) is not None:
+            raise InvalidState("ALREADY_REQUESTED")
+        _check_reviewable(db, submission)
+        if reviewer_user_id not in allowed_reviewers(db, user_id):
+            raise NotAllowedReviewer(str(reviewer_user_id))
+
+        review = ReviewRequest(
+            submission_id=submission_id,
+            reviewer_user_id=reviewer_user_id,
+            requested_at=datetime.now(UTC),
+        )
+        db.add(review)
+        submission.status = SubmissionStatus.PENDING_REVIEW
+        submission.version += 1
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    return RequestResult(submission, review, db.get(User, reviewer_user_id))
