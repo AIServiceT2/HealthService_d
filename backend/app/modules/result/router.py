@@ -13,6 +13,7 @@ from app.core.errors import AppError
 from app.modules.auth.dependencies import get_current_user
 from app.modules.auth.models import User
 from app.modules.result import service
+from app.modules.reward import service as reward_service
 from app.modules.result.schemas import (
     CardRead,
     DropRead,
@@ -48,8 +49,11 @@ def _owner_rewarded_errors(fn):
         raise AppError(409, "INVALID_STATE", "아직 보상이 지급되지 않았습니다.")
 
 
-def _text(level: str, saved: str | None, fallback: str) -> TextRead:
-    return TextRead(level=level, text=saved or fallback, is_fallback=saved is None)
+def _text(level: str, saved: str | None, fallback: str, stored_fallbacks: tuple[str, ...]) -> TextRead:
+    """LLM 글이 없거나(NULL) LLM 실패로 기본 문구가 저장돼 있으면 이 화면의 기본 문구와 isFallback=true."""
+    if not saved or saved in stored_fallbacks:
+        return TextRead(level=level, text=fallback, is_fallback=True)
+    return TextRead(level=level, text=saved, is_fallback=False)
 
 
 @router.get(
@@ -78,12 +82,19 @@ def read_result(
             hit_count=card.snapshot.hit_count,
             exp=card.snapshot.exp,
             total_damage=card.snapshot.total_damage,
-            drops=[DropRead(item_id=i.id, status=i.status) for i in card.drops],
+            drops=[
+                DropRead(item_id=i.id, status=reward_service.item_status(i, card.rewarded_at))
+                for i in card.drops
+            ],
             rewarded_at=card.rewarded_at,
             daily_cap_exceeded=card.daily_cap_exceeded,
         ),
-        narrative=_text("L3", submission.ai_story, service.FALLBACK_NARRATIVE),
-        form_comment=_text("L4", submission.ai_form_tip, service.FALLBACK_FORM_COMMENT),
+        narrative=_text(
+            "L3", submission.ai_story, service.FALLBACK_NARRATIVE, service.STORED_NARRATIVE_FALLBACKS
+        ),
+        form_comment=_text(
+            "L4", submission.ai_form_tip, service.FALLBACK_FORM_COMMENT, service.STORED_FORM_COMMENT_FALLBACKS
+        ),
     )
 
 

@@ -309,3 +309,37 @@ def test_f01_api005_me_has_character_true_after_character_created(client):
 
     body = client.get("/me", headers=_bearer(access)).json()
     assert body["hasCharacter"] is True
+
+
+def test_f01_api005_me_is_guild_leader_for_leader_only(client):
+    from tests.guild_helpers import join_with_code, new_guild
+
+    guild_id, _, leader_headers = new_guild(client)
+    _, member_headers = join_with_code(client, guild_id, leader_headers)
+
+    assert client.get("/me", headers=leader_headers).json()["isGuildLeader"] is True
+    assert client.get("/me", headers=member_headers).json()["isGuildLeader"] is False
+
+
+def test_f01_api001_concurrent_duplicate_email_is_400_not_500(client, monkeypatch):
+    """같은 이메일 가입이 동시에 와서 중복 검사를 둘 다 통과해도 500이 아니라 400 (유니크 제약)."""
+    from app.modules.auth import service
+
+    assert _signup(client).status_code == 201
+    # 두 번째 요청이 첫 요청의 커밋 전에 중복 검사를 지나간 상황을 만든다
+    monkeypatch.setattr(service, "_email_taken", lambda db, email: False)
+
+    res = _signup(client)
+
+    assert res.status_code == 400
+    assert res.json()["details"] == {"reason": "EMAIL_ALREADY_USED"}
+
+
+def test_f01_api001_nickname_is_trimmed_and_blank_rejected(client):
+    assert _signup(client, nickname="  ").status_code == 400
+    assert _signup(client, nickname=" 가 ").status_code == 400  # 지우고 나면 1자
+
+    res = _signup(client, nickname="  민규  ")
+    assert res.status_code == 201
+    access = _login(client).json()["accessToken"]
+    assert client.get("/me", headers=_bearer(access)).json()["nickname"] == "민규"

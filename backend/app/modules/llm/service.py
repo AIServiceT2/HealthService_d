@@ -128,7 +128,7 @@ def _l3_input(submission: WorkoutSubmission) -> dict[str, Any]:
 
 def is_valid_narrative(text: str, skill_name: str) -> bool:
     """숫자·다른 스킬명·아이템명이 있으면 탈락 (backlog US-05 (실패·거절))."""
-    if rules.DIGITS.search(text):
+    if rules.DIGITS.search(text) or rules.KOREAN_NUMBERS.search(text):
         return False
     other_skills = [s for s in rules.SKILL_BY_EXERCISE.values() if s != skill_name]
     return not any(name in text for name in (*other_skills, *rules.ITEM_NAMES))

@@ -118,6 +118,14 @@ def _lock_guild(db: Session, guild_id: uuid.UUID) -> Guild | None:
     return db.scalars(_locked(select(Guild).where(Guild.id == guild_id))).one_or_none()
 
 
+def is_guild_leader(db: Session, user: User) -> bool:
+    """사용자가 소속 길드의 길드장인가 (노션 API-005 isGuildLeader)."""
+    if user.guild_id is None:
+        return False
+    leader = db.scalar(select(Guild.leader_user_id).where(Guild.id == user.guild_id))
+    return leader == user.id
+
+
 def create_guild(db: Session, user_id: uuid.UUID, name: str) -> Guild:
     """길드를 만들고 만든 사람을 길드장·소속원으로 둔다 (노션 API-009).
 

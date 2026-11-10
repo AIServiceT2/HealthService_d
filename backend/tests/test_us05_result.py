@@ -115,3 +115,20 @@ def test_us05_unknown_is_404_and_needs_token(client):
 
     assert _result(client, uuid.uuid4(), headers).status_code == 404
     assert client.get(f"/submissions/{uuid.uuid4()}/result").status_code == 401
+
+
+def test_us05_llm_failure_fallback_saved_is_shown_as_fallback(client, db):
+    """LLM 생성(API-049·050)이 2번 실패해 기본 문구를 저장했으면 결과 카드에서도 isFallback=true (US-05)."""
+    from app.modules.llm.rules import FALLBACK_FORM_TIP
+    from app.modules.snapshot.rules import FALLBACK_NARRATIVE as STORED_NARRATIVE
+
+    submission_id, headers = rewarded(client, db)
+    saved = db.get(WorkoutSubmission, uuid.UUID(submission_id))
+    saved.ai_story = STORED_NARRATIVE
+    saved.ai_form_tip = FALLBACK_FORM_TIP
+    db.commit()
+
+    body = _result(client, submission_id, headers).json()
+
+    assert body["narrative"] == {"level": "L3", "text": FALLBACK_NARRATIVE, "isFallback": True}
+    assert body["formComment"] == {"level": "L4", "text": FALLBACK_FORM_COMMENT, "isFallback": True}
