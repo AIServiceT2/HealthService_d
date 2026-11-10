@@ -1,8 +1,10 @@
 """session API 입출력. JSON 키는 노션 API 명세서대로 camelCase, 파이썬 안에서는 snake_case."""
 
+import uuid
 from datetime import date
+from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
 
@@ -45,3 +47,51 @@ class DailyCapItem(_CamelModel):
 class DailyCapsResponse(_CamelModel):
     date: date
     items: list[DailyCapItem]
+
+
+# ---- API-020 운동 세션 시작 ----
+
+
+class GoalIn(_CamelModel):
+    reps: int = Field(ge=1)
+    sets: int = Field(ge=1)
+
+
+class TargetIn(_CamelModel):
+    # 데모 공략 대상(던전 적 / 주간 보스)은 미정 (PRD 미정 표). 대상 테이블이 없어 id는 검사하지 않음
+    type: Literal["DUNGEON", "BOSS"]
+    id: uuid.UUID
+
+
+class DeviceIn(_CamelModel):
+    # 명세 예시 필드. 저장할 칼럼이 ERD에 없어 받기만 한다 [팀 확인 필요]
+    os: str = Field(max_length=32)
+    model: str = Field(max_length=64)
+
+
+class StartSessionRequest(_CamelModel):
+    exercise_code: str = Field(max_length=32)
+    # ERD에서 goal·target은 NULL 허용이라 선택으로 받는다
+    goal: GoalIn | None = None
+    target: TargetIn | None = None
+    device: DeviceIn | None = None
+
+
+class LivenessChallengeOut(_CamelModel):
+    challenge_id: uuid.UUID
+    action: str
+    timeout_sec: int
+
+
+class ChunkSpecOut(_CamelModel):
+    max_frames: int
+    max_bytes: int
+
+
+class StartSessionResponse(_CamelModel):
+    session_id: uuid.UUID
+    status: str
+    catalog_version: str
+    remaining_daily_cap: int
+    liveness: LivenessChallengeOut
+    chunk_spec: ChunkSpecOut

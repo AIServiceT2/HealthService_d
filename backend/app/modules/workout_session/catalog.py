@@ -22,3 +22,8 @@ class Exercise:
 EXERCISES: dict[str, Exercise] = {
     "SQUAT": Exercise(code="SQUAT", name="스쿼트", daily_cap=200),
 }
+
+
+# 좌표 청크 크기 가안 (노션 API-020·022, ai/ SPEC 3.2). 판정 기준이 아니라 API 계약값
+CHUNK_MAX_FRAMES = 300
+CHUNK_MAX_BYTES = 262144

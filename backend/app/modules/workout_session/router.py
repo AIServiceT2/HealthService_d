@@ -7,18 +7,30 @@
 import uuid
 
 from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+
+from app.core.db import get_db
 
 from app.core.stub import not_implemented
 from app.modules.auth.dependencies import get_current_user
 from app.modules.auth.models import User
 from app.modules.workout_session import service
-from app.modules.workout_session.catalog import CATALOG_VERSION, EXERCISES
+from app.modules.workout_session.catalog import (
+    CATALOG_VERSION,
+    CHUNK_MAX_BYTES,
+    CHUNK_MAX_FRAMES,
+    EXERCISES,
+)
 from app.modules.workout_session.schemas import (
+    ChunkSpecOut,
     DailyCapItem,
     DailyCapsResponse,
     ExerciseCriteria,
     ExerciseItem,
     ExercisesResponse,
+    LivenessChallengeOut,
+    StartSessionRequest,
+    StartSessionResponse,
 )
 
 router = APIRouter(tags=["session"])
@@ -69,11 +81,33 @@ def api_019(user: User = Depends(get_current_user)) -> DailyCapsResponse:
 @router.post(
     "/workout-sessions",
     summary="[API-020] 운동 세션 시작",
-    description="권한: PLAYER",
-    status_code=501,
+    description=(
+        "권한: PLAYER. 무작위 동작 지시(liveness)를 함께 내려준다. "
+        "없는 운동 코드는 400 VALIDATION_FAILED. 일일 상한이 다 차도 막지 않음(차단 여부 미정)"
+    ),
+    status_code=201,
+    response_model=StartSessionResponse,
 )
-def api_020() -> None:
-    not_implemented()
+def api_020(
+    req: StartSessionRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> StartSessionResponse:
+    goal = service.Goal(req.goal.reps, req.goal.sets) if req.goal else None
+    target = service.Target(req.target.type, req.target.id) if req.target else None
+    session, cap = service.start_session(db, user.id, req.exercise_code, goal, target)
+    return StartSessionResponse(
+        session_id=session.id,
+        status=session.status,
+        catalog_version=CATALOG_VERSION,
+        remaining_daily_cap=cap.remaining,
+        liveness=LivenessChallengeOut(
+            challenge_id=session.liveness_challenge_id,
+            action=session.liveness_action,
+            timeout_sec=service.LIVENESS_TIMEOUT_SECONDS,
+        ),
+        chunk_spec=ChunkSpecOut(max_frames=CHUNK_MAX_FRAMES, max_bytes=CHUNK_MAX_BYTES),
+    )
 
 
 @router.post(
