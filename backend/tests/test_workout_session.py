@@ -483,3 +483,16 @@ def test_us01_api027_only_owner(client):
     sid = start_session(client, owner)["sessionId"]
 
     assert discard(client, other, sid).status_code == 403
+
+
+def test_us01_api021_paused_session_gets_specific_message(client):
+    _, headers = new_player(client)
+    started = start_session(client, headers)
+    pause(client, headers, started["sessionId"])
+
+    res = post_liveness(client, headers, started)
+
+    assert res.status_code == 409
+    assert res.json()["message"] == "일시중지된 세션입니다. 재개한 뒤 보내 주세요."
+    resume(client, headers, started["sessionId"])
+    assert post_liveness(client, headers, started).status_code == 200

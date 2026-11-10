@@ -169,8 +169,12 @@ def submit_liveness(
     now = now or _now()
     try:
         session = get_owned_session(db, user_id, session_id, lock=True)
-        if session.status != SessionStatus.ACTIVE or session.liveness_passed is not None:
-            raise _invalid_state("종료된 세션이거나 이미 확인을 끝냈습니다.")
+        if session.liveness_passed is not None:
+            raise _invalid_state("이미 무작위 동작 확인을 끝냈습니다.")
+        if session.status == SessionStatus.PAUSED:
+            raise _invalid_state("일시중지된 세션입니다. 재개한 뒤 보내 주세요.")
+        if session.status != SessionStatus.ACTIVE:
+            raise _invalid_state("종료된 세션입니다.")
         if challenge_id != session.liveness_challenge_id:
             raise _validation_failed("CHALLENGE_MISMATCH")
 
