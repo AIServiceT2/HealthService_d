@@ -5,8 +5,9 @@
 """
 
 import uuid
+from datetime import date
 
-from fastapi import APIRouter, Depends, Header, Response
+from fastapi import APIRouter, Depends, Header, Query, Response
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
@@ -15,9 +16,11 @@ from app.core.stub import not_implemented
 from app.modules.auth.dependencies import get_current_user
 from app.modules.auth.models import User
 from app.modules.submission import service
+from app.modules.submission.constants import SubmissionStatus
 from app.modules.submission.schemas import (
     ErrorResponse,
     SubmissionDetailRead,
+    SubmissionList,
     SubmitRequest,
     SubmitResponse,
 )
@@ -145,11 +148,35 @@ def submit_session(
 @stub_router.get(
     "/me/submissions",
     summary="[API-029] 내 제출 목록",
-    description="권한: PLAYER",
-    status_code=501,
+    description=(
+        "권한: PLAYER. 본인 제출건만, 최신순(startedAt 내림차순). status 필터, from·to는 KST 날짜(둘 다 포함), "
+        "cursor는 앞 응답의 nextCursor, limit 기본 20·최대 50. 항목 형식은 API-028과 같다."
+    ),
+    response_model=SubmissionList,
+    response_model_by_alias=True,
+    responses={
+        400: {"model": ErrorResponse, "description": "VALIDATION_FAILED 입력값이 올바르지 않습니다. (status·기간·limit·cursor)"},
+        401: _UNAUTHENTICATED,
+    },
 )
-def api_029() -> None:
-    not_implemented()
+def list_my_submissions(
+    status: SubmissionStatus | None = Query(default=None, description="상태 필터 (선택)"),
+    date_from: date | None = Query(default=None, alias="from", description="시작 날짜 KST (선택, 예: 2026-11-01)"),
+    date_to: date | None = Query(default=None, alias="to", description="끝 날짜 KST, 포함 (선택)"),
+    cursor: str | None = Query(default=None, description="다음 페이지 커서"),
+    limit: int = Query(default=20, ge=1, le=50, description="기본 20, 최대 50"),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if date_from is not None and date_to is not None and date_from > date_to:
+        raise AppError(400, "VALIDATION_FAILED", "입력값이 올바르지 않습니다.", {"reason": "FROM_AFTER_TO"})
+    try:
+        page = service.list_my_submissions(
+            db, user.id, status=status, date_from=date_from, date_to=date_to, cursor=cursor, limit=limit
+        )
+    except service.InvalidCursor:
+        raise AppError(400, "VALIDATION_FAILED", "입력값이 올바르지 않습니다.", {"reason": "INVALID_CURSOR"})
+    return SubmissionList(items=[to_read(d) for d in page.items], next_cursor=page.next_cursor)
 
 
 @stub_router.post(

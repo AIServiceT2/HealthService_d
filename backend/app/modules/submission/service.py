@@ -1,11 +1,12 @@
 """제출건 규칙. 다른 모듈은 이 파일의 함수로만 제출건을 다룬다."""
 
+import base64
 import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, tuple_
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
@@ -236,3 +237,68 @@ def submit_session(
 
 def submission_for_session(db: Session, session_id: uuid.UUID) -> uuid.UUID | None:
     return db.scalar(select(WorkoutSubmission.id).where(WorkoutSubmission.session_id == session_id))
+
+
+# ---- 내 제출 목록 (노션 API-029) ----
+
+
+class InvalidCursor(Exception):
+    pass
+
+
+@dataclass(frozen=True)
+class SubmissionPage:
+    items: list[SubmissionDetail]
+    next_cursor: str | None
+
+
+# 커서: 마지막 항목의 (started_at, id)를 base64url로 감싼 값. 클라이언트는 받은 값을 그대로 돌려보낸다
+def _encode_cursor(submission: WorkoutSubmission) -> str:
+    raw = f"{submission.started_at.isoformat()}|{submission.id}"
+    return base64.urlsafe_b64encode(raw.encode()).decode()
+
+
+def _decode_cursor(cursor: str) -> tuple[datetime, uuid.UUID]:
+    try:
+        started_text, id_text = base64.urlsafe_b64decode(cursor.encode()).decode().split("|")
+        started_at = datetime.fromisoformat(started_text)
+        if started_at.tzinfo is None:
+            raise ValueError(started_text)
+        return started_at, uuid.UUID(id_text)
+    except ValueError:
+        raise InvalidCursor(cursor) from None
+
+
+def list_my_submissions(
+    db: Session,
+    user_id: uuid.UUID,
+    *,
+    status: str | None,
+    date_from: date | None,
+    date_to: date | None,
+    cursor: str | None,
+    limit: int,
+) -> SubmissionPage:
+    """본인 제출건만, 최신순(started_at 내림차순, 같으면 id)으로 (노션 API-029).
+
+    from·to는 KST 날짜이고 둘 다 포함한다. 정렬은 명세에 없어 최신순으로 정함 [제안].
+    """
+    query = select(WorkoutSubmission).where(WorkoutSubmission.user_id == user_id)
+    if status is not None:
+        query = query.where(WorkoutSubmission.status == status)
+    if date_from is not None:
+        query = query.where(WorkoutSubmission.started_at >= _kst_day_range(date_from)[0])
+    if date_to is not None:
+        query = query.where(WorkoutSubmission.started_at < _kst_day_range(date_to)[1])
+    if cursor is not None:
+        after_started, after_id = _decode_cursor(cursor)
+        query = query.where(
+            tuple_(WorkoutSubmission.started_at, WorkoutSubmission.id) < tuple_(after_started, after_id)
+        )
+    rows = list(
+        db.scalars(
+            query.order_by(WorkoutSubmission.started_at.desc(), WorkoutSubmission.id.desc()).limit(limit + 1)
+        )
+    )
+    page, more = rows[:limit], len(rows) > limit
+    return SubmissionPage(details(db, page), _encode_cursor(page[-1]) if more else None)

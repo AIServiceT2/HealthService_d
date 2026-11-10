@@ -72,3 +72,10 @@ class SubmissionDetailRead(_CamelModel):
     reserved_reps: int
     confidence: float
     liveness_passed: bool | None
+
+
+class SubmissionList(_CamelModel):
+    """API-029 응답 200: { items, nextCursor }. 항목은 API-028과 같은 형식, nextCursor null이면 마지막 쪽."""
+
+    items: list[SubmissionDetailRead]
+    next_cursor: str | None
