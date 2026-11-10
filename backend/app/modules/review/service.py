@@ -89,3 +89,53 @@ def auto_approve(db: Session, submission_id: uuid.UUID) -> AutoApprovalResult:
         db.rollback()
         raise
     return AutoApprovalResult(decision, submission, liveness)
+
+
+# ---- 확인 요청 공유 내용 미리보기 (API-034) ----
+
+
+class NotOwner(Exception):
+    pass
+
+
+@dataclass(frozen=True)
+class ShareContent:
+    """확인자에게 보낼 내용. 얼굴·나이·길드명은 넣지 않는다 (backlog US-07 (권한)).
+
+    관절 선 리플레이(skeleton_replay_url)·L1·L2는 아직 만드는 기능이 없어 빈 값이다.
+    통증 안내 고정 문구는 미정 (노션 API-034).
+    """
+
+    skeleton_replay_url: str | None
+    summary: str | None
+    anomalies: list[dict]
+    pain_notice: str | None
+
+
+def _share_content(submission: WorkoutSubmission) -> ShareContent:
+    return ShareContent(
+        skeleton_replay_url=None, summary=submission.ai_summary, anomalies=[], pain_notice=None
+    )
+
+
+def _check_reviewable(db: Session, submission: WorkoutSubmission) -> None:
+    """확인 요청을 보낼 수 있는 건인가: PREPARED이고 자동 승인 대상이 아님 (backlog US-03·07).
+
+    자동 승인 대상(확신도 기준 이상 + 무작위 동작 통과)은 사람 확인 없이 승인되므로 확인 요청을 막는다.
+    """
+    if submission.status != SubmissionStatus.PREPARED:
+        raise InvalidState(submission.status)
+    if is_auto_approvable(submission.confidence, _liveness_passed(db, submission)):
+        raise InvalidState("AUTO_APPROVABLE")
+
+
+def share_preview(db: Session, user_id: uuid.UUID, submission_id: uuid.UUID) -> ShareContent:
+    """신청자가 확인자에게 보낼 내용을 먼저 본다 (노션 API-034, backlog US-07 (정상) 2번째)."""
+    try:
+        submission = submission_service.get_owned_submission(db, user_id, submission_id)
+    except submission_service.SubmissionNotFound:
+        raise SubmissionNotFound(str(submission_id)) from None
+    except submission_service.NotOwner:
+        raise NotOwner(str(user_id)) from None
+    _check_reviewable(db, submission)
+    return _share_content(submission)

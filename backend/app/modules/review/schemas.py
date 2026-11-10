@@ -28,3 +28,23 @@ class AutoApprovalResponse(_CamelModel):
     liveness_passed: bool | None
     submission_status: str
     approval_path: str | None
+
+
+# ---- API-034 확인 요청 공유 내용 미리보기 ----
+
+
+class Anomaly(_CamelModel):
+    type: str
+    rep_nos: list[int]
+    description: str
+
+
+class SharePreviewResponse(_CamelModel):
+    # 영상·얼굴 없는 관절 선 리플레이. 만드는 기능이 아직 없어 null
+    skeleton_replay_url: str | None
+    # L1 기록 요약. LLM 연결 전이라 null (제출건 ai_summary)
+    summary: str | None
+    # L2 이상치 설명. LLM 연결 전이라 빈 배열
+    anomalies: list[Anomaly]
+    # 통증 안내 고정 문구는 미정 (노션 API-034)이라 null
+    pain_notice: str | None

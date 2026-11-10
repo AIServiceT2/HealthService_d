@@ -13,7 +13,14 @@ from app.core.db import get_db
 from app.core.errors import AppError
 from app.core.stub import not_implemented
 from app.modules.review import rules, service
-from app.modules.review.schemas import AutoApprovalResponse, ErrorResponse
+from app.modules.auth.dependencies import get_current_user
+from app.modules.auth.models import User
+from app.modules.review.schemas import (
+    Anomaly,
+    AutoApprovalResponse,
+    ErrorResponse,
+    SharePreviewResponse,
+)
 from app.modules.snapshot.internal import require_internal_token
 
 # 입력 오류는 전역 처리기가 400으로 돌려주므로 Swagger에 실제와 다른 422가 보이지 않게 4XX를 선언한다
@@ -61,11 +68,31 @@ def api_033(id: uuid.UUID, db: Session = Depends(get_db)) -> AutoApprovalRespons
 @router.get(
     "/submissions/{id}/review-share-preview",
     summary="[API-034] 확인 요청 공유 내용 미리보기",
-    description="권한: OWNER",
-    status_code=501,
+    description=(
+        "권한: OWNER. 확인자에게 보낼 내용을 신청자가 먼저 본다. PREPARED이고 자동 승인 대상이 아닌 건만. "
+        "임시: 관절 선 리플레이·L1 요약·L2 이상치는 기능이 없어 null·빈 배열, 통증 안내 문구는 미정이라 null"
+    ),
+    response_model=SharePreviewResponse,
 )
-def api_034(id: uuid.UUID) -> None:
-    not_implemented()
+def api_034(
+    id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> SharePreviewResponse:
+    try:
+        content = service.share_preview(db, user.id, id)
+    except service.SubmissionNotFound:
+        raise _not_found()
+    except service.NotOwner:
+        raise AppError(403, "FORBIDDEN", "신청자 본인만 볼 수 있습니다.")
+    except service.InvalidState:
+        raise AppError(409, "INVALID_STATE", "이미 자동 승인되었거나 PREPARED 상태가 아닙니다.")
+    return SharePreviewResponse(
+        skeleton_replay_url=content.skeleton_replay_url,
+        summary=content.summary,
+        anomalies=[Anomaly(**a) for a in content.anomalies],
+        pain_notice=content.pain_notice,
+    )
 
 
 @router.post(
