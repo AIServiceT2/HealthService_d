@@ -113,6 +113,21 @@ class GuildJoined(_CamelModel):
     guild_id: uuid.UUID
 
 
+class LeaderDelegate(_CamelModel):
+    """API-016 요청: { userId } 새 길드장 (같은 길드원)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    user_id: uuid.UUID
+
+
+class LeaderDelegated(_CamelModel):
+    """API-016 응답 200: { guildId, leaderUserId }."""
+
+    guild_id: uuid.UUID
+    leader_user_id: uuid.UUID
+
+
 class ErrorResponse(BaseModel):
     """노션 API 명세서 공통 에러 본문: { code, message, details }."""
 

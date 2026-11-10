@@ -1,8 +1,7 @@
 """guild API. 노션 '전운시 API 명세서' API-009~017.
 
-구현: API-009 길드 생성, API-010 길드 정보 조회, API-011 길드원 목록,
-API-012 길드 초대 코드 발급, API-013 초대 코드로 길드 가입,
-API-014 길드 탈퇴, API-015 길드원 내보내기. 나머지는 경로만 있고 501을 돌려준다.
+구현: API-009~016 (길드 생성·정보 조회·길드원 목록·초대 코드 발급·가입·탈퇴·내보내기·길드장 위임).
+API-017 지인 목록은 경로만 있고 501을 돌려준다.
 로그인 확인은 auth 모듈의 get_current_user (Bearer access token, JWT).
 에러 본문 { code, message, details }은 전역 처리기(app/core/errors.py)가 만든다.
 """
@@ -30,6 +29,8 @@ from app.modules.guild.schemas import (
     GuildRead,
     InvitationCreate,
     InvitationCreated,
+    LeaderDelegate,
+    LeaderDelegated,
 )
 
 # 입력 오류는 전역 처리기가 400 VALIDATION_FAILED로 돌려주므로, Swagger에 실제와 다른 422가
@@ -255,11 +256,35 @@ def kick_member(
 @router.post(
     "/guilds/{guild_id}/leader",
     summary="[API-016] 길드장 위임",
-    description="권한: GUILD_LEADER",
-    status_code=501,
+    description=(
+        "권한: GUILD_LEADER. 새 길드장은 같은 길드원이어야 한다. 이전 길드장은 일반 길드원으로 남는다. "
+        "본인을 지정하면 409 (명세에 없음 — 제안·팀 확인 필요). 위임 상세 정책은 미정."
+    ),
+    response_model=LeaderDelegated,
+    response_model_by_alias=True,
+    responses={
+        400: {"model": ErrorResponse, "description": "VALIDATION_FAILED 입력값이 올바르지 않습니다."},
+        401: _UNAUTHENTICATED,
+        403: {"model": ErrorResponse, "description": "FORBIDDEN 길드장만 위임할 수 있습니다."},
+        404: {"model": ErrorResponse, "description": "NOT_FOUND 해당 길드원을 찾을 수 없습니다."},
+        409: {"model": ErrorResponse, "description": "INVALID_STATE 이미 길드장입니다."},
+    },
 )
-def api_016(guild_id: uuid.UUID) -> None:
-    not_implemented()
+def delegate_leader(
+    guild_id: uuid.UUID,
+    body: LeaderDelegate,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        guild = service.delegate_leader(db, user.id, guild_id, body.user_id)
+    except service.NotGuildLeader:
+        raise AppError(403, "FORBIDDEN", "길드장만 위임할 수 있습니다.")
+    except service.AlreadyLeader:
+        raise AppError(409, "INVALID_STATE", "이미 길드장입니다.")
+    except service.MemberNotFound:
+        raise AppError(404, "NOT_FOUND", "해당 길드원을 찾을 수 없습니다.")
+    return LeaderDelegated(guild_id=guild.id, leader_user_id=guild.leader_user_id)
 
 
 @router.get(

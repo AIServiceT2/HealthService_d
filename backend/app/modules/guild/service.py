@@ -59,6 +59,10 @@ class MemberNotFound(Exception):
     pass
 
 
+class AlreadyLeader(Exception):
+    pass
+
+
 _INVITE_CODE_ATTEMPTS = 5
 
 
@@ -287,3 +291,27 @@ def kick_member(db: Session, leader_id: uuid.UUID, guild_id: uuid.UUID, target_i
     except Exception:
         db.rollback()
         raise
+
+
+def delegate_leader(db: Session, leader_id: uuid.UUID, guild_id: uuid.UUID, target_id: uuid.UUID) -> Guild:
+    """길드장을 같은 길드원에게 넘긴다 (노션 API-016). 위임 상세 정책은 미정.
+
+    요청한 사람이 그 길드의 길드장이 아니면 NotGuildLeader, 본인을 지정하면 AlreadyLeader
+    [제안·팀 확인 필요], 대상이 그 길드원이 아니면 MemberNotFound.
+    이전 길드장은 일반 길드원으로 남는다.
+    """
+    try:
+        guild = _lock_guild(db, guild_id)
+        if guild is None or guild.leader_user_id != leader_id:
+            raise NotGuildLeader(str(leader_id))
+        if target_id == leader_id:
+            raise AlreadyLeader(str(target_id))
+        target = db.scalars(select(User).where(User.id == target_id).with_for_update()).one_or_none()
+        if target is None or target.guild_id != guild.id:
+            raise MemberNotFound(str(target_id))
+        guild.leader_user_id = target.id
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    return guild
