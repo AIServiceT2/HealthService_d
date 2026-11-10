@@ -65,4 +65,5 @@ class ErrorResponse(BaseModel):
 
     code: str
     message: str
-    details: dict | None = None
+    # 입력 오류(400)는 항목 목록(list), 그 밖의 에러는 객체이거나 null (app/core/errors.py)
+    details: dict | list | None = None

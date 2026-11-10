@@ -98,3 +98,15 @@ def test_api009_docs_show_400_not_422(client):
 
     assert "400" in responses
     assert "422" not in responses
+
+
+def test_api009_docs_error_details_allow_list(client):
+    """입력 오류의 details는 목록으로 오므로 문서의 에러 본문도 목록을 허용해야 한다."""
+    _, headers = new_player(client)
+    res = client.post("/guilds", json={"name": "가"}, headers=headers)
+    assert isinstance(res.json()["details"], list)
+
+    schemas = client.get("/openapi.json").json()["components"]["schemas"]
+    details = schemas["ErrorResponse"]["properties"]["details"]
+    allowed = {option.get("type") for option in details["anyOf"]}
+    assert {"object", "array", "null"} <= allowed
