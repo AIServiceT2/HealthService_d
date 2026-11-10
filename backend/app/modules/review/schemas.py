@@ -93,3 +93,26 @@ class ReceivedReviewItem(_CamelModel):
 class ReceivedReviewList(_CamelModel):
     items: list[ReceivedReviewItem]
     next_cursor: str | None
+
+
+# ---- API-037 확인 자료 열람 ----
+
+
+class RequesterNickname(_CamelModel):
+    nickname: str
+
+
+class ReviewMaterial(_CamelModel):
+    """확인자 화면. 얼굴·나이·길드명은 넣지 않는다 (backlog US-07 (권한))."""
+
+    submission_id: uuid.UUID
+    status: str
+    version: int
+    requester: RequesterNickname
+    exercise_code: str
+    counted_reps: int
+    confidence: float
+    skeleton_replay_url: str | None
+    summary: str | None
+    anomalies: list[Anomaly]
+    pain_notice: str | None

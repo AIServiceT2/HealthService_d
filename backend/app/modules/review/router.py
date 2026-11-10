@@ -9,7 +9,7 @@ import uuid
 
 from typing import Literal
 
-from fastapi import APIRouter, Depends, Header, Query
+from fastapi import APIRouter, Depends, Header, Query, Response
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
@@ -24,7 +24,9 @@ from app.modules.review.schemas import (
     ErrorResponse,
     ReceivedReviewItem,
     ReceivedReviewList,
+    RequesterNickname,
     RequesterRead,
+    ReviewMaterial,
     ReviewerRead,
     ReviewRequestCreate,
     ReviewRequestCreated,
@@ -211,11 +213,40 @@ def api_036(
 @router.get(
     "/review-requests/{id}",
     summary="[API-037] 확인 자료 열람",
-    description="권한: REVIEWER",
-    status_code=501,
+    description=(
+        "권한: REVIEWER(요청받은 확인자만). id는 제출 ID. 얼굴·나이·길드명은 내려주지 않는다. "
+        "응답 헤더 ETag에 제출건 version(승인·반려 때 If-Match에 넣음). "
+        "임시: 관절 선 리플레이·L1·L2·통증 안내는 기능이 없어 null·빈 배열"
+    ),
+    response_model=ReviewMaterial,
 )
-def api_037(id: uuid.UUID) -> None:
-    not_implemented()
+def api_037(
+    id: uuid.UUID,
+    response: Response,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ReviewMaterial:
+    try:
+        m = service.review_material(db, user.id, id)
+    except service.ReviewNotFound:
+        raise AppError(404, "NOT_FOUND", "확인 요청을 찾을 수 없습니다.")
+    except service.NotReviewer:
+        raise AppError(403, "FORBIDDEN", "요청받은 확인자만 열람할 수 있습니다.")
+    s = m.submission
+    response.headers["ETag"] = f'"{s.version}"'
+    return ReviewMaterial(
+        submission_id=s.id,
+        status=s.status,
+        version=s.version,
+        requester=RequesterNickname(nickname=m.requester.nickname),
+        exercise_code=s.exercise_code,
+        counted_reps=s.counted_reps,
+        confidence=s.confidence,
+        skeleton_replay_url=m.content.skeleton_replay_url,
+        summary=m.content.summary,
+        anomalies=[Anomaly(**a) for a in m.content.anomalies],
+        pain_notice=m.content.pain_notice,
+    )
 
 
 @router.post(

@@ -289,3 +289,42 @@ def list_received(
     page, more = rows[:limit], len(rows) > limit
     items = [ReceivedItem(r, s, u) for r, s, u in page]
     return ReceivedPage(items, _encode_cursor(items[-1].review) if more else None)
+
+
+# ---- 확인 자료 열람 (API-037) ----
+
+
+class ReviewNotFound(Exception):
+    pass
+
+
+class NotReviewer(Exception):
+    pass
+
+
+@dataclass(frozen=True)
+class Material:
+    submission: WorkoutSubmission
+    requester: User
+    content: ShareContent
+
+
+def _assigned_review(db: Session, reviewer_id: uuid.UUID, submission_id: uuid.UUID) -> ReviewRequest:
+    """확인 요청이 없으면 ReviewNotFound, 요청받은 확인자가 아니면 NotReviewer."""
+    review = db.get(ReviewRequest, submission_id)
+    if review is None:
+        raise ReviewNotFound(str(submission_id))
+    if review.reviewer_user_id != reviewer_id:
+        raise NotReviewer(str(reviewer_id))
+    return review
+
+
+def review_material(db: Session, reviewer_id: uuid.UUID, submission_id: uuid.UUID) -> Material:
+    """요청받은 확인자만 확인 자료를 본다 (노션 API-037, backlog US-07 (권한)).
+
+    처리한 뒤(승인·반려·취소)에도 같은 자료를 볼 수 있다. ai_summary·ai_flags는 표시만 하고
+    상태를 바꾸지 않는다 (US-07 (LLM)).
+    """
+    _assigned_review(db, reviewer_id, submission_id)
+    submission = db.get(WorkoutSubmission, submission_id)
+    return Material(submission, db.get(User, submission.user_id), _share_content(submission))
