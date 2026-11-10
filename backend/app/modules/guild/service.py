@@ -293,6 +293,40 @@ def join_guild(db: Session, user_id: uuid.UUID, guild_id: uuid.UUID) -> uuid.UUI
     return guild_id
 
 
+# ---- 지인 (노션 API-017) ----
+
+RELATION_LEADER = "GUILD_LEADER"
+RELATION_MEMBER = "GUILD_MEMBER"
+
+
+@dataclass(frozen=True)
+class Acquaintance:
+    user_id: uuid.UUID
+    nickname: str
+    relation: str
+
+
+def list_acquaintances(db: Session, user_id: uuid.UUID) -> list[Acquaintance]:
+    """확인 요청을 보낼 수 있는 지인 = 같은 길드원 (본인 제외). 길드장 먼저, 그다음 닉네임·ID 순.
+
+    "지인" 정의는 미정이고 노션 API-017의 가안(같은 길드원)을 따른다 [가안·팀 확인 필요].
+    길드가 없으면 빈 목록. 확인 요청(API-035)의 확인자 자격도 이 목록이다 (2026-11-11 팀 요청).
+    """
+    user = db.get(User, user_id)
+    if user is None or user.guild_id is None:
+        return []
+    leader_id = db.scalar(select(Guild.leader_user_id).where(Guild.id == user.guild_id))
+    rows = db.execute(
+        select(User.id, User.nickname)
+        .where(User.guild_id == user.guild_id, User.id != user_id)
+        .order_by(User.nickname, User.id)
+    ).all()
+    items = [
+        Acquaintance(r.id, r.nickname, RELATION_LEADER if r.id == leader_id else RELATION_MEMBER) for r in rows
+    ]
+    return sorted(items, key=lambda a: a.relation != RELATION_LEADER)
+
+
 def join_by_invitation(db: Session, user_id: uuid.UUID, code: str) -> uuid.UUID:
     """초대 코드로 길드에 가입하고 길드 ID를 돌려준다 (노션 API-013).
 
