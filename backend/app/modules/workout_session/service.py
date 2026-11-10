@@ -281,3 +281,11 @@ def pause_session(db: Session, user_id: uuid.UUID, session_id: uuid.UUID) -> Wor
         db, user_id, session_id, SessionStatus.ACTIVE, SessionStatus.PAUSED,
         "진행 중(ACTIVE)인 세션이 아닙니다.",
     )
+
+
+def resume_session(db: Session, user_id: uuid.UUID, session_id: uuid.UUID) -> WorkoutSession:
+    """PAUSED → ACTIVE (노션 API-024). 재개 허용 시간은 미정이라 시간 제한을 두지 않는다."""
+    return _transition(
+        db, user_id, session_id, SessionStatus.PAUSED, SessionStatus.ACTIVE,
+        "일시중지(PAUSED) 상태가 아니거나 재개 허용 시간이 지났습니다.",
+    )

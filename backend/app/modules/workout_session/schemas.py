@@ -145,3 +145,10 @@ class PauseRequest(_CamelModel):
 class SessionStatusResponse(_CamelModel):
     session_id: uuid.UUID
     status: str
+
+
+# ---- API-024 세션 재개 ----
+
+
+class ResumeResponse(SessionStatusResponse):
+    received_chunks: list[int]  # 빠진 seq부터 다시 보내면 된다

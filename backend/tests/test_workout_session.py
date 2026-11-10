@@ -342,3 +342,42 @@ def test_us01_api023_only_owner(client):
     sid = start_session(client, owner)["sessionId"]
 
     assert pause(client, other, sid).status_code == 403
+
+
+# ---- API-024 세션 재개 ----
+
+
+def resume(client, headers, sid):
+    return client.post(f"/workout-sessions/{sid}/resume", headers=headers)
+
+
+def test_us01_api024_resumes_paused_session_with_received_chunks(client):
+    _, headers = new_player(client)
+    sid = start_session(client, headers)["sessionId"]
+    put_chunk(client, headers, sid, 1)
+    put_chunk(client, headers, sid, 3)
+    pause(client, headers, sid)
+
+    res = resume(client, headers, sid)
+
+    assert res.status_code == 200
+    assert res.json() == {"sessionId": sid, "status": "ACTIVE", "receivedChunks": [1, 3]}
+
+
+def test_us01_api024_rejects_when_not_paused(client):
+    _, headers = new_player(client)
+    sid = start_session(client, headers)["sessionId"]
+
+    res = resume(client, headers, sid)
+
+    assert res.status_code == 409
+    assert res.json()["code"] == "INVALID_STATE"
+
+
+def test_us01_api024_only_owner(client):
+    _, owner = new_player(client)
+    _, other = new_player(client)
+    sid = start_session(client, owner)["sessionId"]
+    pause(client, owner, sid)
+
+    assert resume(client, other, sid).status_code == 403

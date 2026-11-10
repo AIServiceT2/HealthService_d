@@ -35,6 +35,7 @@ from app.modules.workout_session.schemas import (
     PauseRequest,
     PoseChunkRequest,
     PoseChunkResponse,
+    ResumeResponse,
     SessionStatusResponse,
     StartSessionRequest,
     StartSessionResponse,
@@ -193,11 +194,23 @@ def api_023(
 @router.post(
     "/workout-sessions/{id}/resume",
     summary="[API-024] 세션 재개",
-    description="권한: OWNER",
-    status_code=501,
+    description=(
+        "권한: OWNER. PAUSED → ACTIVE, 받은 청크 seq 목록을 돌려준다. "
+        "일시중지 상태가 아니면 409 INVALID_STATE. 재개 허용 시간은 미정이라 제한 없음"
+    ),
+    response_model=ResumeResponse,
 )
-def api_024(id: uuid.UUID) -> None:
-    not_implemented()
+def api_024(
+    id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ResumeResponse:
+    session = service.resume_session(db, user.id, id)
+    return ResumeResponse(
+        session_id=session.id,
+        status=session.status,
+        received_chunks=service.received_seqs(db, session.id),
+    )
 
 
 @router.get(
