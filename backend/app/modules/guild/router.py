@@ -1,6 +1,6 @@
 """guild API. 노션 '전운시 API 명세서' API-009~017.
 
-구현: API-009 길드 생성. 나머지는 경로만 있고 501을 돌려준다.
+구현: API-009 길드 생성, API-010 길드 정보 조회. 나머지는 경로만 있고 501을 돌려준다.
 로그인 확인은 auth 모듈의 get_current_user (Bearer access token, JWT).
 에러 본문 { code, message, details }은 전역 처리기(app/core/errors.py)가 만든다.
 """
@@ -16,7 +16,13 @@ from app.core.stub import not_implemented
 from app.modules.auth.dependencies import get_current_user
 from app.modules.auth.models import User
 from app.modules.guild import service
-from app.modules.guild.schemas import ErrorResponse, GuildCreate, GuildCreated
+from app.modules.guild.schemas import (
+    ErrorResponse,
+    GuildCreate,
+    GuildCreated,
+    GuildLeader,
+    GuildRead,
+)
 
 # 입력 오류는 전역 처리기가 400 VALIDATION_FAILED로 돌려주므로, Swagger에 실제와 다른 422가
 # 보이지 않게 공통 에러 본문을 4XX로 선언한다 (character 라우터와 같은 방식)
@@ -56,11 +62,32 @@ def create_guild(
 @router.get(
     "/guilds/{guild_id}",
     summary="[API-010] 길드 정보 조회",
-    description="권한: GUILD_MEMBER",
-    status_code=501,
+    description="권한: GUILD_MEMBER. 그 길드 소속원만 조회할 수 있다.",
+    response_model=GuildRead,
+    response_model_by_alias=True,
+    responses={
+        401: _UNAUTHENTICATED,
+        403: {"model": ErrorResponse, "description": "FORBIDDEN 길드 소속원만 조회할 수 있습니다."},
+        404: {"model": ErrorResponse, "description": "NOT_FOUND 길드를 찾을 수 없습니다."},
+    },
 )
-def api_010(guild_id: uuid.UUID) -> None:
-    not_implemented()
+def read_guild(
+    guild_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        info = service.get_guild_info(db, user.id, guild_id)
+    except service.GuildNotFound:
+        raise AppError(404, "NOT_FOUND", "길드를 찾을 수 없습니다.")
+    except service.NotGuildMember:
+        raise AppError(403, "FORBIDDEN", "길드 소속원만 조회할 수 있습니다.")
+    return GuildRead(
+        id=info.id,
+        name=info.name,
+        leader=GuildLeader(user_id=info.leader_user_id, nickname=info.leader_nickname),
+        member_count=info.member_count,
+    )
 
 
 @router.get(

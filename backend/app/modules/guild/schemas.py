@@ -33,6 +33,22 @@ class GuildCreated(_CamelModel):
     leader_user_id: uuid.UUID
 
 
+class GuildLeader(_CamelModel):
+    """API-010 응답의 leader: { userId, nickname }."""
+
+    user_id: uuid.UUID
+    nickname: str
+
+
+class GuildRead(_CamelModel):
+    """API-010 응답 200: { id, name, leader: { userId, nickname }, memberCount }."""
+
+    id: uuid.UUID
+    name: str
+    leader: GuildLeader
+    member_count: int
+
+
 class ErrorResponse(BaseModel):
     """노션 API 명세서 공통 에러 본문: { code, message, details }."""
 
