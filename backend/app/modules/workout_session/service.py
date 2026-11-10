@@ -250,3 +250,34 @@ def upload_chunk(
         db.rollback()
         raise
     return received_seqs(db, session_id)
+
+
+# ---- 일시중지·재개 (API-023·024) ----
+
+
+def _transition(
+    db: Session,
+    user_id: uuid.UUID,
+    session_id: uuid.UUID,
+    from_status: SessionStatus,
+    to_status: SessionStatus,
+    message: str,
+) -> WorkoutSession:
+    try:
+        session = get_owned_session(db, user_id, session_id, lock=True)
+        if session.status != from_status:
+            raise _invalid_state(message)
+        session.status = to_status
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    return session
+
+
+def pause_session(db: Session, user_id: uuid.UUID, session_id: uuid.UUID) -> WorkoutSession:
+    """ACTIVE → PAUSED (노션 API-023). 중단 사유(reason)·시각(at)은 저장할 칼럼이 ERD에 없어 받기만 한다."""
+    return _transition(
+        db, user_id, session_id, SessionStatus.ACTIVE, SessionStatus.PAUSED,
+        "진행 중(ACTIVE)인 세션이 아닙니다.",
+    )

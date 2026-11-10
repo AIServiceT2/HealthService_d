@@ -297,3 +297,48 @@ def test_us01_api022_only_owner(client):
     sid = start_session(client, owner)["sessionId"]
 
     assert put_chunk(client, other, sid, 1).status_code == 403
+
+
+# ---- API-023 세션 일시중지 ----
+
+PAUSE_BODY = {"reason": "APP_BACKGROUND", "at": "2026-11-09T05:03:00Z"}
+
+
+def pause(client, headers, sid, body=PAUSE_BODY):
+    return client.post(f"/workout-sessions/{sid}/pause", json=body, headers=headers)
+
+
+def test_us01_api023_pauses_active_session(client):
+    _, headers = new_player(client)
+    sid = start_session(client, headers)["sessionId"]
+
+    res = pause(client, headers, sid)
+
+    assert res.status_code == 200
+    assert res.json() == {"sessionId": sid, "status": "PAUSED"}
+
+
+def test_us01_api023_rejects_when_not_active(client):
+    _, headers = new_player(client)
+    sid = start_session(client, headers)["sessionId"]
+    pause(client, headers, sid)
+
+    res = pause(client, headers, sid)
+
+    assert res.status_code == 409
+    assert res.json()["code"] == "INVALID_STATE"
+
+
+def test_us01_api023_rejects_unknown_reason(client):
+    _, headers = new_player(client)
+    sid = start_session(client, headers)["sessionId"]
+
+    assert pause(client, headers, sid, {**PAUSE_BODY, "reason": "TIRED"}).status_code == 400
+
+
+def test_us01_api023_only_owner(client):
+    _, owner = new_player(client)
+    _, other = new_player(client)
+    sid = start_session(client, owner)["sessionId"]
+
+    assert pause(client, other, sid).status_code == 403

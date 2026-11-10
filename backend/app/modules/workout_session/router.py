@@ -32,8 +32,10 @@ from app.modules.workout_session.schemas import (
     LivenessChallengeOut,
     LivenessRequest,
     LivenessResponse,
+    PauseRequest,
     PoseChunkRequest,
     PoseChunkResponse,
+    SessionStatusResponse,
     StartSessionRequest,
     StartSessionResponse,
 )
@@ -175,11 +177,17 @@ def api_022(
 @router.post(
     "/workout-sessions/{id}/pause",
     summary="[API-023] 세션 일시중지",
-    description="권한: OWNER",
-    status_code=501,
+    description="권한: OWNER. ACTIVE → PAUSED. 진행 중이 아니면 409 INVALID_STATE",
+    response_model=SessionStatusResponse,
 )
-def api_023(id: uuid.UUID) -> None:
-    not_implemented()
+def api_023(
+    id: uuid.UUID,
+    req: PauseRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> SessionStatusResponse:
+    session = service.pause_session(db, user.id, id)
+    return SessionStatusResponse(session_id=session.id, status=session.status)
 
 
 @router.post(

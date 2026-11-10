@@ -131,3 +131,17 @@ class PoseChunkRequest(_CamelModel):
 
 class PoseChunkResponse(_CamelModel):
     received: list[int]
+
+
+# ---- API-023 세션 일시중지 ----
+
+
+class PauseRequest(_CamelModel):
+    # 저장할 칼럼이 ERD에 없어 받기만 한다 [팀 확인 필요]
+    reason: Literal["CAMERA_LOST", "APP_BACKGROUND"]
+    at: datetime
+
+
+class SessionStatusResponse(_CamelModel):
+    session_id: uuid.UUID
+    status: str
