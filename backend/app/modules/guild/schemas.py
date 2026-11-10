@@ -1,7 +1,7 @@
 """길드 API 입출력. JSON 키는 노션 API 명세서대로 camelCase, 파이썬 안에서는 snake_case."""
 
 import uuid
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, StringConstraints
 from pydantic.alias_generators import to_camel
@@ -47,6 +47,21 @@ class GuildRead(_CamelModel):
     name: str
     leader: GuildLeader
     member_count: int
+
+
+class GuildMemberRead(_CamelModel):
+    """API-011 목록 항목: { userId, nickname, role }."""
+
+    user_id: uuid.UUID
+    nickname: str
+    role: Literal["LEADER", "MEMBER"]
+
+
+class GuildMemberList(_CamelModel):
+    """API-011 응답 200: { items, nextCursor }. nextCursor가 null이면 마지막 쪽."""
+
+    items: list[GuildMemberRead]
+    next_cursor: str | None
 
 
 class ErrorResponse(BaseModel):

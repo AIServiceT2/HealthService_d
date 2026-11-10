@@ -1,13 +1,13 @@
 """guild API. 노션 '전운시 API 명세서' API-009~017.
 
-구현: API-009 길드 생성, API-010 길드 정보 조회. 나머지는 경로만 있고 501을 돌려준다.
+구현: API-009 길드 생성, API-010 길드 정보 조회, API-011 길드원 목록. 나머지는 경로만 있고 501을 돌려준다.
 로그인 확인은 auth 모듈의 get_current_user (Bearer access token, JWT).
 에러 본문 { code, message, details }은 전역 처리기(app/core/errors.py)가 만든다.
 """
 
 import uuid
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
@@ -21,6 +21,8 @@ from app.modules.guild.schemas import (
     GuildCreate,
     GuildCreated,
     GuildLeader,
+    GuildMemberList,
+    GuildMemberRead,
     GuildRead,
 )
 
@@ -93,11 +95,35 @@ def read_guild(
 @router.get(
     "/guilds/{guild_id}/members",
     summary="[API-011] 길드원 목록",
-    description="권한: GUILD_MEMBER",
-    status_code=501,
+    description=(
+        "권한: GUILD_MEMBER. 길드장이 맨 앞, 나머지는 userId 순. "
+        "cursor는 앞 응답의 nextCursor를 그대로 넣는다. limit 기본 20, 최대 50."
+    ),
+    response_model=GuildMemberList,
+    response_model_by_alias=True,
+    responses={
+        400: {"model": ErrorResponse, "description": "VALIDATION_FAILED 입력값이 올바르지 않습니다. (limit 범위, cursor 형식)"},
+        401: _UNAUTHENTICATED,
+        403: {"model": ErrorResponse, "description": "FORBIDDEN 길드 소속원만 조회할 수 있습니다."},
+    },
 )
-def api_011(guild_id: uuid.UUID) -> None:
-    not_implemented()
+def list_guild_members(
+    guild_id: uuid.UUID,
+    cursor: str | None = Query(default=None, description="다음 페이지 커서 (앞 응답의 nextCursor)"),
+    limit: int = Query(default=20, ge=1, le=50, description="기본 20, 최대 50"),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        page = service.list_guild_members(db, user.id, guild_id, cursor, limit)
+    except service.NotGuildMember:
+        raise AppError(403, "FORBIDDEN", "길드 소속원만 조회할 수 있습니다.")
+    except service.InvalidCursor:
+        raise AppError(400, "VALIDATION_FAILED", "입력값이 올바르지 않습니다.", {"cursor": "형식이 올바르지 않습니다."})
+    return GuildMemberList(
+        items=[GuildMemberRead(user_id=m.user_id, nickname=m.nickname, role=m.role) for m in page.items],
+        next_cursor=page.next_cursor,
+    )
 
 
 @router.post(
