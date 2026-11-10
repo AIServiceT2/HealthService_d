@@ -85,9 +85,16 @@ class Replay:
     events: list[ReplayEvent]
 
 
-def _playback_times(started_at: datetime, reps: list[RepEvent]) -> list[float]:
-    """세션 시작부터 지난 초. 가장 늦은 렙이 30초를 넘으면 간격 비율을 유지한 채 30초 안으로 줄인다 [제안]."""
-    offsets = [max((rep.ts - started_at).total_seconds(), 0.0) for rep in reps]
+def _playback_times(reps: list[RepEvent]) -> list[float]:
+    """첫 렙부터 지난 초. 가장 늦은 렙이 30초를 넘으면 간격 비율을 유지한 채 30초 안으로 줄인다 [제안].
+
+    기준을 세션 시작(서버 시계)이 아니라 첫 렙(앱 시계)으로 둔다. 렙 시각은 앱 시계라 서버 시각과 빼면
+    앱 시계가 느릴 때 모든 t가 0으로, 빠를 때 30초 끝으로 몰렸다 (검토에서 재현).
+    """
+    if not reps:
+        return []
+    first = min(rep.ts for rep in reps)
+    offsets = [(rep.ts - first).total_seconds() for rep in reps]
     longest = max(offsets, default=0.0)
     scale = REPLAY_MAX_SECONDS / longest if longest > REPLAY_MAX_SECONDS else 1.0
     return [round(offset * scale, 1) for offset in offsets]
@@ -105,7 +112,7 @@ def get_replay(db: Session, user_id: uuid.UUID, submission_id: uuid.UUID) -> Rep
     if snapshot.hit_count == 0:
         raise DailyCapExceeded(str(submission_id))
     reps = list(db.scalars(select(RepEvent).where(RepEvent.submission_id == submission_id).order_by(RepEvent.rep_no)))
-    times = _playback_times(submission.started_at, reps)
+    times = _playback_times(reps)
 
     per_hit, remainder = divmod(snapshot.total_damage, snapshot.hit_count)
     events, hits = [], 0

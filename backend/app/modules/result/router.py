@@ -92,7 +92,7 @@ def read_result(
     summary="[API-048] 전투 리플레이 조회",
     description=(
         "권한: OWNER. REWARDED 건만. HIT 수 = hitCount(결과 카드 타격 수), HIT 피해 합 = 결과 카드 totalDamage. "
-        "t는 세션 시작부터의 초를 30초 안으로 줄인 재생 시각(제안). 상한을 넘은 인정 렙은 MISS(DAILY_CAP), "
+        "t는 첫 렙부터의 초를 30초 안으로 줄인 재생 시각(첫 렙 0초, 제안). 상한을 넘은 인정 렙은 MISS(DAILY_CAP), "
         "미인정 렙은 MISS(사유 null, 저장되지 않음). 타격 0(일일 상한 초과)이면 409 reason DAILY_CAP_EXCEEDED. "
         "skeletonUrl은 자료 저장소가 없어 null. 길드원 공개 여부는 미정이라 본인만."
     ),
