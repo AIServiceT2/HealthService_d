@@ -1,13 +1,22 @@
-"""session API. 노션 '전운시 API 명세서'의 MVP 필수 항목을 경로만 만든 것.
+"""session API. 노션 '전운시 API 명세서' API-018~027.
 
-기능은 아직 없고 모두 501을 돌려준다. 입출력 형식은 명세 확정 후 schemas.py에 추가한다.
+구현한 것: API-018~025. API-027(세션 폐기)은 아직 501.
+로그인 확인은 auth 모듈의 get_current_user (Bearer access token).
 """
 
 import uuid
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 from app.core.stub import not_implemented
+from app.modules.auth.dependencies import get_current_user
+from app.modules.auth.models import User
+from app.modules.workout_session.catalog import CATALOG_VERSION, EXERCISES
+from app.modules.workout_session.schemas import (
+    ExerciseCriteria,
+    ExerciseItem,
+    ExercisesResponse,
+)
 
 router = APIRouter(tags=["session"])
 
@@ -15,11 +24,19 @@ router = APIRouter(tags=["session"])
 @router.get(
     "/exercises",
     summary="[API-018] 운동 목록·판정 기준·튜토리얼",
-    description="권한: PLAYER",
-    status_code=501,
+    description="권한: PLAYER. MVP 운동은 스쿼트 1종. 가동범위 수치·권장 촬영 각도·튜토리얼은 미정이라 null",
+    response_model=ExercisesResponse,
 )
-def api_018() -> None:
-    not_implemented()
+def api_018(_: User = Depends(get_current_user)) -> ExercisesResponse:
+    return ExercisesResponse(
+        catalog_version=CATALOG_VERSION,
+        items=[
+            ExerciseItem(
+                code=e.code, name=e.name, daily_cap=e.daily_cap, criteria=ExerciseCriteria()
+            )
+            for e in EXERCISES.values()
+        ],
+    )
 
 
 @router.get(
