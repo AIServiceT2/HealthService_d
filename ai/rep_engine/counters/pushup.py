@@ -15,6 +15,11 @@ class PushupCounter(FlexionCounter):
 
     def __init__(self, cfg: PushupCfg) -> None:
         super().__init__(cfg)
+        self._max_tilt = cfg.max_torso_tilt_deg
+
+    @property
+    def _posture_limit(self) -> float | None:
+        return self._max_tilt
 
     @classmethod
     def from_config(cls, cfg: EngineConfig) -> PushupCounter:

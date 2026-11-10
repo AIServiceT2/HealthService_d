@@ -102,6 +102,8 @@ class PushupCfg(FlexionCfg):
 
     #: 인정 렙 평균 몸통 이탈(180 − 어깨–엉덩이–발목 내각)이 이 값을 넘으면 BODY_LINE_BROKEN
     body_line_dev_deg: float = Field(ge=0)
+    #: 어깨–발목(안 보이면 어깨–엉덩이) 선이 화면 수평선에서 이 각도 이내일 때만 렙으로 셈 (D-71)
+    max_torso_tilt_deg: float = Field(ge=0, le=90)
 
 
 class SitupCfg(FlexionCfg):

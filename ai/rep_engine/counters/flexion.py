@@ -7,6 +7,11 @@
 그러면 렙 동안 둘째 각도의 최저값도 그 기준 이하여야 인정한다 (D-70). 렙 동안 둘째 각도가 한 번도
 안 보였으면 OUT_OF_FRAME, 기준을 못 넘었으면 SHALLOW_DEPTH.
 
+자세 확인(`_posture_limit`, 푸시업)을 쓰는 종목은 자세 각도(`ChainFeatures.posture_angle`)가 보이고
+기준 이하일 때만 렙을 시작한다. 최저점의 자세 각도가 기준을 넘거나 보이지 않으면 그 렙은
+기록하지 않는다 (시도로도 세지 않음).
+그 종목 자세가 아닐 때의 팔 움직임을 세지 않기 위해서다 (D-71).
+
 상태: REST → FLEXING → EXTENDING → REST
 (+ WAIT_REST: 렙을 폐기했거나 화면 이탈로 끊은 뒤, 다시 쉬는 자세가 될 때까지 기다리는 상태)
 
@@ -64,6 +69,7 @@ class FlexionCounter(ExerciseCounter[ChainFeatures]):
         self._min_t = 0
         self._asym_at_min: float | None = None
         self._form_at_min: float | None = None
+        self._posture_at_min: float | None = None
         self._min_aux: float | None = None
         self._n_total = 0
         self._n_invalid = 0
@@ -79,6 +85,15 @@ class FlexionCounter(ExerciseCounter[ChainFeatures]):
     def _aux_accept_angle(self) -> float | None:
         """둘째 판정 각도의 인정 기준 (이하여야 인정). None이면 둘째 조건 없음."""
         return None
+
+    @property
+    def _posture_limit(self) -> float | None:
+        """자세 각도 기준 (이하여야 렙으로 셈). None이면 자세 확인 없음."""
+        return None
+
+    def _can_start(self, f: ChainFeatures) -> bool:
+        limit = self._posture_limit
+        return limit is None or (f.posture_angle is not None and f.posture_angle <= limit)
 
     @property
     def state(self) -> str:
@@ -112,6 +127,7 @@ class FlexionCounter(ExerciseCounter[ChainFeatures]):
         self._min_t = f.t
         self._asym_at_min = f.asymmetry
         self._form_at_min = f.form_angle
+        self._posture_at_min = f.posture_angle
 
     def _close(
         self, end_t: int, out_of_frame: bool, require_attempt: bool = True
@@ -120,6 +136,9 @@ class FlexionCounter(ExerciseCounter[ChainFeatures]):
         c = self._cfg
         if require_attempt and self._min_angle >= c.attempt_angle:
             return []
+        limit = self._posture_limit
+        if limit is not None and (self._posture_at_min is None or self._posture_at_min > limit):
+            return []  # 최저점이 그 종목 자세가 아니거나 확인할 수 없음 → 기록하지 않음
         invalid_ratio = self._n_invalid / self._n_total if self._n_total else 0.0
         aux_limit = self._aux_accept_angle
         aux_missing = aux_limit is not None and self._min_aux is None
@@ -165,7 +184,7 @@ class FlexionCounter(ExerciseCounter[ChainFeatures]):
             self._angle = angle
 
         if self._state == REST:
-            if angle is not None and angle < c.flex_start_angle:
+            if angle is not None and angle < c.flex_start_angle and self._can_start(f):
                 self._begin(f, angle)
             return []
 

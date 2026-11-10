@@ -73,6 +73,9 @@ class FloorSynthConfig:
     thigh_tilt_deg: float = 45.0
     #: 윗몸 일으키기: 렙 최저점에서 허벅지를 더 들어 올리는 양(도)
     thigh_raise_deg: float = 0.0
+    #: 몸 전체를 기준점(푸시업: 손목, 윗몸 일으키기: 엉덩이) 둘레로 돌리는 각도(도, 반시계).
+    #: 예: 푸시업 자세를 70° 세우면 서서 팔만 굽히는 동작 흉내 (자세 확인 테스트용)
+    body_rotation_deg: float = 0.0
     #: [start, end) ms 동안 사람 미검출 (landmarks=null)
     invalid_ranges: list[tuple[int, int]] = field(default_factory=list)
     session_id: str = "synth-floor-1"
@@ -160,6 +163,11 @@ _SIDE_JOINTS: dict[str, tuple[Joint, Joint]] = {
 }
 
 
+def _rotate(pose: dict[str, Vec2], deg: float) -> dict[str, Vec2]:
+    c, s_ = math.cos(math.radians(deg)), math.sin(math.radians(deg))
+    return {k: (u * c - v * s_, u * s_ + v * c) for k, (u, v) in pose.items()}
+
+
 def _common(cfg: FloorSynthConfig, t: int) -> dict[Joint, Vec2]:
     """시각 t → 공통 골격 정규화 좌표 (얼굴 제외)."""
     angle = angle_at(cfg, t)
@@ -168,6 +176,8 @@ def _common(cfg: FloorSynthConfig, t: int) -> dict[Joint, Vec2]:
     else:
         e, _ = progress_at(cfg, t)
         pose = situp_pose(angle, cfg.thigh_tilt_deg + cfg.thigh_raise_deg * e)
+    if cfg.body_rotation_deg:
+        pose = _rotate(pose, cfg.body_rotation_deg)
     scale = cfg.person_scale * cfg.image_height
     x0 = (0.2 if cfg.exercise == "PUSHUP" else 0.45) * cfg.image_width
     ground = 0.7 * cfg.image_height

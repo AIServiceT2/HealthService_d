@@ -241,3 +241,38 @@ def test_us01_recount_api_pushup(monkeypatch: pytest.MonkeyPatch) -> None:
     assert res["recognizedReps"] == 5
     assert {"minElbowAngle", "bodyLineDevAtBottom", "elbowAsymmetryAtBottom"} <= set(res["reps"][0])
     assert "elbowFlexionDeg" in res["poseSummary"]
+
+
+@pytest.mark.parametrize("rotation", [70.0, 90.0, -40.0])
+def test_us01_pushup_arm_bends_off_the_floor_are_not_counted(
+    new_catalog: Catalog, rotation: float
+) -> None:
+    """서 있거나 앉아서 팔만 굽혔다 펴면 렙으로 세지 않는다 (웹캠 실측에서 발견, D-71)."""
+    cfg = FloorSynthConfig("PUSHUP", reps(4, 75), body_rotation_deg=rotation, noise_px=1.0)
+    res = run(cfg, new_catalog)
+    assert res.attempted_reps == 0
+
+
+def _pushup_feats(postures: list[float | None]) -> list[ChainFeatures]:
+    """팔꿈치 170° → 75° → 170° 렙 1개. 프레임마다 자세 각도를 따로 준다."""
+    angles = (
+        [170.0] * 3 + [160.0 - 8.5 * i for i in range(11)] + [80.0 + 8.0 * i for i in range(12)]
+    )
+    assert len(postures) == len(angles)
+    return [
+        ChainFeatures(t=i * 67, valid=True, angle=a, angle_raw=a, posture_angle=p)
+        for i, (a, p) in enumerate(zip(angles, postures, strict=True))
+    ]
+
+
+def test_us01_pushup_posture_rules(new_catalog: Catalog) -> None:
+    cfg = new_catalog.for_model("mediapipe")
+    n = 26
+    lying = PushupCounter.from_config(cfg).run(_pushup_feats([10.0] * n))
+    assert len(lying) == 1 and lying[0].accepted
+    # 엉덩이가 안 보여 자세를 확인할 수 없으면 시작하지 않음
+    unknown = PushupCounter.from_config(cfg).run(_pushup_feats([None] * n))
+    assert unknown == []
+    # 엎드려 시작했어도 최저점에서 자세가 무너지면(일어남) 기록하지 않음
+    bottom_bad = [10.0] * 3 + [10.0] * 9 + [60.0] * 2 + [10.0] * 12
+    assert PushupCounter.from_config(cfg).run(_pushup_feats(bottom_bad)) == []

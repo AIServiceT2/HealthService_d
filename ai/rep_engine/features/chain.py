@@ -13,6 +13,11 @@
 둘째 판정 각도(`aux_angle`, 필터 적용)는 인정 조건을 하나 더 거는 종목만 쓴다.
 - 윗몸 일으키기: 엉덩이 각도 = 어깨–엉덩이–무릎 (상체를 무릎 쪽으로 충분히 접었는지).
 
+자세 각도(`posture_angle`, 필터 전 값)는 렙을 셀 자세인지 확인하는 종목만 쓴다.
+- 푸시업: 어깨 중점에서 발목 중점(안 보이면 엉덩이 중점)으로 가는 선이 **화면 수평선**에서
+  기울어진 각도(0° = 엎드려 수평). 어깨–발목 선은 엉덩이가 처지거나 들려도 변하지 않는다.
+  발목은 잘 안 잡힐 때가 많아 엉덩이로 대신한다. 폰이 바닥과 수평으로 놓였다고 가정한다 (D-71).
+
 보조 각도(`form_angle`, 필터 전 값)는 종목마다 다르다.
 - 푸시업 `body_line_dev`: 180 − (어깨–엉덩이–발목 내각). 몸이 일직선이면 0°.
 - 윗몸 일으키기 `knee_angle`: 엉덩이–무릎–발목 내각.
@@ -26,7 +31,7 @@ from dataclasses import dataclass
 from rep_engine.adapters import Point, SkeletonFrame
 from rep_engine.config import FeaturesCfg
 from rep_engine.features.filters import OneEuroFilter
-from rep_engine.features.geometry import angle_deg, distance
+from rep_engine.features.geometry import angle_deg, distance, midpoint, tilt_from_vertical_deg
 from rep_engine.landmarks import Joint
 
 Triple = tuple[Joint, Joint, Joint]
@@ -35,6 +40,7 @@ Joints = tuple[Point | None, ...]
 FormFn = Callable[[Joints, float], float | None]
 
 FULL_EXTENSION_DEG = 180.0  # 일직선 = 180° (정의상 상수)
+HORIZONTAL_FROM_VERTICAL_DEG = 90.0  # 수평선은 수직선에서 90° (정의상 상수)
 
 LEFT_ARM: Triple = (Joint.LEFT_SHOULDER, Joint.LEFT_ELBOW, Joint.LEFT_WRIST)
 RIGHT_ARM: Triple = (Joint.RIGHT_SHOULDER, Joint.RIGHT_ELBOW, Joint.RIGHT_WRIST)
@@ -64,6 +70,8 @@ class ChainFeatures:
     aux_angle: float | None = None
     #: 좌우 판정 각도 차 (필터 전, 양쪽이 모두 보일 때만)
     asymmetry: float | None = None
+    #: 렙을 셀 자세인지 판단하는 각도 (모듈 설명 참고). 종목에 없거나 관절이 안 보이면 None
+    posture_angle: float | None = None
     #: 종목별 보조 각도 (모듈 설명 참고)
     form_angle: float | None = None
     core_visibility: float | None = None
@@ -73,12 +81,13 @@ class ChainFeatures:
 
 @dataclass(frozen=True, slots=True)
 class ChainSpec:
-    """종목의 판정 사슬(좌·우), 보조 각도 계산, 둘째 판정 사슬(없으면 None)."""
+    """종목의 판정 사슬(좌·우), 보조 각도, 둘째 판정 사슬, 자세 각도 (없으면 None)."""
 
     left: Triple
     right: Triple
     form: FormFn
     aux: tuple[Triple, Triple] | None = None
+    posture: FormFn | None = None
 
 
 def _vis(p: Point | None, min_vis: float) -> Point | None:
@@ -112,7 +121,24 @@ def knee_angle(joints: Joints, min_vis: float) -> float | None:
     return _mean_of_sides(joints, (LEFT_LEG3, RIGHT_LEG3), min_vis)
 
 
-PUSHUP_SPEC = ChainSpec(LEFT_ARM, RIGHT_ARM, body_line_dev)
+def torso_tilt_from_horizontal(joints: Joints, min_vis: float) -> float | None:
+    """어깨 중점 → 발목 중점(안 보이면 엉덩이 중점) 선이 화면 수평선에서 기울어진 각도(0~90°).
+
+    어깨가 안 보이거나, 발목과 엉덩이가 모두 안 보이면 None.
+    """
+    sh = [p for j in (Joint.LEFT_SHOULDER, Joint.RIGHT_SHOULDER) if (p := _vis(joints[j], min_vis))]
+    far = [p for j in (Joint.LEFT_ANKLE, Joint.RIGHT_ANKLE) if (p := _vis(joints[j], min_vis))] or [
+        p for j in (Joint.LEFT_HIP, Joint.RIGHT_HIP) if (p := _vis(joints[j], min_vis))
+    ]
+    if not sh or not far:
+        return None
+    top = midpoint((sh[0].x, sh[0].y), (sh[-1].x, sh[-1].y))
+    bottom = midpoint((far[0].x, far[0].y), (far[-1].x, far[-1].y))
+    tilt = tilt_from_vertical_deg(top, bottom)
+    return None if tilt is None else abs(HORIZONTAL_FROM_VERTICAL_DEG - tilt)
+
+
+PUSHUP_SPEC = ChainSpec(LEFT_ARM, RIGHT_ARM, body_line_dev, posture=torso_tilt_from_horizontal)
 SITUP_SPEC = ChainSpec(
     LEFT_TORSO_FLOOR, RIGHT_TORSO_FLOOR, knee_angle, aux=(LEFT_TORSO_THIGH, RIGHT_TORSO_THIGH)
 )
@@ -197,6 +223,7 @@ class ChainFeatureExtractor:
             angle=self._filter(raw, frame.t),
             angle_raw=raw,
             aux_angle=aux,
+            posture_angle=None if self._spec.posture is None else self._spec.posture(joints, mv),
             asymmetry=abs(sides[0][0] - sides[1][0]) if len(sides) == 2 else None,
             form_angle=self._spec.form(joints, mv),
             core_visibility=sum(v for _, v in sides) / len(sides),
