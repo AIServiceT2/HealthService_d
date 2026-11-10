@@ -8,7 +8,7 @@ provider·email·password_hash는 로그인에 필요해 더한 [추가] 필드�
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import Date, DateTime, ForeignKey, String, Uuid, func
+from sqlalchemy import Date, DateTime, ForeignKey, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.db import Base
@@ -23,8 +23,12 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(255))
     nickname: Mapped[str] = mapped_column(String(12))
     birth_date: Mapped[date] = mapped_column(Date)
-    # 길드 테이블이 아직 없어 FK 없이 둔다 (길드 API 구현 때 연결)
-    guild_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, default=None)
+    # 소속 길드 (노션 DB 3. USER: FK, NULL 허용). guild.leader_user_id → app_user.id와 서로 참조하므로
+    # use_alter로 두 테이블을 만든 뒤 FK를 건다. 길드가 지워지면 소속을 비운다 (길드 삭제 API는 아직 없음)
+    guild_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("guild.id", use_alter=True, name="app_user_guild_id_fkey", ondelete="SET NULL"),
+        default=None,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
