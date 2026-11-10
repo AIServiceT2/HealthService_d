@@ -89,7 +89,7 @@ python -m scripts.seed                     # 계산 시험용 SUBMITTED 건 생�
 .venv/bin/uvicorn app.main:app --port 8000 # GET /health → {"status":"ok"}
 .venv/bin/python -m pytest -v              # 3 passed
 ```
-- 주의: 테스트가 끝날 때 `workout_submission`을 비우는데 개발용 DB와 같은 DB라 시드로 넣은 건도 지워집니다 (first-feature.md 3절 남은 문제 ②)
+- 테스트는 개발 DB가 아니라 테스트 전용 DB(`db-test`, 포트 55432)를 씁니다. 테스트 전에 `docker compose up -d db-test`를 실행합니다. 다른 DB를 쓰려면 `TEST_DATABASE_URL`을 넣습니다 (`backend/tests/conftest.py`). 이전에는 개발 DB를 함께 써서 시드가 지워졌습니다 (first-feature.md 3절 남은 문제 ②)
 
 **앱**
 ```bash

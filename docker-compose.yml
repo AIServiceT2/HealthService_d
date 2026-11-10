@@ -9,6 +9,16 @@ services:
     ports:
       - "5432:5432"
 
+  # 테스트 전용 DB (backend/tests/conftest.py). 테스트가 끝날 때마다 테이블을 비우므로
+  # 개발 DB(db)와 나눈다. 테스트만 돌릴 때: docker compose up -d db-test
+  db-test:
+    image: postgres:18
+    environment:
+      POSTGRES_DB: jeonunsi_test
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "55432:5432"
+
   # AI 렙 판정 내부 API (ai/README.md). 백엔드는 http://ai:8001/internal/... 로 호출.
   # AI_INTERNAL_TOKEN이 비어 있으면 보호된 엔드포인트는 모두 401 (값은 .env에, 저장소에 넣지 않음)
   ai:
