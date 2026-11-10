@@ -1,25 +1,11 @@
 """API-049 L3 전투 서사 생성 — backlog US-02 (실패·거절)·(LLM), US-05 (실패·거절)·(LLM)."""
 
-import pytest
-
-from app.main import app
-from app.modules.llm.client import get_llm_client
 from app.modules.snapshot.rules import FALLBACK_NARRATIVE
-from tests.llm_helpers import FakeLLM, LLMError, LLMRateLimited, post
+from tests.llm_helpers import FakeLLM, LLMError, LLMRateLimited, post, use_llm  # noqa: F401 (fixture)
 from tests.review_helpers import new_prepared
 from tests.submission_helpers import new_submission
 
 PATH = "/internal/llm/narratives"
-
-
-@pytest.fixture
-def use_llm():
-    def install(fake):
-        app.dependency_overrides[get_llm_client] = lambda: fake
-        return fake
-
-    yield install
-    app.dependency_overrides.pop(get_llm_client, None)
 
 
 def story(client, sid, headers):

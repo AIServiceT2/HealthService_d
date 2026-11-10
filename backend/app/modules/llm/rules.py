@@ -15,3 +15,14 @@ DIGITS = re.compile(r"[0-9０-９]")
 SKILL_BY_EXERCISE: dict[str, str] = {"SQUAT": "충격파 스톰프"}
 # 서사에 나오면 안 되는 아이템명. 아이템 카탈로그가 아직 없어 비어 있다 (노션 ERD '아직 정하지 못한 것')
 ITEM_NAMES: tuple[str, ...] = ()
+
+# ---- L4 자세 교정 코멘트 ----
+
+# 기본 문구: DESIGN.md 5절 'LLM 결과 표시'의 교정 기본 문구 예시 [제안·팀 확인 필요 — PRD 미정 표]
+FALLBACK_FORM_TIP = "교정 안내를 불러오지 못했어요. 다음 운동 전 판정 기준을 확인해 주세요."
+# 진단·처방처럼 들리는 표현. 거를 기준은 미정 (backlog US-05 미확정, PRD 미정 표) → 우선 아래 낱말이 있으면 탈락 [제안]
+MEDICAL_WORDS: tuple[str, ...] = (
+    "진단", "처방", "치료", "질환", "질병", "병원", "의사", "복용", "약물", "재활", "부상입니다", "손상",
+)
+# poseSummary로 받는 관절 각도 통계 [제안: 입력 계약 미정 — 노션 API-050]
+POSE_SUMMARY_MAX_JOINTS = 10

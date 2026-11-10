@@ -1,6 +1,9 @@
 """LLM API 테스트 공통 도구. 실제 LLM 대신 응답을 정해 둔 가짜 클라이언트를 끼운다."""
 
-from app.modules.llm.client import LLMError, LLMRateLimited
+import pytest
+
+from app.main import app
+from app.modules.llm.client import LLMError, LLMRateLimited, get_llm_client
 from tests.submission_helpers import internal_headers
 
 
@@ -19,8 +22,20 @@ class FakeLLM:
         return out
 
 
+@pytest.fixture
+def use_llm():
+    """테스트 동안 LLM 클라이언트를 가짜로 바꾼다. use_llm(FakeLLM(...))."""
+
+    def install(fake):
+        app.dependency_overrides[get_llm_client] = lambda: fake
+        return fake
+
+    yield install
+    app.dependency_overrides.pop(get_llm_client, None)
+
+
 def post(client, path: str, body: dict):
     return client.post(path, json=body, headers=internal_headers())
 
 
-__all__ = ["FakeLLM", "LLMError", "LLMRateLimited", "post"]
+__all__ = ["FakeLLM", "LLMError", "LLMRateLimited", "post", "use_llm"]

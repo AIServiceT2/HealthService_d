@@ -155,3 +155,51 @@ def generate_narrative(db: Session, client: LLMClient, submission_id: uuid.UUID)
     result = Generated("L3", text, False) if text else Generated("L3", FALLBACK_NARRATIVE, True)
     _save(db, submission_id, lambda s: setattr(s, "ai_story", result.text))
     return result
+
+
+# ---- L4 자세 교정 코멘트 (API-050) ----
+
+
+def _l4_input(submission: WorkoutSubmission, pose_summary: dict[str, dict]) -> dict[str, Any]:
+    """L4에 보내는 것: 운동 종류·판정 기준·관절 각도 요약 통계만 (03 3-4, backlog US-02 (LLM)).
+
+    - 판정 기준(가동범위 수치)은 미정이라 None (노션 API-018 criteria.kneeAngleMax)
+    - 미인정 사유는 제출건에 저장하는 곳이 아직 없어 넣지 않았다 [팀 확인 필요]
+    - 보상 수치·메모·관절 좌표 원본·얼굴 정보·닉네임·길드명은 넣지 않는다
+    """
+    return {
+        "exerciseName": EXERCISES[submission.exercise_code].name,
+        "criteria": {"kneeAngleMax": None},
+        "poseSummary": pose_summary,
+    }
+
+
+def is_valid_form_tip(text: str) -> bool:
+    """숫자(수치는 결과 카드에만, 03 3-4)나 진단·처방처럼 들리는 표현이 있으면 탈락 (backlog US-05)."""
+    if rules.DIGITS.search(text):
+        return False
+    return not any(word in text for word in rules.MEDICAL_WORDS)
+
+
+def generate_form_tip(
+    db: Session, client: LLMClient, submission_id: uuid.UUID, pose_summary: dict[str, dict]
+) -> Generated:
+    """L4 자세 교정 코멘트를 만들어 ai_form_tip에 저장한다 (노션 API-050).
+
+    이미 LLM이 만든 코멘트(기본 문구가 아닌 것)가 있으면 다시 부르지 않는다 [제안].
+    """
+    submission = _read(db, submission_id)
+    if submission.ai_form_tip and submission.ai_form_tip != rules.FALLBACK_FORM_TIP:
+        return Generated("L4", submission.ai_form_tip, False)
+    payload = _l4_input(submission, pose_summary)
+    db.rollback()
+
+    try:
+        text = _generate(client, "L4", payload, is_valid_form_tip)
+    except LLMRateLimited:
+        _save(db, submission_id, lambda s: setattr(s, "ai_form_tip", rules.FALLBACK_FORM_TIP))
+        raise RateLimited(Generated("L4", rules.FALLBACK_FORM_TIP, True)) from None
+
+    result = Generated("L4", text, False) if text else Generated("L4", rules.FALLBACK_FORM_TIP, True)
+    _save(db, submission_id, lambda s: setattr(s, "ai_form_tip", result.text))
+    return result

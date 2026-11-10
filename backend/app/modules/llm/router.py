@@ -13,7 +13,12 @@ from app.core.errors import AppError
 from app.core.stub import not_implemented
 from app.modules.llm import service
 from app.modules.llm.client import LLMClient, get_llm_client
-from app.modules.llm.schemas import ErrorResponse, GeneratedText, NarrativeRequest
+from app.modules.llm.schemas import (
+    ErrorResponse,
+    FormCommentRequest,
+    GeneratedText,
+    NarrativeRequest,
+)
 from app.modules.snapshot.internal import require_internal_token
 
 # 입력 오류는 전역 처리기가 400으로 돌려주므로 Swagger에 실제와 다른 422가 보이지 않게 4XX를 선언한다
@@ -69,11 +74,24 @@ def api_049(
 @router.post(
     "/internal/llm/form-comments",
     summary="[API-050] L4 자세 교정 코멘트 생성",
-    description="권한: SYSTEM",
-    status_code=501,
+    description=(
+        "권한: SYSTEM (X-Internal-Token). 관절 좌표 원본 대신 각도 요약 통계(poseSummary, 0~180도, 관절 최대 10개)만 "
+        "받아 운동 종류·판정 기준과 함께 보낸다(입력 계약 미정). 숫자나 진단·처방처럼 들리는 표현이 있으면 다시 만들고 "
+        "2번 실패하면 기본 문구. ai_form_tip에 저장. 호출 한도 초과는 429. 제공사 미정이라 지금은 모의 응답"
+    ),
+    response_model=GeneratedText,
 )
-def api_050() -> None:
-    not_implemented()
+def api_050(
+    req: FormCommentRequest,
+    db: Session = Depends(get_db),
+    client: LLMClient = Depends(get_llm_client),
+):
+    pose = {k: v.model_dump(exclude_none=True) for k, v in req.pose_summary.items()}
+    try:
+        result = _errors(lambda: service.generate_form_tip(db, client, req.submission_id, pose))
+    except service.RateLimited as e:
+        return _rate_limited(e.result)
+    return GeneratedText(level=result.level, text=result.text, is_fallback=result.is_fallback)
 
 
 @router.post(
