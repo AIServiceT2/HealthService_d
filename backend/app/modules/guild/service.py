@@ -47,6 +47,10 @@ class InvitationExpired(Exception):
     pass
 
 
+class LeaderCannotLeave(Exception):
+    pass
+
+
 _INVITE_CODE_ATTEMPTS = 5
 
 
@@ -83,6 +87,14 @@ class GuildInfo:
 def _lock_user(db: Session, user_id: uuid.UUID) -> User:
     """사용자 행을 잠근다. 같은 사용자의 길드 요청이 동시에 와도 하나씩 처리된다."""
     return db.scalars(select(User).where(User.id == user_id).with_for_update()).one()
+
+
+def _lock_guild(db: Session, guild_id: uuid.UUID) -> Guild | None:
+    """길드 행을 잠근다. 탈퇴·내보내기·위임이 같은 길드에 동시에 와도 하나씩 처리된다.
+
+    잠그는 순서는 항상 길드 → 사용자 (교착 상태를 피하려고).
+    """
+    return db.scalars(select(Guild).where(Guild.id == guild_id).with_for_update()).one_or_none()
 
 
 def create_guild(db: Session, user_id: uuid.UUID, name: str) -> Guild:
@@ -226,3 +238,22 @@ def join_by_invitation(db: Session, user_id: uuid.UUID, code: str) -> uuid.UUID:
         db.rollback()
         raise
     return invitation.guild_id
+
+
+def leave_guild(db: Session, user_id: uuid.UUID, guild_id: uuid.UUID) -> None:
+    """본인이 길드를 탈퇴한다 (노션 API-014). 탈퇴 제한 정책은 미정이라 명세의 규칙만 둔다.
+
+    그 길드 소속원이 아니면 NotGuildMember, 길드장이면 LeaderCannotLeave(위임 후 탈퇴).
+    """
+    try:
+        guild = _lock_guild(db, guild_id)
+        user = _lock_user(db, user_id)
+        if guild is None or user.guild_id != guild.id:
+            raise NotGuildMember(str(user_id))
+        if guild.leader_user_id == user.id:
+            raise LeaderCannotLeave(str(user_id))
+        user.guild_id = None
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise

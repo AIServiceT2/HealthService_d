@@ -1,14 +1,15 @@
 """guild API. 노션 '전운시 API 명세서' API-009~017.
 
 구현: API-009 길드 생성, API-010 길드 정보 조회, API-011 길드원 목록,
-API-012 길드 초대 코드 발급, API-013 초대 코드로 길드 가입. 나머지는 경로만 있고 501을 돌려준다.
+API-012 길드 초대 코드 발급, API-013 초대 코드로 길드 가입,
+API-014 길드 탈퇴. 나머지는 경로만 있고 501을 돌려준다.
 로그인 확인은 auth 모듈의 get_current_user (Bearer access token, JWT).
 에러 본문 { code, message, details }은 전역 처리기(app/core/errors.py)가 만든다.
 """
 
 import uuid
 
-from fastapi import APIRouter, Body, Depends, Query
+from fastapi import APIRouter, Body, Depends, Query, Response
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
@@ -196,11 +197,30 @@ def join_guild(
 @router.delete(
     "/guilds/{guild_id}/members/me",
     summary="[API-014] 길드 탈퇴",
-    description="권한: GUILD_MEMBER",
-    status_code=501,
+    description=(
+        "권한: GUILD_MEMBER. 본문 없음, 성공 시 204. 길드장은 위임(API-016) 후 탈퇴할 수 있다. "
+        "탈퇴 제한 정책은 미정."
+    ),
+    status_code=204,
+    response_class=Response,
+    responses={
+        401: _UNAUTHENTICATED,
+        403: {"model": ErrorResponse, "description": "FORBIDDEN 길드 소속원만 탈퇴할 수 있습니다."},
+        409: {"model": ErrorResponse, "description": "INVALID_STATE 길드장은 위임 후 탈퇴할 수 있습니다."},
+    },
 )
-def api_014(guild_id: uuid.UUID) -> None:
-    not_implemented()
+def leave_guild(
+    guild_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        service.leave_guild(db, user.id, guild_id)
+    except service.NotGuildMember:
+        raise AppError(403, "FORBIDDEN", "길드 소속원만 탈퇴할 수 있습니다.")
+    except service.LeaderCannotLeave:
+        raise AppError(409, "INVALID_STATE", "길드장은 위임 후 탈퇴할 수 있습니다.")
+    return Response(status_code=204)
 
 
 @router.delete(
