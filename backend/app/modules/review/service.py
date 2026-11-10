@@ -5,6 +5,7 @@ version을 1 올린다 (취소 API-030과 같은 방식). 그래서 취소·승�
 """
 
 import base64
+import json
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -107,7 +108,8 @@ class NotOwner(Exception):
 class ShareContent:
     """확인자에게 보낼 내용. 얼굴·나이·길드명은 넣지 않는다 (backlog US-07 (권한)).
 
-    관절 선 리플레이(skeleton_replay_url)·L1·L2는 아직 만드는 기능이 없어 빈 값이다.
+    L1(summary)·L2(anomalies)는 API-051이 ai_summary·ai_flags에 저장한 값이고, 만들기 전에는 빈 값이다.
+    관절 선 리플레이(skeleton_replay_url)는 만드는 기능이 아직 없어 None.
     통증 안내 고정 문구는 미정 (노션 API-034).
     """
 
@@ -117,9 +119,26 @@ class ShareContent:
     pain_notice: str | None
 
 
+def _anomalies(ai_flags: str | None) -> list[dict]:
+    """ai_flags(L2, API-051이 저장한 JSON 배열)를 읽는다. 형식이 맞지 않으면 보여 주지 않는다."""
+    if not ai_flags:
+        return []
+    try:
+        items = json.loads(ai_flags)
+        return [
+            {"type": str(a["type"]), "rep_nos": [int(n) for n in a["repNos"]], "description": str(a["description"])}
+            for a in items
+        ]
+    except (ValueError, TypeError, KeyError):
+        return []
+
+
 def _share_content(submission: WorkoutSubmission) -> ShareContent:
     return ShareContent(
-        skeleton_replay_url=None, summary=submission.ai_summary, anomalies=[], pain_notice=None
+        skeleton_replay_url=None,
+        summary=submission.ai_summary,
+        anomalies=_anomalies(submission.ai_flags),
+        pain_notice=None,
     )
 
 

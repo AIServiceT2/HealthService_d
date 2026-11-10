@@ -9,6 +9,8 @@
   (STACK.md '입력 데이터 계약과 재시도 계획').
 """
 
+import json
+import statistics
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -21,7 +23,7 @@ from app.modules.llm import rules
 from app.modules.llm.client import LLMClient, LLMError, LLMRateLimited
 from app.modules.snapshot.rules import FALLBACK_NARRATIVE
 from app.modules.submission.constants import SubmissionStatus
-from app.modules.submission.models import WorkoutSubmission
+from app.modules.submission.models import RepEvent, WorkoutSubmission
 from app.modules.workout_session.catalog import EXERCISES
 
 
@@ -203,3 +205,122 @@ def generate_form_tip(
     result = Generated("L4", text, False) if text else Generated("L4", rules.FALLBACK_FORM_TIP, True)
     _save(db, submission_id, lambda s: setattr(s, "ai_form_tip", result.text))
     return result
+
+
+# ---- L1 기록 요약·L2 이상치 설명 (API-051) ----
+
+
+@dataclass(frozen=True)
+class RepStats:
+    counted: int
+    uncounted: int
+    intervals: list[tuple[int, float]]  # (뒤 렙 번호, 앞 렙과의 간격 초)
+
+    def interval_summary(self) -> dict[str, float] | None:
+        if not self.intervals:
+            return None
+        values = [v for _, v in self.intervals]
+        return {
+            "avg": round(statistics.fmean(values), 2),
+            "min": round(min(values), 2),
+            "max": round(max(values), 2),
+            "std": round(statistics.pstdev(values), 2),
+        }
+
+
+def _rep_stats(db: Session, submission_id: uuid.UUID) -> RepStats:
+    reps = list(
+        db.scalars(select(RepEvent).where(RepEvent.submission_id == submission_id).order_by(RepEvent.rep_no))
+    )
+    intervals = [
+        (b.rep_no, (b.ts - a.ts).total_seconds()) for a, b in zip(reps, reps[1:], strict=False)
+    ]
+    counted = sum(1 for r in reps if r.counted)
+    return RepStats(counted, len(reps) - counted, intervals)
+
+
+def find_anomalies(stats: RepStats) -> list[dict[str, Any]]:
+    """규칙 검사로 이상치 종류와 렙 번호를 찾는다. LLM은 이 결과를 설명만 한다 (03 3-4 L2)."""
+    found: list[dict[str, Any]] = []
+    fast = [no for no, sec in stats.intervals if sec < rules.MIN_REP_INTERVAL_SEC]
+    if fast:
+        found.append({"type": "TEMPO_TOO_FAST", "repNos": fast})
+    values = [sec for _, sec in stats.intervals]
+    if len(values) + 1 >= rules.UNIFORM_TEMPO_MIN_REPS and statistics.pstdev(values) < rules.UNIFORM_TEMPO_STD_SEC:
+        found.append({"type": "UNIFORM_TEMPO", "repNos": []})
+    return found
+
+
+def _l1_input(submission: WorkoutSubmission, stats: RepStats) -> dict[str, Any]:
+    """L1에 보내는 것: 운동 종류·인정/미인정 렙 수·렙 간격 통계 (03 3-4 L1, 노션 API-051).
+
+    닉네임·길드명·메모·관절 좌표 원본은 넣지 않는다. 렙 간격은 통계로만 보낸다.
+    메모 입력은 아직 없다 (DATA-MODEL.md '아직 정하지 못한 것').
+    """
+    return {
+        "exerciseName": EXERCISES[submission.exercise_code].name,
+        "countedReps": stats.counted,
+        "uncountedReps": stats.uncounted,
+        "repIntervalSec": stats.interval_summary(),
+    }
+
+
+def _l2_input(anomaly: dict[str, Any], stats: RepStats) -> dict[str, Any]:
+    """L2에 보내는 것: 규칙 검사 결과(종류·렙 번호)와 렙 간격 통계만 (03 3-4 L2)."""
+    return {"anomalyType": anomaly["type"], "repNos": anomaly["repNos"], "repIntervalSec": stats.interval_summary()}
+
+
+def _fallback_summary(payload: dict[str, Any]) -> str:
+    """LLM이 실패하면 입력값으로 만든 기본 문장 (03 3-4 L1)."""
+    text = f"{payload['exerciseName']} 인정 {payload['countedReps']}회, 미인정 {payload['uncountedReps']}회."
+    if payload["repIntervalSec"]:
+        text += f" 렙 간격 평균 {payload['repIntervalSec']['avg']}초."
+    return text
+
+
+def _any_text(text: str) -> bool:
+    """L1·L2는 숫자(렙 수·간격)를 써도 된다. 길이·빈 값 검사(_generate)만 한다."""
+    return True
+
+
+def generate_review_summary(db: Session, client: LLMClient, submission_id: uuid.UUID) -> dict[str, Any]:
+    """L1 요약을 ai_summary에, L2 이상치 설명을 ai_flags(JSON 배열)에 저장한다 (노션 API-051).
+
+    - 확인 화면(API-034·037)에 표시만 하고 상태를 바꾸지 않는다 (US-07 (LLM))
+    - 자동 승인 건에도 만들지는 미정 → 상태로 막지 않고 호출한 쪽이 정한다 (노션 API-051)
+    - 이미 저장된 값이 있어도 다시 만든다 (요청 시점의 렙 기록으로 새로 요약) [제안]
+    """
+    submission = _read(db, submission_id)
+    stats = _rep_stats(db, submission_id)
+    l1 = _l1_input(submission, stats)
+    found = find_anomalies(stats)
+    db.rollback()
+
+    try:
+        summary = _generate(client, "L1", l1, _any_text) or _fallback_summary(l1)
+        anomalies = [
+            {
+                **a,
+                "description": _generate(client, "L2", _l2_input(a, stats), _any_text)
+                or rules.FALLBACK_ANOMALY_DESCRIPTIONS[a["type"]],
+            }
+            for a in found
+        ]
+    except LLMRateLimited:
+        summary = _fallback_summary(l1)
+        anomalies = [{**a, "description": rules.FALLBACK_ANOMALY_DESCRIPTIONS[a["type"]]} for a in found]
+        _save_review_summary(db, submission_id, summary, anomalies)
+        raise RateLimited(Generated("L1", summary, True)) from None
+
+    _save_review_summary(db, submission_id, summary, anomalies)
+    return {"summary": summary, "anomalies": anomalies}
+
+
+def _save_review_summary(
+    db: Session, submission_id: uuid.UUID, summary: str, anomalies: list[dict[str, Any]]
+) -> None:
+    def apply(s: WorkoutSubmission) -> None:
+        s.ai_summary = summary
+        s.ai_flags = json.dumps(anomalies, ensure_ascii=False)
+
+    _save(db, submission_id, apply)

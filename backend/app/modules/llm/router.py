@@ -10,7 +10,6 @@ from sqlalchemy.orm import Session
 
 from app.core.db import get_db
 from app.core.errors import AppError
-from app.core.stub import not_implemented
 from app.modules.llm import service
 from app.modules.llm.client import LLMClient, get_llm_client
 from app.modules.llm.schemas import (
@@ -18,6 +17,8 @@ from app.modules.llm.schemas import (
     FormCommentRequest,
     GeneratedText,
     NarrativeRequest,
+    ReviewSummaryRequest,
+    ReviewSummaryResponse,
 )
 from app.modules.snapshot.internal import require_internal_token
 
@@ -97,8 +98,21 @@ def api_050(
 @router.post(
     "/internal/llm/review-summaries",
     summary="[API-051] L1 기록 요약·L2 이상치 설명 생성",
-    description="권한: SYSTEM",
-    status_code=501,
+    description=(
+        "권한: SYSTEM (X-Internal-Token). L1에는 운동 종류·인정/미인정 렙 수·렙 간격 통계만 보낸다. "
+        "이상치 종류·렙 번호는 규칙(렙 간격 1초 미만 TEMPO_TOO_FAST, 간격이 거의 같으면 UNIFORM_TEMPO — 기준값 가정)이 "
+        "찾고 LLM은 설명만 쓴다. ai_summary·ai_flags(JSON)에 저장, 상태는 바꾸지 않음. 실패하면 입력값으로 만든 문장·"
+        "고정 설명. 호출 한도 초과는 429. 제공사 미정이라 지금은 모의 응답"
+    ),
+    response_model=ReviewSummaryResponse,
 )
-def api_051() -> None:
-    not_implemented()
+def api_051(
+    req: ReviewSummaryRequest,
+    db: Session = Depends(get_db),
+    client: LLMClient = Depends(get_llm_client),
+):
+    try:
+        result = _errors(lambda: service.generate_review_summary(db, client, req.submission_id))
+    except service.RateLimited as e:
+        return _rate_limited(e.result)
+    return ReviewSummaryResponse.model_validate(result)

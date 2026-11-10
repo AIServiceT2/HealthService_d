@@ -52,3 +52,21 @@ class FormCommentRequest(_CamelModel):
     submission_id: uuid.UUID
     # 키는 관절 이름(kneeAngle 등). 입력 계약이 미정이라 이름은 형식만 검사한다
     pose_summary: dict[JointName, AngleStats] = Field(max_length=POSE_SUMMARY_MAX_JOINTS)
+
+
+# ---- API-051 L1 기록 요약·L2 이상치 설명 ----
+
+
+class ReviewSummaryRequest(_CamelModel):
+    submission_id: uuid.UUID
+
+
+class AnomalyRead(_CamelModel):
+    type: str
+    rep_nos: list[int]
+    description: str
+
+
+class ReviewSummaryResponse(_CamelModel):
+    summary: str
+    anomalies: list[AnomalyRead]
