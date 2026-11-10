@@ -27,6 +27,29 @@ class SnapshotRead(SnapshotValues):
     submission_id: uuid.UUID
 
 
+class NarrativeRead(_CamelModel):
+    """L3 전투 서사. LLM이 없거나 실패하면 기본 문구와 isFallback=true."""
+
+    level: str
+    text: str
+    is_fallback: bool
+
+
+class RewardPreview(_CamelModel):
+    """API-032 응답 200: { status, snapshot, narrative }."""
+
+    status: str
+    snapshot: SnapshotValues
+    narrative: NarrativeRead
+
+
+class RewardPreviewPending(_CamelModel):
+    """API-032 응답 202 (스냅샷 계산 전): { status: "SUBMITTED", retryAfterSec }."""
+
+    status: str
+    retry_after_sec: int
+
+
 class ErrorResponse(BaseModel):
     """노션 API 명세서 공통 에러 본문: { code, message, details }."""
 

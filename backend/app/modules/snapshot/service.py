@@ -1,6 +1,7 @@
 """보상 스냅샷 규칙. 다른 모듈은 이 파일의 함수로만 스냅샷을 다룬다."""
 
 import uuid
+from dataclasses import dataclass
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -22,6 +23,14 @@ class NotSubmitted(Exception):
 
 class CalculationError(Exception):
     pass
+
+
+class NotOwner(Exception):
+    pass
+
+
+class NoPreview(Exception):
+    """스냅샷 없이 SUBMITTED도 아닌 건 (계산 전에 취소된 건 등)."""
 
 
 def calculate_hit_count(exercise_code: str, rewardable_reps: int) -> int:
@@ -79,3 +88,28 @@ def prepare_snapshot(db: Session, submission_id: uuid.UUID) -> SubmissionSnapsho
         db.rollback()
         raise
     return snapshot
+
+
+@dataclass(frozen=True)
+class Preview:
+    """API-032 미리보기. snapshot이 None이면 아직 계산 전(SUBMITTED)."""
+
+    status: str
+    snapshot: SubmissionSnapshot | None
+    narrative_text: str | None
+
+
+def get_reward_preview(db: Session, user_id: uuid.UUID, submission_id: uuid.UUID) -> Preview:
+    """제출한 본인만 본다 (노션 API-032, backlog US-02 (권한)). 조회는 상태를 바꾸지 않는다.
+
+    없으면 SubmissionNotFound, 남의 건이면 NotOwner, 스냅샷 없이 SUBMITTED도 아니면 NoPreview.
+    """
+    submission = db.get(WorkoutSubmission, submission_id)
+    if submission is None:
+        raise SubmissionNotFound(str(submission_id))
+    if submission.user_id != user_id:
+        raise NotOwner(str(user_id))
+    snapshot = db.get(SubmissionSnapshot, submission_id)
+    if snapshot is None and submission.status != SubmissionStatus.SUBMITTED:
+        raise NoPreview(submission.status)
+    return Preview(status=submission.status, snapshot=snapshot, narrative_text=submission.ai_story)

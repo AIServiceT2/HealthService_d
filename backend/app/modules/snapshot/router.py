@@ -1,19 +1,28 @@
 """snapshot API. 노션 '전운시 API 명세서' API-031·032.
 
-구현: API-031 보상 스냅샷 계산·고정. API-032는 경로만 있고 501을 돌려준다.
+구현: API-031 보상 스냅샷 계산·고정, API-032 보상·타격 수 미리보기.
 """
 
 import uuid
 
 from fastapi import APIRouter, Depends, Header
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
 from app.core.errors import AppError
-from app.core.stub import not_implemented
-from app.modules.snapshot import service
+from app.modules.auth.dependencies import get_current_user
+from app.modules.auth.models import User
+from app.modules.snapshot import rules, service
 from app.modules.snapshot.internal import require_internal_token
-from app.modules.snapshot.schemas import ErrorResponse, SnapshotRead
+from app.modules.snapshot.schemas import (
+    ErrorResponse,
+    NarrativeRead,
+    RewardPreview,
+    RewardPreviewPending,
+    SnapshotRead,
+    SnapshotValues,
+)
 
 # 입력 오류는 전역 처리기가 400으로 돌려주므로 Swagger에 실제와 다른 422가 보이지 않게 4XX를 선언한다
 router = APIRouter(
@@ -61,8 +70,44 @@ def prepare_snapshot(
 @router.get(
     "/submissions/{id}/reward-preview",
     summary="[API-032] 보상·타격 수 미리보기",
-    description="권한: OWNER",
-    status_code=501,
+    description=(
+        "권한: OWNER. 스냅샷이 아직 없으면(SUBMITTED) 202 { status, retryAfterSec }. "
+        "서사(L3)는 LLM 연결 전이라 기본 문구와 isFallback=true (문구는 제안·팀 확인 필요). "
+        "수치는 모두 규칙 엔진의 스냅샷 값이다."
+    ),
+    response_model=RewardPreview,
+    response_model_by_alias=True,
+    responses={
+        202: {"model": RewardPreviewPending, "description": "스냅샷 계산 전. retryAfterSec 뒤 다시 조회"},
+        401: {"model": ErrorResponse, "description": "UNAUTHENTICATED 로그인이 필요합니다."},
+        403: {"model": ErrorResponse, "description": "FORBIDDEN 제출한 본인만 볼 수 있습니다."},
+        404: {"model": ErrorResponse, "description": "NOT_FOUND 제출건을 찾을 수 없습니다."},
+        409: {"model": ErrorResponse, "description": "INVALID_STATE 보상을 계산하기 전에 끝난 제출건입니다. (명세에 없음, 제안)"},
+    },
 )
-def api_032(id: uuid.UUID) -> None:
-    not_implemented()
+def reward_preview(
+    id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        preview = service.get_reward_preview(db, user.id, id)
+    except service.SubmissionNotFound:
+        raise AppError(404, "NOT_FOUND", "제출건을 찾을 수 없습니다.")
+    except service.NotOwner:
+        raise AppError(403, "FORBIDDEN", "제출한 본인만 볼 수 있습니다.")
+    except service.NoPreview:
+        raise AppError(409, "INVALID_STATE", "보상을 계산하기 전에 끝난 제출건입니다.")
+
+    if preview.snapshot is None:
+        pending = RewardPreviewPending(status=preview.status, retry_after_sec=rules.PREVIEW_RETRY_AFTER_SEC)
+        return JSONResponse(status_code=202, content=pending.model_dump(by_alias=True))
+    return RewardPreview(
+        status=preview.status,
+        snapshot=SnapshotValues.model_validate(preview.snapshot),
+        narrative=NarrativeRead(
+            level="L3",
+            text=preview.narrative_text or rules.FALLBACK_NARRATIVE,
+            is_fallback=preview.narrative_text is None,
+        ),
+    )

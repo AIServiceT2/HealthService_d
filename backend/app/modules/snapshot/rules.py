@@ -10,3 +10,9 @@ DAMAGE_PER_HIT = 30
 DEFAULT_WEAKNESS_MULTIPLIER = 1.0
 # 타격이 1 이상이면 상자 1개 (드랍 확률 미정)
 DROP_COUNT_WHEN_HIT = 1
+
+# API-032 미리보기 재요청 간격 (노션 API-032 예시 값)
+PREVIEW_RETRY_AFTER_SEC = 2
+# LLM(L3) 서사가 없거나 실패했을 때 기본 문구. 문구 내용은 미정 (PRD 미정 표) [제안·팀 확인 필요].
+# 숫자·스킬명·아이템명을 넣지 않는다 (backlog US-05)
+FALLBACK_NARRATIVE = "운동 기록이 전투 준비에 반영됐어요."
