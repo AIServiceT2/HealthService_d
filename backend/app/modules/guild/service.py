@@ -6,7 +6,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import case, func, select, tuple_
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -152,19 +152,15 @@ def get_guild_info(db: Session, user_id: uuid.UUID, guild_id: uuid.UUID) -> Guil
     )
 
 
-# 커서: 마지막 항목의 정렬 키(길드장 0 / 길드원 1, user_id)를 base64url로 감싼 값.
+# 커서: 마지막 항목의 user_id를 base64url로 감싼 값.
 # 클라이언트는 받은 값을 그대로 돌려보내기만 한다 (형식은 서버 내부 약속).
-def _encode_cursor(rank: int, user_id: uuid.UUID) -> str:
-    return base64.urlsafe_b64encode(f"{rank}:{user_id}".encode()).decode()
+def _encode_cursor(user_id: uuid.UUID) -> str:
+    return base64.urlsafe_b64encode(str(user_id).encode()).decode()
 
 
-def _decode_cursor(cursor: str) -> tuple[int, uuid.UUID]:
+def _decode_cursor(cursor: str) -> uuid.UUID:
     try:
-        rank_text, user_text = base64.urlsafe_b64decode(cursor.encode()).decode().split(":")
-        rank = int(rank_text)
-        if rank not in (0, 1):
-            raise ValueError(rank)
-        return rank, uuid.UUID(user_text)
+        return uuid.UUID(base64.urlsafe_b64decode(cursor.encode()).decode())
     except ValueError:
         raise InvalidCursor(cursor) from None
 
@@ -172,8 +168,10 @@ def _decode_cursor(cursor: str) -> tuple[int, uuid.UUID]:
 def list_guild_members(
     db: Session, user_id: uuid.UUID, guild_id: uuid.UUID, cursor: str | None, limit: int
 ) -> GuildMemberPage:
-    """길드 소속원만 목록을 본다 (노션 API-011). 길드장이 맨 앞, 나머지는 user_id 순.
+    """길드 소속원만 목록을 본다 (노션 API-011). user_id 순, 길드장은 role로 구분한다.
 
+    정렬에 '길드장 먼저'를 넣으면 페이지를 넘기는 중에 위임이 일어날 때 순서가 바뀌어
+    중복·누락이 생기므로, 바뀌지 않는 user_id로만 정렬한다.
     요청한 사람이 그 길드 소속원이 아니면 NotGuildMember (없는 길드도 같음 — 명세 에러는 403뿐).
     커서가 올바르지 않으면 InvalidCursor.
     """
@@ -182,19 +180,21 @@ def list_guild_members(
         raise NotGuildMember(str(user_id))
     guild = db.get(Guild, guild_id)
 
-    rank = case((User.id == guild.leader_user_id, 0), else_=1)
-    query = select(User.id, User.nickname, rank.label("rank")).where(User.guild_id == guild_id)
+    query = select(User.id, User.nickname).where(User.guild_id == guild_id)
     if cursor is not None:
-        after_rank, after_id = _decode_cursor(cursor)
-        query = query.where(tuple_(rank, User.id) > tuple_(after_rank, after_id))
-    rows = db.execute(query.order_by(rank, User.id).limit(limit + 1)).all()
+        query = query.where(User.id > _decode_cursor(cursor))
+    rows = db.execute(query.order_by(User.id).limit(limit + 1)).all()
 
     page, more = rows[:limit], len(rows) > limit
     items = [
-        GuildMember(user_id=r.id, nickname=r.nickname, role=ROLE_LEADER if r.rank == 0 else ROLE_MEMBER)
+        GuildMember(
+            user_id=r.id,
+            nickname=r.nickname,
+            role=ROLE_LEADER if r.id == guild.leader_user_id else ROLE_MEMBER,
+        )
         for r in page
     ]
-    next_cursor = _encode_cursor(page[-1].rank, page[-1].id) if more else None
+    next_cursor = _encode_cursor(page[-1].id) if more else None
     return GuildMemberPage(items=items, next_cursor=next_cursor)
 
 
@@ -208,14 +208,15 @@ def issue_invitation(
     """그 길드의 길드장만 초대 코드를 발급한다 (노션 API-012).
 
     길드장이 아니면 NotGuildLeader (소속원이 아니거나 없는 길드도 같음 — 명세 에러는 403뿐).
+    길드 행을 잠근 채 길드장인지 확인하므로, 위임과 동시에 와도 이전 길드장은 발급할 수 없다.
     코드가 이미 쓰인 값과 겹치면 새로 뽑아 다시 저장한다.
     """
-    guild = db.get(Guild, guild_id)
-    if guild is None or guild.leader_user_id != user_id:
-        raise NotGuildLeader(str(user_id))
-
     expires_at = datetime.now(UTC).replace(microsecond=0) + timedelta(hours=expires_in_hours)
     for _ in range(_INVITE_CODE_ATTEMPTS):
+        guild = _lock_guild(db, guild_id)
+        if guild is None or guild.leader_user_id != user_id:
+            db.rollback()
+            raise NotGuildLeader(str(user_id))
         invitation = GuildInvitation(
             code=_new_invite_code(), guild_id=guild_id, created_by=user_id, expires_at=expires_at
         )
@@ -223,6 +224,7 @@ def issue_invitation(
         try:
             db.commit()
         except IntegrityError:
+            # 코드 겹침. 롤백하면 잠금도 풀리므로 다음 시도에서 다시 잠그고 확인한다
             db.rollback()
             continue
         return invitation

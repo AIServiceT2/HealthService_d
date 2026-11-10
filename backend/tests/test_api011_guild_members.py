@@ -7,21 +7,24 @@
 import uuid
 
 from tests.character_helpers import new_player
-from tests.guild_helpers import add_member, new_guild
+from tests.guild_helpers import add_member, join_with_code, new_guild
 
 
-def test_api011_lists_leader_first_then_members(client, db):
+def test_api011_lists_members_by_user_id_with_roles(client, db):
     guild_id, leader_id, headers = new_guild(client)
-    member_ids = {add_member(client, db, guild_id)[0] for _ in range(2)}
+    member_ids = [add_member(client, db, guild_id)[0] for _ in range(2)]
 
     res = client.get(f"/guilds/{guild_id}/members", headers=headers)
 
     assert res.status_code == 200
     body = res.json()
     assert body["nextCursor"] is None
-    assert body["items"][0] == {"userId": str(leader_id), "nickname": "플레이어", "role": "LEADER"}
-    assert {i["userId"] for i in body["items"][1:]} == {str(m) for m in member_ids}
-    assert all(i["role"] == "MEMBER" for i in body["items"][1:])
+    expected_ids = sorted([leader_id, *member_ids])
+    assert [i["userId"] for i in body["items"]] == [str(i) for i in expected_ids]
+    roles = {i["userId"]: i["role"] for i in body["items"]}
+    assert roles[str(leader_id)] == "LEADER"
+    assert all(roles[str(m)] == "MEMBER" for m in member_ids)
+    assert {"userId": str(leader_id), "nickname": "플레이어", "role": "LEADER"} in body["items"]
 
 
 def test_api011_member_can_list(client, db):
@@ -48,6 +51,26 @@ def test_api011_pages_with_cursor_without_gaps_or_duplicates(client, db):
         cursor = body["nextCursor"]
         if cursor is None:
             break
+
+    assert len(seen) == 5
+    assert len(set(seen)) == 5
+
+
+def test_api011_leader_change_during_paging_has_no_gaps_or_duplicates(client):
+    """페이지를 넘기는 중에 길드장이 바뀌어도 모든 길드원이 한 번씩만 나온다 (검토에서 찾은 버그)."""
+    guild_id, _, leader = new_guild(client)
+    member_ids = sorted(join_with_code(client, guild_id, leader)[0] for _ in range(4))
+
+    first = client.get(f"/guilds/{guild_id}/members", params={"limit": 2}, headers=leader).json()
+    # 첫 쪽을 본 뒤 user_id가 가장 큰 길드원에게 위임
+    client.post(f"/guilds/{guild_id}/leader", json={"userId": str(member_ids[-1])}, headers=leader)
+    seen, cursor = [i["userId"] for i in first["items"]], first["nextCursor"]
+    while cursor:
+        body = client.get(
+            f"/guilds/{guild_id}/members", params={"limit": 2, "cursor": cursor}, headers=leader
+        ).json()
+        seen += [i["userId"] for i in body["items"]]
+        cursor = body["nextCursor"]
 
     assert len(seen) == 5
     assert len(set(seen)) == 5

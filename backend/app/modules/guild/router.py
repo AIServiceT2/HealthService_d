@@ -103,7 +103,7 @@ def read_guild(
     "/guilds/{guild_id}/members",
     summary="[API-011] 길드원 목록",
     description=(
-        "권한: GUILD_MEMBER. 길드장이 맨 앞, 나머지는 userId 순. "
+        "권한: GUILD_MEMBER. userId 순으로 정렬하고 길드장은 role=LEADER로 구분한다. "
         "cursor는 앞 응답의 nextCursor를 그대로 넣는다. limit 기본 20, 최대 50."
     ),
     response_model=GuildMemberList,
