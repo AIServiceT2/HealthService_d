@@ -1,0 +1,4400 @@
+{
+  "title": "전운시 기능명세서",
+  "exported_at": "2026-11-10T05:12:16.006Z",
+  "source": "https://app.notion.com/p/6b29f445dcd3459fb7c56c1de47b7494",
+  "count": 38,
+  "features": [
+    {
+      "명세 ID": "JN-001",
+      "기능": "운동하면 렙을 세어 자동 제출",
+      "epic": "운동·제출",
+      "범위": "MVP 필수",
+      "명세 상태": "세부 결정 필요",
+      "사용자": [
+        "플레이어"
+      ],
+      "스토리": "US-01",
+      "원본 기능 ID": "F-02, F-10, F-11(즉시 피드백만)",
+      "LLM": "없음",
+      "상태 전이": "(없음) → SUBMITTED",
+      "화면": null,
+      "세부 페이지": "세션 종료·제출",
+      "설명": [
+        "세션을 끝내면 운동 종류·관절 좌표(얼굴 제외)·렙 시각을 보내 제출건 생성 (SUBMITTED)",
+        "본인 계정으로만 제출"
+      ],
+      "미정 사항": "- 세션 시작 시 무작위 동작 확인에 실패하면 세션을 다시 시작하게 할지, 제출은 하되 자동 승인 대상에서 뺄지\n- 푸시업·플랭크 등 나머지 운동의 일일 상한 (고객은 스쿼트 200회·러닝 10km만 답함)\n- 인정이 잘 되는 촬영 각도 (3주차 첫 데모 전 카메라 각도 테스트 후)",
+      "구현여부": false,
+      "구현 확인": "코드 미확인",
+      "근거 문서": "backlog.md US-01; PRD v1.0; mvp-scope.md",
+      "출처 링크": "https://github.com/AIServiceT2/HealthService_d/blob/main/docs/requirements/backlog.md",
+      "순서": 15,
+      "notion_url": "https://app.notion.com/p/413262013787818288f4e1494e3cd619",
+      "detail": [
+        {
+          "heading": "목적과 적용 범위",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "세션 종료 시 운동 종류·관절 좌표·렙 타임스탬프를 검증해 본인 제출건을 생성하고 일일 상한을 예약한다."
+            },
+            {
+              "type": "paragraph",
+              "text": "첫 데모 목표 흐름에 포함. 실제 구현 완료를 뜻하지 않는다."
+            }
+          ]
+        },
+        {
+          "heading": "입출력·화면",
+          "level": 2,
+          "content": [
+            {
+              "type": "bullet",
+              "text": "입출력: 카메라 세션·시작/종료 시각·관절 좌표(얼굴 제외)·렙 타임스탬프 → 제출 ID·SUBMITTED·인정량·보상 대상 인정량"
+            },
+            {
+              "type": "bullet",
+              "text": "화면: 운동 준비 → 카메라 운동 → 제출 상세"
+            },
+            {
+              "type": "bullet",
+              "text": "상태 전이: (없음) → SUBMITTED"
+            },
+            {
+              "type": "bullet",
+              "text": "권한: 아래 원본 인수 조건을 적용한다."
+            }
+          ]
+        },
+        {
+          "heading": "인수 조건 — 원본 백로그",
+          "level": 2,
+          "content": [
+            {
+              "type": "todo",
+              "text": "(정상) 스쿼트를 고르고 세션을 끝내면, 기기가 센 인정 렙 수(예: 30)를 인정량으로 가진 SUBMITTED 제출건이 1개 생기고, 운동 종류는 스쿼트 하나만 기록된다",
+              "checked": false
+            },
+            {
+              "type": "todo",
+              "text": "(정상) 제출 후 그날(KST) 스쿼트 상한 예약량이 인정 렙 수만큼 늘어난다 (0회 → 30회)",
+              "checked": false
+            },
+            {
+              "type": "todo",
+              "text": "(정상) 서버로 전송된 데이터에는 영상 파일과 얼굴 랜드마크 좌표가 없고, 얼굴을 뺀 관절 좌표와 렙 타임스탬프만 있다",
+              "checked": false
+            },
+            {
+              "type": "todo",
+              "text": "(실패·거절) 그날 스쿼트 인정량이 이미 200회인 상태에서 30회를 하면 제출건은 기록되지만 보상 대상 인정량은 0이다",
+              "checked": false
+            },
+            {
+              "type": "todo",
+              "text": "(실패·거절) 같은 사용자에게 같은 시간대의 활성 스쿼트 제출건이 있으면 새 제출건이 만들어지지 않고 거부 응답이 온다",
+              "checked": false
+            },
+            {
+              "type": "todo",
+              "text": "(실패·거절) 가동범위 기준에 못 미친 렙은 화면에 미인정으로 표시되고 인정량에 들어가지 않는다. 사용자가 인정 렙 수를 늘리는 요청은 거부된다",
+              "checked": false
+            },
+            {
+              "type": "todo",
+              "text": "(권한) 제출건은 로그인한 본인 계정으로만 만들어지고, 다른 사용자의 계정으로 제출을 요청하면 거부된다",
+              "checked": false
+            }
+          ]
+        },
+        {
+          "heading": "미확정·충돌 처리",
+          "level": 2,
+          "content": [
+            {
+              "type": "bullet",
+              "text": "세션 시작 시 무작위 동작 확인에 실패하면 세션을 다시 시작하게 할지, 제출은 하되 자동 승인 대상에서 뺄지"
+            },
+            {
+              "type": "bullet",
+              "text": "푸시업·플랭크 등 나머지 운동의 일일 상한 (고객은 스쿼트 200회·러닝 10km만 답함)"
+            },
+            {
+              "type": "bullet",
+              "text": "인정이 잘 되는 촬영 각도 (3주차 첫 데모 전 카메라 각도 테스트 후)"
+            }
+          ]
+        },
+        {
+          "heading": "구현 대조",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "해당 기능 전체의 완료 구현은 현재 로컬 코드에서 확인되지 않았다."
+            }
+          ]
+        },
+        {
+          "heading": "근거",
+          "level": 2,
+          "content": [
+            {
+              "type": "bullet",
+              "text": "원본 백로그 US-01"
+            },
+            {
+              "type": "bullet",
+              "text": "MVP 포함·제외 결정"
+            },
+            {
+              "type": "bullet",
+              "text": "PRD v1.0"
+            },
+            {
+              "type": "bullet",
+              "text": "데이터 모델 초안"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "명세 ID": "JN-002",
+      "기능": "보상·타격 수 미리보기",
+      "epic": "보상·전투",
+      "범위": "MVP 필수",
+      "명세 상태": "세부 결정 필요",
+      "사용자": [
+        "플레이어"
+      ],
+      "스토리": "US-02",
+      "원본 기능 ID": "F-03",
+      "LLM": "L3·L4",
+      "상태 전이": "SUBMITTED → PREPARED",
+      "화면": null,
+      "세부 페이지": null,
+      "설명": [
+        "지급 전 보상·타격 수와 L3 서사·L4 팁 미리보기",
+        "본인만 볼 수 있음",
+        "LLM이 실패해도 기본 문구로 진행"
+      ],
+      "미정 사항": "- AI 자동 승인 건에도 L1·L2를 만들지 (보는 사람이 없어 호출 비용만 듦)\n- LLM 실패 시 보여 줄 기본 문구의 내용",
+      "구현여부": false,
+      "구현 확인": "부분 구현",
+      "근거 문서": "backlog.md US-02; PRD v1.0; mvp-scope.md",
+      "출처 링크": "https://github.com/AIServiceT2/HealthService_d/blob/main/docs/requirements/backlog.md",
+      "순서": 18,
+      "notion_url": "https://app.notion.com/p/41326201378781e8b88ec84d7b74d5f8",
+      "detail": [
+        {
+          "heading": "목적과 적용 범위",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "규칙 엔진이 계산한 보상·타격 수를 스냅샷에 고정하고 지급 전 미리보기를 제공한다."
+            },
+            {
+              "type": "paragraph",
+              "text": "첫 데모 목표 흐름에 포함. 실제 구현 완료를 뜻하지 않는다."
+            }
+          ]
+        },
+        {
+          "heading": "입출력·화면",
+          "level": 2,
+          "content": [
+            {
+              "type": "bullet",
+              "text": "입출력: 제출 ID·인정량·카탈로그·확정 능력치 → PREPARED·snapshot·ai_story·ai_form_tip"
+            },
+            {
+              "type": "bullet",
+              "text": "화면: 제출 상세·보상 미리보기"
+            },
+            {
+              "type": "bullet",
+              "text": "상태 전이: SUBMITTED → PREPARED"
+            },
+            {
+              "type": "bullet",
+              "text": "권한: 아래 원본 인수 조건을 적용한다."
+            }
+          ]
+        },
+        {
+          "heading": "인수 조건 — 원본 백로그",
+          "level": 2,
+          "content": [
+            {
+              "type": "todo",
+              "text": "(정상) SUBMITTED 건의 계산이 끝나면 상태가 PREPARED가 되고, 인정 렙 30회 스쿼트의 타격 수는 30으로 저장된다",
+              "checked": false
+            },
+            {
+              "type": "todo",
+              "text": "(정상) 스냅샷에 카탈로그 버전·확정 능력치·약점 배율·AI 판정 확신도가 저장되고, 이후 운영자가 카탈로그를 바꿔도 이 제출건의 보상 수치는 바뀌지 않는다",
+              "checked": false
+            },
+            {
+              "type": "todo",
+              "text": "(실패·거절) 보상 계산이 실패하면 상태는 SUBMITTED에 남고, 재시도해서 계산이 성공했을 때만 PREPARED가 된다",
+              "checked": false
+            },
+            {
+              "type": "todo",
+              "text": "(실패·거절) LLM 호출이 실패해도 상태는 PREPARED가 되고, ai_story·ai_form_tip에는 미리 정한 기본 문구가 저장된다",
+              "checked": false
+            },
+            {
+              "type": "todo",
+              "text": "(권한) 보상 미리보기는 제출한 본인에게만 보이고, 다른 사용자가 같은 제출건의 미리보기를 요청하면 거부된다",
+              "checked": false
+            },
+            {
+              "type": "todo",
+              "text": "(LLM) LLM이 만든 ai_story·ai_form_tip은 제출건 상태와 보상 수치(경험치·피해량·타격 수)를 바꾸지 않는다. 같은 제출건에서 LLM 출력이 달라져도 보상 수치는 같다",
+              "checked": false
+            },
+            {
+              "type": "todo",
+              "text": "(LLM) L3 요청에는 스킬명·운동 종류·적 이름·약점 적중 여부만, L4 요청에는 판정 기준·관절 각도 요약 통계·미인정 사유만 담기고, 수치·메모·관절 좌표 원본·얼굴 정보·닉네임·길드명은 담기지 않는다 (제안서 Ⅳ-13)",
+              "checked": false
+            }
+          ]
+        },
+        {
+          "heading": "미확정·충돌 처리",
+          "level": 2,
+          "content": [
+            {
+              "type": "bullet",
+              "text": "AI 자동 승인 건에도 L1·L2를 만들지 (보는 사람이 없어 호출 비용만 듦)"
+            },
+            {
+              "type": "bullet",
+              "text": "LLM 실패 시 보여 줄 기본 문구의 내용"
+            },
+            {
+              "type": "paragraph",
+              "text": "현재 구현은 counted_reps로 hit_count만 계산한다. 일일 상한 이후 rewardable_reps 적용, 경험치·피해·드랍, 전체 스냅샷·인증·LLM은 미구현 범위다. L4 입력의 ‘요약 통계’와 ‘수치 제외’ 표현은 전달 형식을 확정해야 한다."
+            }
+          ]
+        },
+        {
+          "heading": "구현 확인",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "현재 타격 수 계산과 계산 완료 상태 표시만 부분 구현되어 있다. 전체 보상 스냅샷·인증·LLM·지급은 완료되지 않았다."
+            }
+          ]
+        },
+        {
+          "heading": "근거",
+          "level": 2,
+          "content": [
+            {
+              "type": "bullet",
+              "text": "원본 백로그 US-02"
+            },
+            {
+              "type": "bullet",
+              "text": "MVP 포함·제외 결정"
+            },
+            {
+              "type": "bullet",
+              "text": "PRD v1.0"
+            },
+            {
+              "type": "bullet",
+              "text": "데이터 모델 초안"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "명세 ID": "JN-003",
+      "기능": "AI 확신도 기준 이상이면 바로 승인",
+      "epic": "AI·검토",
+      "범위": "MVP 필수",
+      "명세 상태": "세부 결정 필요",
+      "사용자": [
+        "시스템"
+      ],
+      "스토리": "US-03",
+      "원본 기능 ID": "F-04",
+      "LLM": "없음",
+      "상태 전이": "PREPARED → APPROVED",
+      "화면": null,
+      "세부 페이지": "승인",
+      "설명": [
+        "확신도 90% 이상 + 무작위 동작 확인 통과면 바로 승인 (PREPARED → APPROVED)",
+        "미달이면 확인 요청 버튼 표시"
+      ],
+      "미정 사항": "- 확신도 기준 90% 확정 (3주차 첫 데모 전 자세 인식 모델 테스트 후)\n- 확신도 계산 방법 (강준석·김지은, US-03 구현 시작 전. 출처: PRD 미정 표)",
+      "구현여부": false,
+      "구현 확인": "코드 미확인",
+      "근거 문서": "backlog.md US-03; PRD v1.0; mvp-scope.md",
+      "출처 링크": "https://github.com/AIServiceT2/HealthService_d/blob/main/docs/requirements/backlog.md",
+      "순서": 19,
+      "notion_url": "https://app.notion.com/p/413262013787811eb3f0f91391f494e8",
+      "detail": [
+        {
+          "heading": "목적과 적용 범위",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "확신도와 무작위 동작 확인 결과로 자동 승인을 결정하고 승인 경로를 기록한다."
+            },
+            {
+              "type": "paragraph",
+              "text": "첫 데모 목표 흐름에 포함. 실제 구현 완료를 뜻하지 않는다."
+            }
+          ]
+        },
+        {
+          "heading": "입출력·화면",
+          "level": 2,
+          "content": [
+            {
+              "type": "bullet",
+              "text": "입출력: PREPARED 제출건·confidence·liveness_passed → APPROVED·approval_path, 미달이면 PREPARED 유지"
+            },
+            {
+              "type": "bullet",
+              "text": "화면: 제출 상세·확인 요청 진입"
+            },
+            {
+              "type": "bullet",
+              "text": "상태 전이: PREPARED → APPROVED"
+            },
+            {
+              "type": "bullet",
+              "text": "권한: 아래 원본 인수 조건을 적용한다."
+            }
+          ]
+        },
+        {
+          "heading": "인수 조건 — 원본 백로그",
+          "level": 2,
+          "content": [
+            {
+              "type": "todo",
+              "text": "(정상) 확신도가 기준(90%) 이상이고 무작위 동작 확인을 통과한 PREPARED 건은 사람 확인 없이 APPROVED가 된다",
+              "checked": false
+            },
+            {
+              "type": "todo",
+              "text": "(정상) 승인된 제출건에 승인 경로(AI 자동 승인)와 확신도 값이 기록된다",
+              "checked": false
+            },
+            {
+              "type": "todo",
+              "text": "(실패·거절) 확신도가 기준 미만인 건은 APPROVED가 되지 않고 PREPARED에 머물며, 신청자 화면에 확인 요청 보내기 버튼이 나타난다",
+              "checked": false
+            },
+            {
+              "type": "todo",
+              "text": "(실패·거절) 무작위 동작 확인을 통과하지 못한 세션의 제출건은 확신도와 관계없이 자동 승인되지 않는다",
+              "checked": false
+            },
+            {
+              "type": "todo",
+              "text": "(실패·거절) PREPARED를 거치지 않고 SUBMITTED에서 바로 APPROVED로 바꾸는 요청은 거부된다",
+              "checked": false
+            },
+            {
+              "type": "todo",
+              "text": "(권한) 플레이어와 확인자는 확신도 값이나 승인 상태를 직접 바꿀 수 없고, 그런 요청은 거부된다",
+              "checked": false
+            }
+          ]
+        },
+        {
+          "heading": "미확정·충돌 처리",
+          "level": 2,
+          "content": [
+            {
+              "type": "bullet",
+              "text": "확신도 기준 90% 확정 (3주차 첫 데모 전 자세 인식 모델 테스트 후)"
+            },
+            {
+              "type": "bullet",
+              "text": "확신도 계산 방법 (강준석·김지은, US-03 구현 시작 전. 출처: PRD 미정 표)"
+            },
+            {
+              "type": "paragraph",
+              "text": "90%는 고객 제시 기준이며 최종 기준값과 확신도 산정 방법은 PRD v1.0에서 미확정이다. 모델의 원시 신뢰도를 승인 확률로 그대로 사용하지 않는다."
+            }
+          ]
+        },
+        {
+          "heading": "구현 대조",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "해당 기능 전체의 완료 구현은 현재 로컬 코드에서 확인되지 않았다."
+            }
+          ]
+        },
+        {
+          "heading": "근거",
+          "level": 2,
+          "content": [
+            {
+              "type": "bullet",
+              "text": "원본 백로그 US-03"
+            },
+            {
+              "type": "bullet",
+              "text": "MVP 포함·제외 결정"
+            },
+            {
+              "type": "bullet",
+              "text": "PRD v1.0"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "명세 ID": "JN-004",
+      "기능": "보상을 한 번만 반영",
+      "epic": "보상·전투",
+      "범위": "MVP 필수",
+      "명세 상태": "세부 결정 필요",
+      "사용자": [
+        "시스템"
+      ],
+      "스토리": "US-04",
+      "원본 기능 ID": "F-05",
+      "LLM": "없음",
+      "상태 전이": "APPROVED → REWARDED",
+      "화면": "결과 페이지",
+      "세부 페이지": "보상 지급",
+      "설명": [
+        "승인된 건의 경험치·아이템·피해를 스냅샷 값만큼 한 번만 지급 (APPROVED → REWARDED)",
+        "같은 요청이 두 번 와도 한 번만 반영"
+      ],
+      "미정 사항": "- 데모에서 공략 대상을 던전 적으로 할지 주간 보스로 할지 (반영되는 값이 던전 공략 / 보스 체력으로 달라짐)",
+      "구현여부": false,
+      "구현 확인": "코드 미확인",
+      "근거 문서": "backlog.md US-04; PRD v1.0; mvp-scope.md",
+      "출처 링크": "https://github.com/AIServiceT2/HealthService_d/blob/main/docs/requirements/backlog.md",
+      "순서": 28,
+      "notion_url": "https://app.notion.com/p/4132620137878117bd1ee6db95cb1afe",
+      "detail": [
+        {
+          "heading": "목적과 적용 범위",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "승인된 스냅샷의 경험치·아이템·능력치 경험치·피해를 트랜잭션으로 한 번만 반영한다."
+            },
+            {
+              "type": "paragraph",
+              "text": "첫 데모 목표 흐름에 포함. 실제 구현 완료를 뜻하지 않는다."
+            }
+          ]
+        },
+        {
+          "heading": "입출력·화면",
+          "level": 2,
+          "content": [
+            {
+              "type": "bullet",
+              "text": "입출력: APPROVED·snapshot → RewardLedger·보상·REWARDED·24시간 보호 종료 시각"
+            },
+            {
+              "type": "bullet",
+              "text": "화면: 결과 카드·캐릭터·보유 아이템"
+            },
+            {
+              "type": "bullet",
+              "text": "상태 전이: APPROVED → REWARDED"
+            },
+            {
+              "type": "bullet",
+              "text": "권한: 아래 원본 인수 조건을 적용한다."
+            }
+          ]
+        },
+        {
+          "heading": "인수 조건 — 원본 백로그",
+          "level": 2,
+          "content": [
+            {
+              "type": "todo",
+              "text": "(정상) APPROVED 건이 지급되면 상태가 REWARDED가 되고, 경험치·아이템·능력치 경험치·보스(또는 던전) 피해가 스냅샷에 저장된 값만큼 한 번 늘어난다",
+              "checked": false
+            },
+            {
+              "type": "todo",
+              "text": "(정상) 지급 직후 얻은 아이템은 LOCKED, 능력치 경험치는 '확정 대기'로 표시되고, 지급 후 24시간이 지나기 전에는 위력·방어 계산에 들어가지 않는다",
+              "checked": false
+            },
+            {
+              "type": "todo",
+              "text": "(실패·거절) 같은 지급 요청이 두 번 오면 두 번째 요청은 첫 번째 결과를 그대로 돌려주고, 경험치·아이템·피해량은 다시 늘지 않는다",
+              "checked": false
+            },
+            {
+              "type": "todo",
+              "text": "(실패·거절) 지급 중 오류가 나면 상태는 APPROVED에 남고 보상은 하나도 반영되지 않으며, 재시도가 성공했을 때만 REWARDED가 된다",
+              "checked": false
+            },
+            {
+              "type": "todo",
+              "text": "(실패·거절) APPROVED가 아닌 건(PREPARED, CANCELED 등)에 대한 지급 요청은 거부된다",
+              "checked": false
+            },
+            {
+              "type": "todo",
+              "text": "(권한) 지급은 시스템만 실행하고, 플레이어가 지급을 직접 요청하면 거부된다. 다른 사용자는 남의 지급 내역을 볼 수 없다",
+              "checked": false
+            }
+          ]
+        },
+        {
+          "heading": "미확정·충돌 처리",
+          "level": 2,
+          "content": [
+            {
+              "type": "bullet",
+              "text": "데모에서 공략 대상을 던전 적으로 할지 주간 보스로 할지 (반영되는 값이 던전 공략 / 보스 체력으로 달라짐)"
+            }
+          ]
+        },
+        {
+          "heading": "구현 대조",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "해당 기능 전체의 완료 구현은 현재 로컬 코드에서 확인되지 않았다."
+            }
+          ]
+        },
+        {
+          "heading": "근거",
+          "level": 2,
+          "content": [
+            {
+              "type": "bullet",
+              "text": "원본 백로그 US-04"
+            },
+            {
+              "type": "bullet",
+              "text": "MVP 포함·제외 결정"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "명세 ID": "JN-005",
+      "기능": "리플레이·결과 카드·교정 코멘트 보기",
+      "epic": "보상·전투",
+      "범위": "MVP 필수",
+      "명세 상태": "세부 결정 필요",
+      "사용자": [
+        "플레이어"
+      ],
+      "스토리": "US-05",
+      "원본 기능 ID": "F-06, F-13",
+      "LLM": "L3·L4",
+      "상태 전이": "REWARDED (상태 변경 없이 결과 표시)",
+      "화면": null,
+      "세부 페이지": "리플레이·결과 카드",
+      "설명": [
+        "지급 완료 건의 리플레이·결과 카드·서사·교정 코멘트 표시",
+        "리플레이 콤보 수 = 타격 수, 30초 이내",
+        "본인만 볼 수 있음"
+      ],
+      "미정 사항": "- 같은 길드원에게 리플레이를 공개할지\n- 교정 코멘트에서 거를 \"진단·처방처럼 들리는 표현\"의 기준",
+      "구현여부": false,
+      "구현 확인": "코드 미확인",
+      "근거 문서": "backlog.md US-05; PRD v1.0; mvp-scope.md",
+      "출처 링크": "https://github.com/AIServiceT2/HealthService_d/blob/main/docs/requirements/backlog.md",
+      "순서": 30,
+      "notion_url": "https://app.notion.com/p/4132620137878118955fef6ebc0345d3",
+      "detail": [
+        {
+          "heading": "목적과 적용 범위",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "지급 완료된 운동의 타격 수와 일치하는 리플레이·결과 카드·L3 서사·L4 코멘트를 본인에게 표시한다."
+            },
+            {
+              "type": "paragraph",
+              "text": "첫 데모 목표 흐름에 포함. 실제 구현 완료를 뜻하지 않는다."
+            }
+          ]
+        },
+        {
+          "heading": "입출력·화면",
+          "level": 2,
+          "content": [
+            {
+              "type": "bullet",
+              "text": "입출력: REWARDED·snapshot·지급 내역·검사된 AI 문구 → 리플레이·결과 카드"
+            },
+            {
+              "type": "bullet",
+              "text": "화면: 홈 결과 진입 → 전투 리플레이 → 결과 카드"
+            },
+            {
+              "type": "bullet",
+              "text": "상태 전이: REWARDED (상태 변경 없이 결과 표시)"
+            },
+            {
+              "type": "bullet",
+              "text": "권한: 아래 원본 인수 조건을 적용한다."
+            }
+          ]
+        },
+        {
+          "heading": "인수 조건 — 원본 백로그",
+          "level": 2,
+          "content": [
+            {
+              "type": "todo",
+              "text": "(정상) REWARDED 건의 리플레이 콤보 수는 결과 카드의 타격 수와 같다 (인정 렙 30회 → 30 COMBO)",
+              "checked": false
+            },
+            {
+              "type": "todo",
+              "text": "(정상) 리플레이는 30초를 넘지 않고, 스킵을 누르면 결과 카드로 넘어간다",
+              "checked": false
+            },
+            {
+              "type": "todo",
+              "text": "(실패·거절) REWARDED가 아닌 건(PREPARED, CANCELED 등)은 리플레이를 열 수 없다",
+              "checked": false
+            },
+            {
+              "type": "todo",
+              "text": "(실패·거절) 일일 상한 초과로 타격 수가 0이면 리플레이 없이 \"일일 상한 초과\" 카드가 나온다",
+              "checked": false
+            },
+            {
+              "type": "todo",
+              "text": "(실패·거절) 서사 후보에 숫자·다른 스킬명·아이템명이 있으면 저장하지 않고 다시 만들며, 2번 실패하면 기본 문구가 나온다",
+              "checked": false
+            },
+            {
+              "type": "todo",
+              "text": "(권한) 리플레이·결과 카드·교정 코멘트는 본인에게만 보이고, 다른 사용자가 요청하면 거부된다",
+              "checked": false
+            },
+            {
+              "type": "todo",
+              "text": "(LLM) 서사·코멘트를 표시하거나 다시 만드는 일은 제출건 상태와 결과 카드의 수치를 바꾸지 않는다",
+              "checked": false
+            },
+            {
+              "type": "todo",
+              "text": "(LLM) 서사를 다시 만드는 요청에도 수치·메모·관절 좌표 원본·닉네임은 담기지 않는다 (제안서 Ⅳ-13)",
+              "checked": false
+            }
+          ]
+        },
+        {
+          "heading": "미확정·충돌 처리",
+          "level": 2,
+          "content": [
+            {
+              "type": "bullet",
+              "text": "같은 길드원에게 리플레이를 공개할지"
+            },
+            {
+              "type": "bullet",
+              "text": "교정 코멘트에서 거를 \"진단·처방처럼 들리는 표현\"의 기준"
+            }
+          ]
+        },
+        {
+          "heading": "구현 대조",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "해당 기능 전체의 완료 구현은 현재 로컬 코드에서 확인되지 않았다."
+            }
+          ]
+        },
+        {
+          "heading": "근거",
+          "level": 2,
+          "content": [
+            {
+              "type": "bullet",
+              "text": "원본 백로그 US-05"
+            },
+            {
+              "type": "bullet",
+              "text": "MVP 포함·제외 결정"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "명세 ID": "JN-006",
+      "기능": "승인 전 제출 취소",
+      "epic": "운동·제출",
+      "범위": "MVP 필수",
+      "명세 상태": "세부 결정 필요",
+      "사용자": [
+        "플레이어"
+      ],
+      "스토리": "US-06",
+      "원본 기능 ID": "F-02",
+      "LLM": "없음",
+      "상태 전이": "SUBMITTED / PREPARED / PENDING_REVIEW → CANCELED",
+      "화면": null,
+      "세부 페이지": "제출 취소",
+      "설명": [
+        "승인 전(SUBMITTED·PREPARED·PENDING_REVIEW) 본인 제출 취소",
+        "취소하면 상한 예약 해제",
+        "승인과 동시에 오면 하나만 성공"
+      ],
+      "미정 사항": "- 승인 전 취소가 가능한 시점. 확신도가 기준 이상이면 PREPARED → APPROVED가 바로 일어나서, 정상 경로에서는 취소 버튼을 누를 틈이 거의 없음",
+      "구현여부": false,
+      "구현 확인": "코드 미확인",
+      "근거 문서": "backlog.md US-06; PRD v1.0; mvp-scope.md",
+      "출처 링크": "https://github.com/AIServiceT2/HealthService_d/blob/main/docs/requirements/backlog.md",
+      "순서": 21,
+      "notion_url": "https://app.notion.com/p/413262013787817c8bd2d115183de60b",
+      "detail": [
+        {
+          "heading": "목적과 적용 범위",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "승인 전 본인 제출을 취소하고 상한 예약을 해제한다. 승인과 경합하면 하나만 성공한다."
+            },
+            {
+              "type": "paragraph",
+              "text": "MVP 필수이나 첫 데모 이후 경로."
+            }
+          ]
+        },
+        {
+          "heading": "입출력·화면",
+          "level": 2,
+          "content": [
+            {
+              "type": "bullet",
+              "text": "입출력: 본인 제출 ID·현재 상태 → CANCELED·상한 예약 해제"
+            },
+            {
+              "type": "bullet",
+              "text": "화면: 제출 상세"
+            },
+            {
+              "type": "bullet",
+              "text": "상태 전이: SUBMITTED / PREPARED / PENDING_REVIEW → CANCELED"
+            },
+            {
+              "type": "bullet",
+              "text": "권한: 아래 원본 인수 조건을 적용한다."
+            }
+          ]
+        },
+        {
+          "heading": "인수 조건 — 원본 백로그",
+          "level": 2,
+          "content": [
+            {
+              "type": "todo",
+              "text": "(정상) 신청자가 SUBMITTED·PREPARED·PENDING_REVIEW 건을 취소하면 상태가 CANCELED가 된다",
+              "checked": false
+            },
+            {
+              "type": "todo",
+              "text": "(정상) 취소하면 그 건이 예약한 일일 상한 인정량이 해제되어, 그날 스쿼트 상한 예약량이 취소 전보다 그만큼 줄어든다",
+              "checked": false
+            },
+            {
+              "type": "todo",
+              "text": "(실패·거절) APPROVED·REWARDED 건의 취소 요청은 거부되고 상태가 바뀌지 않는다",
+              "checked": false
+            },
+            {
+              "type": "todo",
+              "text": "(실패·거절) 취소와 승인이 동시에 오면 먼저 처리된 하나만 반영되고 나중 요청은 거부된다. 취소가 먼저 처리되면 지급은 0건이다",
+              "checked": false
+            },
+            {
+              "type": "todo",
+              "text": "(실패·거절) CANCELED 건은 다른 상태로 바뀌지 않는다",
+              "checked": false
+            },
+            {
+              "type": "todo",
+              "text": "(권한) 신청자 본인만 취소할 수 있고, 확인자·길드장·다른 사용자의 취소 요청은 거부된다",
+              "checked": false
+            },
+            {
+              "type": "todo",
+              "text": "(취소·반려 스토리) 신청자가 승인 전(SUBMITTED / PREPARED / PENDING_REVIEW)에 취소하면 CANCELED로 가고, 그 건에는 이후 보상 지급과 리플레이가 생기지 않는다",
+              "checked": false
+            }
+          ]
+        },
+        {
+          "heading": "미확정·충돌 처리",
+          "level": 2,
+          "content": [
+            {
+              "type": "bullet",
+              "text": "승인 전 취소가 가능한 시점. 확신도가 기준 이상이면 PREPARED → APPROVED가 바로 일어나서, 정상 경로에서는 취소 버튼을 누를 틈이 거의 없음"
+            }
+          ]
+        },
+        {
+          "heading": "구현 대조",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "해당 기능 전체의 완료 구현은 현재 로컬 코드에서 확인되지 않았다."
+            }
+          ]
+        },
+        {
+          "heading": "근거",
+          "level": 2,
+          "content": [
+            {
+              "type": "bullet",
+              "text": "원본 백로그 US-06"
+            },
+            {
+              "type": "bullet",
+              "text": "MVP 포함·제외 결정"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "명세 ID": "JN-007",
+      "기능": "애매한 건을 지인·길드장에게 확인 요청",
+      "epic": "AI·검토",
+      "범위": "MVP 필수",
+      "명세 상태": "세부 결정 필요",
+      "사용자": [
+        "플레이어"
+      ],
+      "스토리": "US-07",
+      "원본 기능 ID": "F-04",
+      "LLM": "L1·L2",
+      "상태 전이": "PREPARED → PENDING_REVIEW → APPROVED",
+      "화면": null,
+      "세부 페이지": "확인 요청",
+      "설명": [
+        "자동 승인 미달 건을 지인 또는 길드장 1명에게 확인 요청",
+        "보내기 전 공유 내용 미리보기",
+        "본인을 확인자로 지정 X"
+      ],
+      "미정 사항": "- 신청자가 아무에게도 보내지 않거나 확인자가 응답하지 않을 때의 처리\n- \"지인\"을 어떻게 정할지 (친구 목록 등)\n- 봐주기를 막기 위한 보상 제한·운영자 표본 재검토 여부",
+      "구현여부": false,
+      "구현 확인": "코드 미확인",
+      "근거 문서": "backlog.md US-07; PRD v1.0; mvp-scope.md",
+      "출처 링크": "https://github.com/AIServiceT2/HealthService_d/blob/main/docs/requirements/backlog.md",
+      "순서": 20,
+      "notion_url": "https://app.notion.com/p/4132620137878184ae62f7966d6e584b",
+      "detail": [
+        {
+          "heading": "목적과 적용 범위",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "자동 승인 기준 미달 건의 공유 내용을 미리 확인한 뒤 지인 또는 길드장 1명에게 확인을 요청한다."
+            },
+            {
+              "type": "paragraph",
+              "text": "MVP 필수이나 첫 데모 이후 경로."
+            }
+          ]
+        },
+        {
+          "heading": "입출력·화면",
+          "level": 2,
+          "content": [
+            {
+              "type": "bullet",
+              "text": "입출력: PREPARED·선택 확인자·공유 확인 → ReviewRequest·PENDING_REVIEW → 확인자 승인 시 APPROVED"
+            },
+            {
+              "type": "bullet",
+              "text": "화면: 공유 미리보기·확인자 선택·검토 상세"
+            },
+            {
+              "type": "bullet",
+              "text": "상태 전이: PREPARED → PENDING_REVIEW → APPROVED"
+            },
+            {
+              "type": "bullet",
+              "text": "권한: 아래 원본 인수 조건을 적용한다."
+            }
+          ]
+        },
+        {
+          "heading": "인수 조건 — 원본 백로그",
+          "level": 2,
+          "content": [
+            {
+              "type": "todo",
+              "text": "(정상) 확신도 기준 미만인 PREPARED 건에서 신청자가 확인자(지인 또는 길드장) 1명을 골라 보내면 상태가 PENDING_REVIEW가 된다",
+              "checked": false
+            },
+            {
+              "type": "todo",
+              "text": "(정상) 보내기 전에 보낼 내용(관절 선 또는 실루엣, 운동 종류, 제출 간격 통계)의 미리보기가 나오고, 신청자가 확인을 누른 뒤에만 전송된다",
+              "checked": false
+            },
+            {
+              "type": "todo",
+              "text": "(실패·거절) 이미 APPROVED된 건에는 보내기 버튼이 없고, 보내기 요청은 거부된다",
+              "checked": false
+            },
+            {
+              "type": "todo",
+              "text": "(실패·거절) 신청자 본인을 확인자로 고르면 거부된다",
+              "checked": false
+            },
+            {
+              "type": "todo",
+              "text": "(권한) 확인자 화면에는 얼굴·나이·길드명이 나오지 않고, 요청받지 않은 사용자는 그 건을 볼 수 없다",
+              "checked": false
+            },
+            {
+              "type": "todo",
+              "text": "(LLM) 확인 화면의 ai_summary·ai_flags는 표시만 되고, 확인자가 승인이나 반려를 누르기 전까지 상태는 PENDING_REVIEW에서 바뀌지 않는다",
+              "checked": false
+            },
+            {
+              "type": "todo",
+              "text": "(LLM) L1·L2 요청에는 닉네임·길드명, 메모 속 이름·연락처·장소, 관절 좌표 원본, 건강 앱 원본 데이터가 담기지 않고, 관절 좌표는 통계로만 보낸다 (제안서 Ⅳ-13)",
+              "checked": false
+            }
+          ]
+        },
+        {
+          "heading": "미확정·충돌 처리",
+          "level": 2,
+          "content": [
+            {
+              "type": "bullet",
+              "text": "신청자가 아무에게도 보내지 않거나 확인자가 응답하지 않을 때의 처리"
+            },
+            {
+              "type": "bullet",
+              "text": "\"지인\"을 어떻게 정할지 (친구 목록 등)"
+            },
+            {
+              "type": "bullet",
+              "text": "봐주기를 막기 위한 보상 제한·운영자 표본 재검토 여부"
+            }
+          ]
+        },
+        {
+          "heading": "구현 대조",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "해당 기능 전체의 완료 구현은 현재 로컬 코드에서 확인되지 않았다."
+            }
+          ]
+        },
+        {
+          "heading": "근거",
+          "level": 2,
+          "content": [
+            {
+              "type": "bullet",
+              "text": "원본 백로그 US-07"
+            },
+            {
+              "type": "bullet",
+              "text": "MVP 포함·제외 결정"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "명세 ID": "JN-008",
+      "기능": "확인자가 사유와 함께 반려",
+      "epic": "AI·검토",
+      "범위": "MVP 필수",
+      "명세 상태": "세부 결정 필요",
+      "사용자": [
+        "확인자",
+        "길드장"
+      ],
+      "스토리": "US-08",
+      "원본 기능 ID": "F-04",
+      "LLM": "없음",
+      "상태 전이": "PENDING_REVIEW → REJECTED → CLOSED",
+      "화면": null,
+      "세부 페이지": "반려",
+      "설명": [
+        "사유 코드(기록이상/본인확인실패/도용의심)와 설명을 남겨 반려",
+        "반려하면 REJECTED → CLOSED, 상한 예약 해제"
+      ],
+      "미정 사항": "- 운영자의 도용 확정 절차\n- 반려 사유와 설명을 신청자에게 어디까지 보여 줄지",
+      "구현여부": false,
+      "구현 확인": "코드 미확인",
+      "근거 문서": "backlog.md US-08; PRD v1.0; mvp-scope.md",
+      "출처 링크": "https://github.com/AIServiceT2/HealthService_d/blob/main/docs/requirements/backlog.md",
+      "순서": 27,
+      "notion_url": "https://app.notion.com/p/41326201378781a1b4a5dcfee0ebc463",
+      "detail": [
+        {
+          "heading": "목적과 적용 범위",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "요청받은 확인자가 사유 코드와 설명을 남겨 반려하면 카메라 세션을 종료하고 상한 예약을 해제한다."
+            },
+            {
+              "type": "paragraph",
+              "text": "MVP 필수이나 첫 데모 이후 경로."
+            }
+          ]
+        },
+        {
+          "heading": "입출력·화면",
+          "level": 2,
+          "content": [
+            {
+              "type": "bullet",
+              "text": "입출력: PENDING_REVIEW·사유 코드·설명 → REJECTED → CLOSED·상한 예약 해제"
+            },
+            {
+              "type": "bullet",
+              "text": "화면: 확인자 검토·반려 입력·제출 상세"
+            },
+            {
+              "type": "bullet",
+              "text": "상태 전이: PENDING_REVIEW → REJECTED → CLOSED"
+            },
+            {
+              "type": "bullet",
+              "text": "권한: 아래 원본 인수 조건을 적용한다."
+            }
+          ]
+        },
+        {
+          "heading": "인수 조건 — 원본 백로그",
+          "level": 2,
+          "content": [
+            {
+              "type": "todo",
+              "text": "(정상) 확인자가 사유 코드(기록이상 / 본인확인실패 / 도용의심)와 설명을 입력해 반려하면, 카메라 세션 건은 REJECTED를 거쳐 CLOSED가 된다",
+              "checked": false
+            },
+            {
+              "type": "todo",
+              "text": "(정상) 반려되면 그 건이 예약한 일일 상한 인정량이 해제되고 보상은 지급되지 않는다",
+              "checked": false
+            },
+            {
+              "type": "todo",
+              "text": "(실패·거절) 사유 코드나 설명 없이 반려를 요청하면 거부되고 상태는 PENDING_REVIEW에 남는다",
+              "checked": false
+            },
+            {
+              "type": "todo",
+              "text": "(실패·거절) AI 판정이나 ai_flags만으로는 반려되지 않고, 확인자의 반려 요청이 있어야 REJECTED가 된다",
+              "checked": false
+            },
+            {
+              "type": "todo",
+              "text": "(실패·거절) CLOSED 건은 재제출되거나 다른 상태로 바뀌지 않는다",
+              "checked": false
+            },
+            {
+              "type": "todo",
+              "text": "(권한) 그 건을 요청받은 확인자만 반려할 수 있고, 신청자 본인과 요청받지 않은 사용자의 반려 요청은 거부된다",
+              "checked": false
+            },
+            {
+              "type": "todo",
+              "text": "(취소·반려 스토리) 확인자가 PENDING_REVIEW 건을 사유와 함께 반려하면 REJECTED → CLOSED로 가고, 신청자는 새 세션으로 다시 운동해야 한다",
+              "checked": false
+            }
+          ]
+        },
+        {
+          "heading": "미확정·충돌 처리",
+          "level": 2,
+          "content": [
+            {
+              "type": "bullet",
+              "text": "운영자의 도용 확정 절차"
+            },
+            {
+              "type": "bullet",
+              "text": "반려 사유와 설명을 신청자에게 어디까지 보여 줄지"
+            }
+          ]
+        },
+        {
+          "heading": "구현 대조",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "해당 기능 전체의 완료 구현은 현재 로컬 코드에서 확인되지 않았다."
+            }
+          ]
+        },
+        {
+          "heading": "근거",
+          "level": 2,
+          "content": [
+            {
+              "type": "bullet",
+              "text": "원본 백로그 US-08"
+            },
+            {
+              "type": "bullet",
+              "text": "MVP 포함·제외 결정"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "명세 ID": "JN-009",
+      "기능": "회원 가입·로그인과 본인 권한",
+      "epic": "계정·길드",
+      "범위": "MVP 필수",
+      "명세 상태": "세부 결정 필요",
+      "사용자": [
+        "플레이어"
+      ],
+      "스토리": "공통",
+      "원본 기능 ID": "F-01",
+      "LLM": "없음",
+      "상태 전이": "직접 전이 없음 / 연계 스토리 참고",
+      "화면": "계정 등록 페이지",
+      "세부 페이지": "회원가입·로그인",
+      "설명": [
+        "이메일·비밀번호로 가입·로그인",
+        "14세 미만 가입 불가 (가정)",
+        "다른 사람의 제출·결과·지급 내역 접근 차단"
+      ],
+      "미정 사항": "로그인 방식·토큰 저장/갱신·필수 가입 필드 미정. 14세 미만 가입 제한은 R16의 가정으로 법적 확정 사항이 아님.",
+      "구현여부": false,
+      "구현 확인": "코드 미확인",
+      "근거 문서": "docs/PRD.md; 3절 F-01, 미정; backlog 권한 조건; R16",
+      "출처 링크": "https://github.com/AIServiceT2/HealthService_d/blob/main/docs/PRD.md",
+      "순서": 1,
+      "notion_url": "https://app.notion.com/p/413262013787812ab8c0c0c4fa129670",
+      "detail": [
+        {
+          "heading": "기능 목적",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "로그인 사용자 기준으로 제출·조회·취소 권한을 검사한다."
+            },
+            {
+              "type": "bullet",
+              "text": "범위: MVP 필수"
+            },
+            {
+              "type": "bullet",
+              "text": "원본 매핑: F-01 / 공통"
+            },
+            {
+              "type": "bullet",
+              "text": "사용자: 플레이어"
+            }
+          ]
+        },
+        {
+          "heading": "입력·출력",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "가입·인증 정보 → 사용자 세션·본인 식별"
+            }
+          ]
+        },
+        {
+          "heading": "처리 규칙·예외·권한",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "타인의 제출·미리보기·지급 내역·리플레이 접근을 거부한다. 확인자는 배정된 검토 건만 접근한다."
+            }
+          ]
+        },
+        {
+          "heading": "검증 기준",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "비로그인·다른 계정 요청이 거부되고 본인 요청만 처리되는지 확인한다."
+            }
+          ]
+        },
+        {
+          "heading": "미정·의존성",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "로그인 방식·토큰 저장/갱신·필수 가입 필드 미정. 14세 미만 가입 제한은 R16의 가정으로 법적 확정 사항이 아님."
+            }
+          ]
+        },
+        {
+          "heading": "구현 확인",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "해당 기능 전체의 완료 구현은 확인되지 않았다."
+            }
+          ]
+        },
+        {
+          "heading": "출처",
+          "level": 2,
+          "content": [
+            {
+              "type": "bullet",
+              "text": "docs/PRD.md — 3절 F-01, 미정; backlog 권한 조건; R16"
+            },
+            {
+              "type": "bullet",
+              "text": "현재 MVP 범위"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "명세 ID": "JN-010",
+      "기능": "캐릭터 생성·성장 조회",
+      "epic": "계정·길드",
+      "범위": "MVP 필수",
+      "명세 상태": "세부 결정 필요",
+      "사용자": [
+        "플레이어"
+      ],
+      "스토리": "US-04 전제",
+      "원본 기능 ID": "F-01 / F-05",
+      "LLM": "없음",
+      "상태 전이": "직접 전이 없음 / 연계 스토리 참고",
+      "화면": "캐릭터 페이지",
+      "세부 페이지": "캐릭터 생성·성장",
+      "설명": [
+        "캐릭터 1개 생성, 경험치·레벨 확인",
+        "레벨은 경험치로 계산",
+        "확정 대기 능력치는 전투 계산 제외"
+      ],
+      "미정 사항": "캐릭터 입력 필드·성장 공식·능력치 축·아바타 선택 범위 미정.",
+      "구현여부": false,
+      "구현 확인": "코드 미확인",
+      "근거 문서": "docs/decisions/mvp-scope.md; 포함 F-01; DATA-MODEL Character 초안",
+      "출처 링크": "https://github.com/AIServiceT2/HealthService_d/blob/main/docs/decisions/mvp-scope.md",
+      "순서": 2,
+      "notion_url": "https://app.notion.com/p/413262013787816c9dd5e5ae1fb60de0",
+      "detail": [
+        {
+          "heading": "기능 목적",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "사용자 캐릭터를 생성하고 지급된 경험치·능력치와 확정 대기 상태를 구분한다."
+            },
+            {
+              "type": "bullet",
+              "text": "범위: MVP 필수"
+            },
+            {
+              "type": "bullet",
+              "text": "원본 매핑: F-01 / F-05 / US-04 전제"
+            },
+            {
+              "type": "bullet",
+              "text": "사용자: 플레이어"
+            }
+          ]
+        },
+        {
+          "heading": "입력·출력",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "사용자·캐릭터 설정·지급 내역 → 캐릭터·경험치·능력치 표시"
+            }
+          ]
+        },
+        {
+          "heading": "처리 규칙·예외·권한",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "아바타 꾸미기는 최소화한다. 확정 대기 능력치는 보호 기간 중 전투 계산에 포함하지 않는다."
+            }
+          ]
+        },
+        {
+          "heading": "검증 기준",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "보상 지급 후 경험치가 한 번 증가하고 확정 대기 능력치가 계산에 섞이지 않는다."
+            }
+          ]
+        },
+        {
+          "heading": "미정·의존성",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "캐릭터 입력 필드·성장 공식·능력치 축·아바타 선택 범위 미정."
+            }
+          ]
+        },
+        {
+          "heading": "구현 확인",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "해당 기능 전체의 완료 구현은 확인되지 않았다."
+            }
+          ]
+        },
+        {
+          "heading": "출처",
+          "level": 2,
+          "content": [
+            {
+              "type": "bullet",
+              "text": "docs/decisions/mvp-scope.md — 포함 F-01; DATA-MODEL Character 초안"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "명세 ID": "JN-011",
+      "기능": "길드 가입·길드장 관리",
+      "epic": "계정·길드",
+      "범위": "MVP 필수",
+      "명세 상태": "세부 결정 필요",
+      "사용자": [
+        "플레이어",
+        "길드장"
+      ],
+      "스토리": "US-07 전제",
+      "원본 기능 ID": "F-01",
+      "LLM": "없음",
+      "상태 전이": "직접 전이 없음 / 연계 스토리 참고",
+      "화면": "길드 페이지",
+      "세부 페이지": "길드 관리",
+      "설명": [
+        "길드 생성·초대 코드로 가입·탈퇴·길드장 위임",
+        "길드장은 확인 요청 대상이 됨",
+        "확인자 화면에 길드명 비공개"
+      ],
+      "미정 사항": "길드 생성·가입·초대·탈퇴·길드장 위임의 상세 정책과 지인 목록 정의 미정.",
+      "구현여부": false,
+      "구현 확인": "코드 미확인",
+      "근거 문서": "docs/proposal/draft.md; Ⅳ-11 F-01; 고객 미팅 피드백 8~10",
+      "출처 링크": "https://github.com/AIServiceT2/HealthService_d/blob/main/docs/proposal/draft.md",
+      "순서": 5,
+      "notion_url": "https://app.notion.com/p/413262013787812ca0abe7d69e839ecf",
+      "detail": [
+        {
+          "heading": "기능 목적",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "사용자 소속 길드와 길드장을 관리하여 사람 확인 대상과 협동 전투의 기반을 제공한다."
+            },
+            {
+              "type": "bullet",
+              "text": "범위: MVP 필수"
+            },
+            {
+              "type": "bullet",
+              "text": "원본 매핑: F-01 / US-07 전제"
+            },
+            {
+              "type": "bullet",
+              "text": "사용자: 플레이어, 길드장"
+            }
+          ]
+        },
+        {
+          "heading": "입력·출력",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "사용자·길드·길드장 → 소속 정보·확인자 후보"
+            }
+          ]
+        },
+        {
+          "heading": "처리 규칙·예외·권한",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "검토 공유 데이터에는 길드명을 넣지 않는다. 타 길드 무작위 배정·검토 배지는 폐기된 방안이다."
+            }
+          ]
+        },
+        {
+          "heading": "검증 기준",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "현재 길드장을 확인자 후보로 찾고 본인을 확인자로 선택하면 거부한다."
+            }
+          ]
+        },
+        {
+          "heading": "미정·의존성",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "길드 생성·가입·초대·탈퇴·길드장 위임의 상세 정책과 지인 목록 정의 미정."
+            }
+          ]
+        },
+        {
+          "heading": "구현 확인",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "해당 기능 전체의 완료 구현은 확인되지 않았다."
+            }
+          ]
+        },
+        {
+          "heading": "출처",
+          "level": 2,
+          "content": [
+            {
+              "type": "bullet",
+              "text": "docs/proposal/draft.md — Ⅳ-11 F-01; 고객 미팅 피드백 8~10"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "명세 ID": "JN-012",
+      "기능": "운동 선택·튜토리얼·목표 설정",
+      "epic": "운동·제출",
+      "범위": "MVP 필수",
+      "명세 상태": "세부 결정 필요",
+      "사용자": [
+        "플레이어"
+      ],
+      "스토리": "US-01",
+      "원본 기능 ID": "F-10",
+      "LLM": "없음",
+      "상태 전이": "직접 전이 없음 / 연계 스토리 참고",
+      "화면": "운동 준비 페이지",
+      "세부 페이지": "운동 선택·튜토리얼",
+      "설명": [
+        "스쿼트 선택 후 판정 기준·권장 촬영 각도 안내",
+        "목표 횟수·세트·공략 대상(던전/보스) 선택",
+        "데모 예시 30회 × 1세트"
+      ],
+      "미정 사항": "가동범위 수치·촬영 각도·목표 입력 범위·데모 대상(던전/보스) 미정.",
+      "구현여부": false,
+      "구현 확인": "코드 미확인",
+      "근거 문서": "docs/requirements/user-flows.md; 1단계; PRD 2절",
+      "출처 링크": "https://github.com/AIServiceT2/HealthService_d/blob/main/docs/requirements/user-flows.md",
+      "순서": 7,
+      "notion_url": "https://app.notion.com/p/413262013787818595edcb13e999b9fe",
+      "detail": [
+        {
+          "heading": "기능 목적",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "스쿼트 선택 후 판정 기준·권장 촬영 각도를 안내하고 목표 횟수·세트·공략 대상을 정한다."
+            },
+            {
+              "type": "bullet",
+              "text": "범위: MVP 필수"
+            },
+            {
+              "type": "bullet",
+              "text": "원본 매핑: F-10 / US-01"
+            },
+            {
+              "type": "bullet",
+              "text": "사용자: 플레이어"
+            }
+          ]
+        },
+        {
+          "heading": "입력·출력",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "운동 종류·목표 횟수/세트·대상 → 세션 준비 정보"
+            }
+          ]
+        },
+        {
+          "heading": "처리 규칙·예외·권한",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "MVP 운동은 스쿼트 1종이다. 첫 데모 예시는 30회 × 1세트이며 모든 사용자에게 강제하는 값은 아니다."
+            }
+          ]
+        },
+        {
+          "heading": "검증 기준",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "튜토리얼을 확인하고 목표와 대상을 정한 뒤 카메라 세션을 시작할 수 있다."
+            }
+          ]
+        },
+        {
+          "heading": "미정·의존성",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "가동범위 수치·촬영 각도·목표 입력 범위·데모 대상(던전/보스) 미정."
+            }
+          ]
+        },
+        {
+          "heading": "구현 확인",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "해당 기능 전체의 완료 구현은 확인되지 않았다."
+            }
+          ]
+        },
+        {
+          "heading": "출처",
+          "level": 2,
+          "content": [
+            {
+              "type": "bullet",
+              "text": "docs/requirements/user-flows.md — 1단계; PRD 2절"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "명세 ID": "JN-013",
+      "기능": "무작위 동작 확인",
+      "epic": "운동·제출",
+      "범위": "MVP 필수",
+      "명세 상태": "세부 결정 필요",
+      "사용자": [
+        "플레이어",
+        "시스템"
+      ],
+      "스토리": "US-01 / US-03",
+      "원본 기능 ID": "F-11 / F-04",
+      "LLM": "없음",
+      "상태 전이": "직접 전이 없음 / 연계 스토리 참고",
+      "화면": "카메라 운동 페이지",
+      "세부 페이지": "세션 시작",
+      "설명": [
+        "세션 시작 시 지시한 무작위 동작으로 실제 사람인지 확인",
+        "통과 못 하면 확신도가 높아도 자동 승인 X"
+      ],
+      "미정 사항": "동작 종류·판정 기준·재시작 또는 제출 허용 여부 미정. 데이터의 법적 분류는 별도 검토 사항.",
+      "구현여부": false,
+      "구현 확인": "코드 미확인",
+      "근거 문서": "docs/requirements/backlog.md; US-01·US-03; PRD 미정",
+      "출처 링크": "https://github.com/AIServiceT2/HealthService_d/blob/main/docs/requirements/backlog.md",
+      "순서": 10,
+      "notion_url": "https://app.notion.com/p/41326201378781a7bf54f4e0c772889d",
+      "detail": [
+        {
+          "heading": "기능 목적",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "세션 시작 시 지시한 무작위 동작으로 실제 사람이 참여 중인지 확인한다."
+            },
+            {
+              "type": "bullet",
+              "text": "범위: MVP 필수"
+            },
+            {
+              "type": "bullet",
+              "text": "원본 매핑: F-11 / F-04 / US-01 / US-03"
+            },
+            {
+              "type": "bullet",
+              "text": "사용자: 플레이어, 시스템"
+            }
+          ]
+        },
+        {
+          "heading": "입력·출력",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "동작 지시·관절 움직임 → liveness_passed"
+            }
+          ]
+        },
+        {
+          "heading": "처리 규칙·예외·권한",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "신원 식별을 목적으로 하지 않는다. 통과하지 못하면 확신도가 높아도 자동 승인하지 않는다."
+            }
+          ]
+        },
+        {
+          "heading": "검증 기준",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "동작 확인 실패·높은 확신도 조합에서도 APPROVED가 되지 않는다."
+            }
+          ]
+        },
+        {
+          "heading": "미정·의존성",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "동작 종류·판정 기준·재시작 또는 제출 허용 여부 미정. 데이터의 법적 분류는 별도 검토 사항."
+            }
+          ]
+        },
+        {
+          "heading": "구현 확인",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "해당 기능 전체의 완료 구현은 확인되지 않았다."
+            }
+          ]
+        },
+        {
+          "heading": "출처",
+          "level": 2,
+          "content": [
+            {
+              "type": "bullet",
+              "text": "docs/requirements/backlog.md — US-01·US-03; PRD 미정"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "명세 ID": "JN-014",
+      "기능": "온디바이스 렙 인식·즉시 피드백",
+      "epic": "운동·제출",
+      "범위": "MVP 필수",
+      "명세 상태": "세부 결정 필요",
+      "사용자": [
+        "플레이어"
+      ],
+      "스토리": "US-01",
+      "원본 기능 ID": "F-11 (F-08 통합)",
+      "LLM": "없음",
+      "상태 전이": "직접 전이 없음 / 연계 스토리 참고",
+      "화면": null,
+      "세부 페이지": "운동 중",
+      "설명": [
+        "기기 안에서 스쿼트 렙을 세고 인정·미인정을 바로 표시",
+        "가동범위 미달 렙은 인정 X",
+        "영상은 저장·전송 X"
+      ],
+      "미정 사항": "모델 비교·최종 모델·가동범위·각도 검증 필요. R12의 횟수 줄이기 조작 시점·서버 계약 미정.",
+      "구현여부": false,
+      "구현 확인": "코드 미확인",
+      "근거 문서": "docs/domain/03-rules-states-llm.md; R11·R12; STACK 모델 어댑터; 제안서 F-11",
+      "출처 링크": "https://github.com/AIServiceT2/HealthService_d/blob/main/docs/domain/03-rules-states-llm.md",
+      "순서": 11,
+      "notion_url": "https://app.notion.com/p/4132620137878112a307fa52d7019c21",
+      "detail": [
+        {
+          "heading": "기능 목적",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "기기 안 자세 모델과 가동범위 규칙으로 스쿼트 렙을 세고 인정·미인정을 즉시 표시한다."
+            },
+            {
+              "type": "bullet",
+              "text": "범위: MVP 필수"
+            },
+            {
+              "type": "bullet",
+              "text": "원본 매핑: F-11 (F-08 통합) / US-01"
+            },
+            {
+              "type": "bullet",
+              "text": "사용자: 플레이어"
+            }
+          ]
+        },
+        {
+          "heading": "입력·출력",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "카메라 프레임·판정 기준 → 관절 좌표·인정 렙·미인정 사유"
+            }
+          ]
+        },
+        {
+          "heading": "처리 규칙·예외·권한",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "영상은 저장·외부 전송하지 않는다. 관절 누락·인식 불가 상태를 정상 인정으로 처리하지 않는다. 인정 렙마다 공격 피드백을 연결하는 기획이 있다."
+            }
+          ]
+        },
+        {
+          "heading": "검증 기준",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "가동범위 미달 렙이 인정량에 포함되지 않고, 사용자 횟수 증가 요청이 거부된다."
+            }
+          ]
+        },
+        {
+          "heading": "미정·의존성",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "모델 비교·최종 모델·가동범위·각도 검증 필요. R12의 횟수 줄이기 조작 시점·서버 계약 미정."
+            }
+          ]
+        },
+        {
+          "heading": "구현 확인",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "해당 기능 전체의 완료 구현은 확인되지 않았다."
+            }
+          ]
+        },
+        {
+          "heading": "출처",
+          "level": 2,
+          "content": [
+            {
+              "type": "bullet",
+              "text": "docs/domain/03-rules-states-llm.md — R11·R12; STACK 모델 어댑터; 제안서 F-11"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "명세 ID": "JN-015",
+      "기능": "일일 상한·중복 제출·서버 재검증",
+      "epic": "운동·제출",
+      "범위": "MVP 필수",
+      "명세 상태": "세부 결정 필요",
+      "사용자": [
+        "시스템"
+      ],
+      "스토리": "US-01 / US-06 / US-08",
+      "원본 기능 ID": "F-02",
+      "LLM": "없음",
+      "상태 전이": "직접 전이 없음 / 연계 스토리 참고",
+      "화면": null,
+      "세부 페이지": null,
+      "설명": [
+        "스쿼트 하루 200회 상한 (날짜는 KST 시작일 기준)",
+        "상한 초과분은 기록만 하고 보상 0",
+        "같은 시간대 활성 제출 중복 X",
+        "서버가 좌표로 렙 수 재계산"
+      ],
+      "미정 사항": "잔여 상한을 일부 넘는 세션의 부분 인정 방식·서버 좌표 재계산 계약·동시성 구현 확정 필요.",
+      "구현여부": false,
+      "구현 확인": "코드 미확인",
+      "근거 문서": "docs/domain/03-rules-states-llm.md; R1~R3; backlog US-01; STACK 렙 수 일관성",
+      "출처 링크": "https://github.com/AIServiceT2/HealthService_d/blob/main/docs/domain/03-rules-states-llm.md",
+      "순서": 16,
+      "notion_url": "https://app.notion.com/p/41326201378781518f47f4103704c7e5",
+      "detail": [
+        {
+          "heading": "기능 목적",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "스쿼트 200회 일일 상한과 활성 제출 시간대 중복을 검사하고 인정량을 원자적으로 예약한다."
+            },
+            {
+              "type": "bullet",
+              "text": "범위: MVP 필수"
+            },
+            {
+              "type": "bullet",
+              "text": "원본 매핑: F-02 / US-01 / US-06 / US-08"
+            },
+            {
+              "type": "bullet",
+              "text": "사용자: 시스템"
+            }
+          ]
+        },
+        {
+          "heading": "입력·출력",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "사용자·시작/종료 시각·운동·렙/좌표·예약 합계 → 접수/거부·보상 대상 인정량"
+            }
+          ]
+        },
+        {
+          "heading": "처리 규칙·예외·권한",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "KST 운동 시작 날짜 기준이며 자정을 넘겨도 시작 날짜를 적용한다. 상한 초과 기록은 남기되 초과량의 보상·타격은 0이다. 취소·반려 시 해당 예약을 해제한다. 서버는 받은 관절 좌표로 렙 수를 다시 계산해 그 값을 인정량으로 쓰고, 앱이 보낸 렙 수가 더 크면 요청을 거부한다 (출처: STACK.md 핵심 기능과 기술의 연결 — 렙 수 일관성 검사)."
+            }
+          ]
+        },
+        {
+          "heading": "검증 기준",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "이미 200회인 사용자의 추가 30회는 기록되나 보상 대상 0. 같은 시간 활성 스쿼트 건은 거부. 동시 접수로 상한이 중복 예약되지 않는다."
+            }
+          ]
+        },
+        {
+          "heading": "미정·의존성",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "잔여 상한을 일부 넘는 세션의 부분 인정 방식·서버 좌표 재계산 계약·동시성 구현 확정 필요."
+            }
+          ]
+        },
+        {
+          "heading": "구현 확인",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "해당 기능 전체의 완료 구현은 확인되지 않았다."
+            }
+          ]
+        },
+        {
+          "heading": "출처",
+          "level": 2,
+          "content": [
+            {
+              "type": "bullet",
+              "text": "docs/domain/03-rules-states-llm.md — R1~R3; backlog US-01; STACK 렙 수 일관성"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "명세 ID": "JN-016",
+      "기능": "카메라 중단·재연결·제출 재시도",
+      "epic": "운동·제출",
+      "범위": "MVP 필수",
+      "명세 상태": "세부 결정 필요",
+      "사용자": [
+        "플레이어",
+        "시스템"
+      ],
+      "스토리": "US-01 보완",
+      "원본 기능 ID": "F-02 / F-11",
+      "LLM": "없음",
+      "상태 전이": "직접 전이 없음 / 연계 스토리 참고",
+      "화면": null,
+      "세부 페이지": "중단·재연결",
+      "설명": [
+        "카메라 권한 거부·앱 중단·통신 장애 시 일시중지·재개",
+        "불완전한 기록은 자동 제출 X",
+        "같은 세션을 다시 보내도 중복 제출 X"
+      ],
+      "미정 사항": "세션 복귀·종료 정책, 재시도 간격·payload 제한·오프라인 보관 방식은 구현 계획/검증 전.",
+      "구현여부": false,
+      "구현 확인": "코드 미확인",
+      "근거 문서": "docs/STACK.md; 입력 데이터 계약과 재시도 계획; DESIGN 8-2",
+      "출처 링크": "https://github.com/AIServiceT2/HealthService_d/blob/main/docs/STACK.md",
+      "순서": 14,
+      "notion_url": "https://app.notion.com/p/41326201378781099366fc585c9fe915",
+      "detail": [
+        {
+          "heading": "기능 목적",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "카메라 권한·앱 중단·통신 장애 시 세션과 접수 상태를 안전하게 복구한다."
+            },
+            {
+              "type": "bullet",
+              "text": "범위: MVP 필수"
+            },
+            {
+              "type": "bullet",
+              "text": "원본 매핑: F-02 / F-11 / US-01 보완"
+            },
+            {
+              "type": "bullet",
+              "text": "사용자: 플레이어, 시스템"
+            }
+          ]
+        },
+        {
+          "heading": "입력·출력",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "권한 상태·앱 수명주기·session_id·요청 결과 → 중단 안내·기존 제출 조회/재시도"
+            }
+          ]
+        },
+        {
+          "heading": "처리 규칙·예외·권한",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "백그라운드에서 촬영·추론을 중단하고 불완전 기록을 자동 제출하지 않는다. 응답 유실 시 같은 세션 ID로 기존 접수 여부부터 확인한다."
+            }
+          ]
+        },
+        {
+          "heading": "검증 기준",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "권한 거절 시 정상 녹화 상태로 표시하지 않는다. 동일 세션 재전송이 제출건을 중복 생성하지 않는지 검증한다."
+            }
+          ]
+        },
+        {
+          "heading": "미정·의존성",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "세션 복귀·종료 정책, 재시도 간격·payload 제한·오프라인 보관 방식은 구현 계획/검증 전."
+            }
+          ]
+        },
+        {
+          "heading": "구현 확인",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "해당 기능 전체의 완료 구현은 확인되지 않았다."
+            }
+          ]
+        },
+        {
+          "heading": "출처",
+          "level": 2,
+          "content": [
+            {
+              "type": "bullet",
+              "text": "docs/STACK.md — 입력 데이터 계약과 재시도 계획; DESIGN 8-2"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "명세 ID": "JN-017",
+      "기능": "L3 전투 서사 생성·출력 검사",
+      "epic": "AI·검토",
+      "범위": "MVP 필수",
+      "명세 상태": "세부 결정 필요",
+      "사용자": [
+        "시스템",
+        "플레이어"
+      ],
+      "스토리": "US-02 / US-05",
+      "원본 기능 ID": "F-03 / F-06",
+      "LLM": "L3",
+      "상태 전이": "직접 전이 없음 / 연계 스토리 참고",
+      "화면": null,
+      "세부 페이지": null,
+      "설명": [
+        "결과에 붙일 짧은 2인칭 전투 서사(L3) 생성",
+        "숫자·다른 스킬명·아이템명이 나오면 다시 생성, 2번 실패 시 기본 문구"
+      ],
+      "미정 사항": "제공사·모델·최종 기본 문구·호출 제한 미정.",
+      "구현여부": false,
+      "구현 확인": "코드 미확인",
+      "근거 문서": "docs/domain/03-rules-states-llm.md; R5·R10, 3-4 L3; backlog US-02·05",
+      "출처 링크": "https://github.com/AIServiceT2/HealthService_d/blob/main/docs/domain/03-rules-states-llm.md",
+      "순서": 31,
+      "notion_url": "https://app.notion.com/p/41326201378781678dc2e3e6e8c3a375",
+      "detail": [
+        {
+          "heading": "기능 목적",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "규칙 엔진 결과에 덧붙일 짧은 2인칭 전투 서사를 생성하고 검증한다."
+            },
+            {
+              "type": "bullet",
+              "text": "범위: MVP 필수"
+            },
+            {
+              "type": "bullet",
+              "text": "원본 매핑: F-03 / F-06 / US-02 / US-05"
+            },
+            {
+              "type": "bullet",
+              "text": "사용자: 시스템, 플레이어"
+            }
+          ]
+        },
+        {
+          "heading": "입력·출력",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "스킬명·운동 종류·적 이름·약점 적중 여부 → ai_story"
+            }
+          ]
+        },
+        {
+          "heading": "처리 규칙·예외·권한",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "수치·메모·관절 좌표·닉네임을 입력하지 않는다. 출력의 숫자·다른 스킬명·아이템명을 거부하고 2회 실패 시 기본 문구를 사용한다."
+            }
+          ]
+        },
+        {
+          "heading": "검증 기준",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "금지 표현 후보가 저장되지 않고, LLM 장애 중에도 PREPARED에 도달하며 보상 수치는 변하지 않는다."
+            }
+          ]
+        },
+        {
+          "heading": "미정·의존성",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "제공사·모델·최종 기본 문구·호출 제한 미정."
+            }
+          ]
+        },
+        {
+          "heading": "구현 확인",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "해당 기능 전체의 완료 구현은 확인되지 않았다."
+            }
+          ]
+        },
+        {
+          "heading": "출처",
+          "level": 2,
+          "content": [
+            {
+              "type": "bullet",
+              "text": "docs/domain/03-rules-states-llm.md — R5·R10, 3-4 L3; backlog US-02·05"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "명세 ID": "JN-018",
+      "기능": "L4 자세 교정 코멘트",
+      "epic": "AI·검토",
+      "범위": "MVP 필수",
+      "명세 상태": "세부 결정 필요",
+      "사용자": [
+        "시스템",
+        "플레이어"
+      ],
+      "스토리": "US-02 / US-05",
+      "원본 기능 ID": "F-13",
+      "LLM": "L4",
+      "상태 전이": "직접 전이 없음 / 연계 스토리 참고",
+      "화면": null,
+      "세부 페이지": null,
+      "설명": [
+        "다음 세션에서 고칠 점 한두 문장(L4)",
+        "진단·처방 같은 표현 X, 실패 시 기본 문구"
+      ],
+      "미정 사항": "‘각도 요약 통계’와 ‘수치 제외’의 입력 계약 불명확. 금지 표현 기준·기본 문구·제공사 미정.",
+      "구현여부": false,
+      "구현 확인": "코드 미확인",
+      "근거 문서": "docs/domain/03-rules-states-llm.md; 3-4 L4; backlog US-02·05",
+      "출처 링크": "https://github.com/AIServiceT2/HealthService_d/blob/main/docs/domain/03-rules-states-llm.md",
+      "순서": 32,
+      "notion_url": "https://app.notion.com/p/413262013787813fb6cfd6fe45fdbf7c",
+      "detail": [
+        {
+          "heading": "기능 목적",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "저장된 자세 요약을 바탕으로 다음 세션에서 고칠 점 한두 문장을 제공한다."
+            },
+            {
+              "type": "bullet",
+              "text": "범위: MVP 필수"
+            },
+            {
+              "type": "bullet",
+              "text": "원본 매핑: F-13 / US-02 / US-05"
+            },
+            {
+              "type": "bullet",
+              "text": "사용자: 시스템, 플레이어"
+            }
+          ]
+        },
+        {
+          "heading": "입력·출력",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "운동별 판정 기준·관절 각도 요약·미인정 사유 → ai_form_tip"
+            }
+          ]
+        },
+        {
+          "heading": "처리 규칙·예외·권한",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "관절 좌표 원본·얼굴·닉네임·길드명·메모를 외부 LLM에 보내지 않는다. 진단·처방 표현을 검사하고 실패 시 기본 문구를 사용한다."
+            }
+          ]
+        },
+        {
+          "heading": "검증 기준",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "검사를 통과한 코멘트만 본인 결과 화면에 표시하며 생성 실패·재생성이 보상이나 상태를 바꾸지 않는다."
+            }
+          ]
+        },
+        {
+          "heading": "미정·의존성",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "‘각도 요약 통계’와 ‘수치 제외’의 입력 계약 불명확. 금지 표현 기준·기본 문구·제공사 미정."
+            }
+          ]
+        },
+        {
+          "heading": "구현 확인",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "해당 기능 전체의 완료 구현은 확인되지 않았다."
+            }
+          ]
+        },
+        {
+          "heading": "출처",
+          "level": 2,
+          "content": [
+            {
+              "type": "bullet",
+              "text": "docs/domain/03-rules-states-llm.md — 3-4 L4; backlog US-02·05"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "명세 ID": "JN-019",
+      "기능": "L1 기록 요약·L2 이상치 설명",
+      "epic": "AI·검토",
+      "범위": "MVP 필수",
+      "명세 상태": "세부 결정 필요",
+      "사용자": [
+        "시스템",
+        "확인자"
+      ],
+      "스토리": "US-07",
+      "원본 기능 ID": "F-03 / F-04",
+      "LLM": "L1·L2",
+      "상태 전이": "직접 전이 없음 / 연계 스토리 참고",
+      "화면": "확인자 검토 페이지",
+      "세부 페이지": "확인 자료",
+      "설명": [
+        "확인자에게 L1 기록 요약·L2 이상 징후 설명 제공",
+        "보조 정보일 뿐 자동 반려 근거로 쓰지 않음"
+      ],
+      "미정 사항": "메모 필드 도입·비식별 처리·통증 안내 고정 문구·자동 승인 건의 호출 여부 미정.",
+      "구현여부": false,
+      "구현 확인": "코드 미확인",
+      "근거 문서": "docs/domain/03-rules-states-llm.md; 3-4 L1·L2; backlog US-07",
+      "출처 링크": "https://github.com/AIServiceT2/HealthService_d/blob/main/docs/domain/03-rules-states-llm.md",
+      "순서": 25,
+      "notion_url": "https://app.notion.com/p/4132620137878178865af9561cac2fe6",
+      "detail": [
+        {
+          "heading": "기능 목적",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "사람 확인에 필요한 기록 요약과 규칙 기반 이상 징후 설명을 제공한다."
+            },
+            {
+              "type": "bullet",
+              "text": "범위: MVP 필수"
+            },
+            {
+              "type": "bullet",
+              "text": "원본 매핑: F-03 / F-04 / US-07"
+            },
+            {
+              "type": "bullet",
+              "text": "사용자: 시스템, 확인자"
+            }
+          ]
+        },
+        {
+          "heading": "입력·출력",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "운동/인정량·비식별 메모·규칙 결과·렙 간격 통계 → ai_summary·ai_flags"
+            }
+          ]
+        },
+        {
+          "heading": "처리 규칙·예외·권한",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "메모의 이름·연락처·장소와 좌표 원본을 제외한다. LLM 요약은 보조 정보이며 자동 반려 근거로 쓰지 않는다. 실패 시 기본 요약·규칙 결과를 보여 준다."
+            }
+          ]
+        },
+        {
+          "heading": "검증 기준",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "LLM 플래그만으로 PENDING_REVIEW 상태가 바뀌지 않고 확인자의 결정이 있어야 승인·반려된다."
+            }
+          ]
+        },
+        {
+          "heading": "미정·의존성",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "메모 필드 도입·비식별 처리·통증 안내 고정 문구·자동 승인 건의 호출 여부 미정."
+            }
+          ]
+        },
+        {
+          "heading": "구현 확인",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "해당 기능 전체의 완료 구현은 확인되지 않았다."
+            }
+          ]
+        },
+        {
+          "heading": "출처",
+          "level": 2,
+          "content": [
+            {
+              "type": "bullet",
+              "text": "docs/domain/03-rules-states-llm.md — 3-4 L1·L2; backlog US-07"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "명세 ID": "JN-020",
+      "기능": "사람 확인 자료 열람·승인",
+      "epic": "AI·검토",
+      "범위": "MVP 필수",
+      "명세 상태": "세부 결정 필요",
+      "사용자": [
+        "확인자",
+        "길드장"
+      ],
+      "스토리": "US-07",
+      "원본 기능 ID": "F-04",
+      "LLM": "L1·L2",
+      "상태 전이": "PENDING_REVIEW → APPROVED",
+      "화면": null,
+      "세부 페이지": "승인",
+      "설명": [
+        "요청받은 확인자가 관절 선 리플레이·통계를 보고 승인",
+        "얼굴·나이·길드명 비공개",
+        "신청자 본인 승인 X"
+      ],
+      "미정 사항": "미전송·무응답·판단 불가 처리, 확인자 교체, 봐주기 대응 미정. 과거 12시간 재배정·24시간 운영자 이관은 적용하지 않음.",
+      "구현여부": false,
+      "구현 확인": "코드 미확인",
+      "근거 문서": "docs/domain/03-rules-states-llm.md; 3-2·3-3; backlog US-07",
+      "출처 링크": "https://github.com/AIServiceT2/HealthService_d/blob/main/docs/domain/03-rules-states-llm.md",
+      "순서": 26,
+      "notion_url": "https://app.notion.com/p/4132620137878156943aca43bb125072",
+      "detail": [
+        {
+          "heading": "기능 목적",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "선택된 확인자가 공유된 자료를 보고 실제 운동으로 판단하면 승인한다."
+            },
+            {
+              "type": "bullet",
+              "text": "범위: MVP 필수"
+            },
+            {
+              "type": "bullet",
+              "text": "원본 매핑: F-04 / US-07"
+            },
+            {
+              "type": "bullet",
+              "text": "사용자: 확인자, 길드장"
+            }
+          ]
+        },
+        {
+          "heading": "입력·출력",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "PENDING_REVIEW·관절 선/실루엣·운동·제출 간격 통계 → APPROVED·확인자 승인 경로"
+            }
+          ]
+        },
+        {
+          "heading": "처리 규칙·예외·권한",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "요청받은 사람만 열람·승인한다. 얼굴·나이·길드명은 표시하지 않고 신청자 본인은 승인할 수 없다."
+            }
+          ]
+        },
+        {
+          "heading": "검증 기준",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "배정 확인자가 승인하면 APPROVED가 되며 미배정 사용자와 본인 승인은 거부된다. 취소와 경합 시 한 경로만 성공한다."
+            }
+          ]
+        },
+        {
+          "heading": "미정·의존성",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "미전송·무응답·판단 불가 처리, 확인자 교체, 봐주기 대응 미정. 과거 12시간 재배정·24시간 운영자 이관은 적용하지 않음."
+            }
+          ]
+        },
+        {
+          "heading": "구현 확인",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "해당 기능 전체의 완료 구현은 확인되지 않았다."
+            }
+          ]
+        },
+        {
+          "heading": "출처",
+          "level": 2,
+          "content": [
+            {
+              "type": "bullet",
+              "text": "docs/domain/03-rules-states-llm.md — 3-2·3-3; backlog US-07"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "명세 ID": "JN-021",
+      "기능": "24시간 보호·아이템 잠금·능력치 확정",
+      "epic": "보상·전투",
+      "범위": "MVP 필수",
+      "명세 상태": "세부 결정 필요",
+      "사용자": [
+        "시스템",
+        "플레이어"
+      ],
+      "스토리": "US-04",
+      "원본 기능 ID": "F-05",
+      "LLM": "없음",
+      "상태 전이": "직접 전이 없음 / 연계 스토리 참고",
+      "화면": null,
+      "세부 페이지": "아이템·능력치",
+      "설명": [
+        "지급 후 24시간 동안 아이템 LOCKED, 능력치 경험치 확정 대기",
+        "24시간이 지나면 잠금 해제·확정"
+      ],
+      "미정 사항": "잠금 해제 상태명·작업 실행 방식·24시간 경계 처리 및 신고 제외와의 정책 정합성 확인 필요.",
+      "구현여부": false,
+      "구현 확인": "코드 미확인",
+      "근거 문서": "docs/requirements/backlog.md; US-04; DATA-MODEL Item·RewardLedger",
+      "출처 링크": "https://github.com/AIServiceT2/HealthService_d/blob/main/docs/requirements/backlog.md",
+      "순서": 3,
+      "notion_url": "https://app.notion.com/p/41326201378781908b20f9f80755e20c",
+      "detail": [
+        {
+          "heading": "기능 목적",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "지급 후 24시간 아이템을 LOCKED, 능력치 경험치를 확정 대기로 관리한다."
+            },
+            {
+              "type": "bullet",
+              "text": "범위: MVP 필수"
+            },
+            {
+              "type": "bullet",
+              "text": "원본 매핑: F-05 / US-04"
+            },
+            {
+              "type": "bullet",
+              "text": "사용자: 시스템, 플레이어"
+            }
+          ]
+        },
+        {
+          "heading": "입력·출력",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "지급 시각·아이템·stat_exp → 보호 종료 시각·잠금/확정 대기 상태"
+            }
+          ]
+        },
+        {
+          "heading": "처리 규칙·예외·권한",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "보호 기간 전에는 해당 능력치를 위력·방어 계산에 넣지 않는다. 신고·회수 제외와 별개로 US-04 보호 기간 요구는 유지한다."
+            }
+          ]
+        },
+        {
+          "heading": "검증 기준",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "지급 직후 잠금 상태를 확인하고 24시간 이전 계산에서 대기 능력치가 빠지는지 검증한다."
+            }
+          ]
+        },
+        {
+          "heading": "미정·의존성",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "잠금 해제 상태명·작업 실행 방식·24시간 경계 처리 및 신고 제외와의 정책 정합성 확인 필요."
+            }
+          ]
+        },
+        {
+          "heading": "구현 확인",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "해당 기능 전체의 완료 구현은 확인되지 않았다."
+            }
+          ]
+        },
+        {
+          "heading": "출처",
+          "level": 2,
+          "content": [
+            {
+              "type": "bullet",
+              "text": "docs/requirements/backlog.md — US-04; DATA-MODEL Item·RewardLedger"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "명세 ID": "JN-022",
+      "기능": "보상 스냅샷·카탈로그 버전 고정",
+      "epic": "보상·전투",
+      "범위": "MVP 필수",
+      "명세 상태": "세부 결정 필요",
+      "사용자": [
+        "시스템"
+      ],
+      "스토리": "US-02",
+      "원본 기능 ID": "F-03",
+      "LLM": "없음",
+      "상태 전이": "SUBMITTED → PREPARED",
+      "화면": "제출 상세 페이지",
+      "세부 페이지": "보상 미리보기",
+      "설명": [
+        "계산 시점의 카탈로그·보상·타격 수·드랍을 스냅샷으로 고정",
+        "스쿼트 1회 = 1타",
+        "카탈로그가 바뀌어도 기존 보상은 그대로"
+      ],
+      "미정 사항": "경험치·피해 공식·드랍 확률 미정. 약점 배율은 원본 스냅샷 요구에 있지만 MVP 약점 기능은 제외되어 기본값 정책 결정 필요.",
+      "구현여부": false,
+      "구현 확인": "부분 구현",
+      "근거 문서": "docs/requirements/backlog.md; US-02; R5·R9; first-feature",
+      "출처 링크": "https://github.com/AIServiceT2/HealthService_d/blob/main/docs/requirements/backlog.md",
+      "순서": 17,
+      "notion_url": "https://app.notion.com/p/41326201378781e69fccc24001fbd86b",
+      "detail": [
+        {
+          "heading": "기능 목적",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "계산 시점의 카탈로그·확정 능력치·보상·타격 수·드랍 결과를 고정한다."
+            },
+            {
+              "type": "bullet",
+              "text": "범위: MVP 필수"
+            },
+            {
+              "type": "bullet",
+              "text": "원본 매핑: F-03 / US-02"
+            },
+            {
+              "type": "bullet",
+              "text": "사용자: 시스템"
+            }
+          ]
+        },
+        {
+          "heading": "입력·출력",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "인정량·카탈로그·확정 능력치·확신도 → 불변 snapshot"
+            }
+          ]
+        },
+        {
+          "heading": "처리 규칙·예외·권한",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "운영자가 카탈로그를 바꾸거나 LLM을 재생성해도 기존 보상은 바뀌지 않는다. 스쿼트 1회=1타, 0회=0타. 드랍은 계산 결과를 재사용한다."
+            }
+          ]
+        },
+        {
+          "heading": "검증 기준",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "30회 입력의 타격 수 30을 확인하고 카탈로그 변경 이후에도 원래 스냅샷으로 지급되는지 검증한다."
+            }
+          ]
+        },
+        {
+          "heading": "미정·의존성",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "경험치·피해 공식·드랍 확률 미정. 약점 배율은 원본 스냅샷 요구에 있지만 MVP 약점 기능은 제외되어 기본값 정책 결정 필요."
+            }
+          ]
+        },
+        {
+          "heading": "구현 확인",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "현재 타격 수 계산과 계산 완료 상태 표시만 부분 구현되어 있다. 전체 보상 스냅샷·인증·LLM·지급은 완료되지 않았다."
+            }
+          ]
+        },
+        {
+          "heading": "출처",
+          "level": 2,
+          "content": [
+            {
+              "type": "bullet",
+              "text": "docs/requirements/backlog.md — US-02; R5·R9; first-feature"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "명세 ID": "JN-023",
+      "기능": "던전·보스 피해 반영",
+      "epic": "보상·전투",
+      "범위": "MVP 필수",
+      "명세 상태": "세부 결정 필요",
+      "사용자": [
+        "시스템",
+        "플레이어"
+      ],
+      "스토리": "US-04",
+      "원본 기능 ID": "F-05",
+      "LLM": "없음",
+      "상태 전이": "APPROVED → REWARDED (보스 ACTIVE → DEFEATED는 대상 미정)",
+      "화면": null,
+      "세부 페이지": null,
+      "설명": [
+        "선택한 던전 또는 보스에 피해를 지급과 함께 한 번만 반영",
+        "데모 대상(던전/보스) 미정"
+      ],
+      "미정 사항": "첫 데모 대상·적/보스 모델·체력·피해 계산 공식 미정. 전체 주간 레이드 운영 범위 별도 확인.",
+      "구현여부": false,
+      "구현 확인": "코드 미확인",
+      "근거 문서": "docs/requirements/backlog.md; US-04; PRD 미정",
+      "출처 링크": "https://github.com/AIServiceT2/HealthService_d/blob/main/docs/requirements/backlog.md",
+      "순서": 29,
+      "notion_url": "https://app.notion.com/p/41326201378781af9bceecf92df5b7d4",
+      "detail": [
+        {
+          "heading": "기능 목적",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "선택한 공략 대상에 스냅샷 피해를 보상 지급과 함께 한 번만 반영한다."
+            },
+            {
+              "type": "bullet",
+              "text": "범위: MVP 필수"
+            },
+            {
+              "type": "bullet",
+              "text": "원본 매핑: F-05 / US-04"
+            },
+            {
+              "type": "bullet",
+              "text": "사용자: 시스템, 플레이어"
+            }
+          ]
+        },
+        {
+          "heading": "입력·출력",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "선택 대상·snapshot.damage·지급 키 → 던전 공략 또는 보스 피해"
+            }
+          ]
+        },
+        {
+          "heading": "처리 규칙·예외·권한",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "지급 실패 시 부분 피해가 남지 않으며 재요청으로 피해가 중복 누적되지 않는다. 던전과 주간 보스를 모두 완성하는 범위로 단정하지 않는다."
+            }
+          ]
+        },
+        {
+          "heading": "검증 기준",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "동일 제출 지급 두 번에 대상 피해가 한 번만 증가한다."
+            }
+          ]
+        },
+        {
+          "heading": "미정·의존성",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "첫 데모 대상·적/보스 모델·체력·피해 계산 공식 미정. 전체 주간 레이드 운영 범위 별도 확인."
+            }
+          ]
+        },
+        {
+          "heading": "구현 확인",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "해당 기능 전체의 완료 구현은 확인되지 않았다."
+            }
+          ]
+        },
+        {
+          "heading": "출처",
+          "level": 2,
+          "content": [
+            {
+              "type": "bullet",
+              "text": "docs/requirements/backlog.md — US-04; PRD 미정"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "명세 ID": "JN-024",
+      "기능": "운동 이력·성과 지표 집계",
+      "epic": "공통·운영",
+      "범위": "범위 확인",
+      "명세 상태": "제안·검토",
+      "사용자": [
+        "운영자",
+        "플레이어"
+      ],
+      "스토리": "고객 요구",
+      "원본 기능 ID": "기능 ID 미부여",
+      "LLM": "없음",
+      "상태 전이": "직접 전이 없음 / 연계 스토리 참고",
+      "화면": "운영 페이지",
+      "세부 페이지": "지표 집계",
+      "설명": [
+        "(범위 확인) 유지율·주간 제출·레이드 참여 집계",
+        "고객 목표: 4주 유지율 30~40%, 주 3건 이상, 레이드 참여 50% 이상"
+      ],
+      "미정 사항": "유지율 목표 30/40% 선택·지표 분모·기간·집계 화면·MVP 포함 여부 미정.",
+      "구현여부": false,
+      "구현 확인": "코드 미확인",
+      "근거 문서": "docs/interview/client-meeting-1.md; 질의응답 1; 제안서 Ⅴ",
+      "출처 링크": "https://github.com/AIServiceT2/HealthService_d/blob/main/docs/interview/client-meeting-1.md",
+      "순서": 35,
+      "notion_url": "https://app.notion.com/p/41326201378781969557f7357dc21738",
+      "detail": [
+        {
+          "heading": "기능 목적",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "운동 제출 로그를 남기고 유지율·주간 제출·레이드 참여를 집계하는 요구를 추적한다."
+            },
+            {
+              "type": "bullet",
+              "text": "범위: 범위 확인"
+            },
+            {
+              "type": "bullet",
+              "text": "원본 매핑: 기능 ID 미부여 / 고객 요구"
+            },
+            {
+              "type": "bullet",
+              "text": "사용자: 운영자, 플레이어"
+            }
+          ]
+        },
+        {
+          "heading": "입력·출력",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "제출 이력·사용자 코호트·참여 기록 → 추이와 지표"
+            }
+          ]
+        },
+        {
+          "heading": "처리 규칙·예외·권한",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "고객 목표는 4주 유지율 30~40%, 사용자당 주 3건 이상, 레이드 참여율 50% 이상이다. 이는 구현 완료나 검증 결과가 아니다."
+            }
+          ]
+        },
+        {
+          "heading": "검증 기준",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "제출 로그 기반 계산을 재현할 수 있어야 한다는 검증안. 화면·분모 확정 후 구체 인수 조건을 정한다."
+            }
+          ]
+        },
+        {
+          "heading": "미정·의존성",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "유지율 목표 30/40% 선택·지표 분모·기간·집계 화면·MVP 포함 여부 미정."
+            }
+          ]
+        },
+        {
+          "heading": "출처",
+          "level": 2,
+          "content": [
+            {
+              "type": "bullet",
+              "text": "docs/interview/client-meeting-1.md — 질의응답 1; 제안서 Ⅴ"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "명세 ID": "JN-025",
+      "기능": "AI 판정 문의",
+      "epic": "공통·운영",
+      "범위": "범위 확인",
+      "명세 상태": "제안·검토",
+      "사용자": [
+        "플레이어",
+        "운영자"
+      ],
+      "스토리": "스토리 미배정",
+      "원본 기능 ID": "F-04",
+      "LLM": "없음",
+      "상태 전이": "직접 전이 없음 / 연계 스토리 참고",
+      "화면": null,
+      "세부 페이지": "문의·신고",
+      "설명": [
+        "(범위 확인) AI 판정에 대한 문의를 운영자에게 전달",
+        "문의해도 제출 상태는 그대로"
+      ],
+      "미정 사항": "운영자 인원·문의 입력·접수 채널·응답 기한·MVP 포함 여부 미정.",
+      "구현여부": false,
+      "구현 확인": "코드 미확인",
+      "근거 문서": "docs/proposal/draft.md; Ⅳ-11 F-04, Ⅳ-12; 고객 미팅 피드백 8",
+      "출처 링크": "https://github.com/AIServiceT2/HealthService_d/blob/main/docs/proposal/draft.md",
+      "순서": 22,
+      "notion_url": "https://app.notion.com/p/4132620137878138acdec14f6aefc059",
+      "detail": [
+        {
+          "heading": "기능 목적",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "AI 판정에 대한 사용자 문의를 운영자에게 전달한다."
+            },
+            {
+              "type": "bullet",
+              "text": "범위: 범위 확인"
+            },
+            {
+              "type": "bullet",
+              "text": "원본 매핑: F-04 / 스토리 미배정"
+            },
+            {
+              "type": "bullet",
+              "text": "사용자: 플레이어, 운영자"
+            }
+          ]
+        },
+        {
+          "heading": "입력·출력",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "제출건 참조·문의 → 문의 기록/답변(계약 미정)"
+            }
+          ]
+        },
+        {
+          "heading": "처리 규칙·예외·권한",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "문의는 사람 확인 요청과 다르며 제출건 승인·반려 상태를 바꾸지 않는다."
+            }
+          ]
+        },
+        {
+          "heading": "검증 기준",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "문의 접수만으로 운동 제출 상태가 변경되지 않는지 확인한다."
+            }
+          ]
+        },
+        {
+          "heading": "미정·의존성",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "운영자 인원·문의 입력·접수 채널·응답 기한·MVP 포함 여부 미정."
+            }
+          ]
+        },
+        {
+          "heading": "출처",
+          "level": 2,
+          "content": [
+            {
+              "type": "bullet",
+              "text": "docs/proposal/draft.md — Ⅳ-11 F-04, Ⅳ-12; 고객 미팅 피드백 8"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "명세 ID": "JN-026",
+      "기능": "신고 접수·운영자 판정·보상 회수",
+      "epic": "확장",
+      "범위": "후순위·제외",
+      "명세 상태": "세부 결정 필요",
+      "사용자": [
+        "플레이어",
+        "운영자",
+        "시스템"
+      ],
+      "스토리": "MVP 제외",
+      "원본 기능 ID": "F-07",
+      "LLM": "없음",
+      "상태 전이": "REWARDED → REVOKED (MVP 제외)",
+      "화면": null,
+      "세부 페이지": null,
+      "설명": [
+        "(MVP 제외) 지급 후 24시간 안에 신고",
+        "운영자가 확정하면 보상 회수 (REWARDED → REVOKED)"
+      ],
+      "미정 사항": "사용한 아이템 롤백 범위·운영자 절차 미정('여전히 가정' 5행). 신고 1인당 하루 3건, 기각 3회 누적 시 7일 신고 권한 정지는 03 3-3의 규칙이지만 F-07이 MVP에서 빠져 이번에 구현하지 않음.",
+      "구현여부": false,
+      "구현 확인": "코드 미확인",
+      "근거 문서": "docs/decisions/mvp-scope.md; 제외 F-07·제안서(v2)와 다른 점; 03 R8·3-2 REWARDED → REVOKED·3-3 보호 기간·신고 행",
+      "출처 링크": "https://github.com/AIServiceT2/HealthService_d/blob/main/docs/decisions/mvp-scope.md",
+      "순서": 23,
+      "notion_url": "https://app.notion.com/p/4132620137878152a9cae08080bb5e68",
+      "detail": [
+        {
+          "heading": "기능 목적",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "24시간 보호 기간 안에 접수한 신고를 운영자가 확정하면 지급 내역을 역적용한다."
+            },
+            {
+              "type": "bullet",
+              "text": "범위: 후순위·제외"
+            },
+            {
+              "type": "bullet",
+              "text": "원본 매핑: F-07 / MVP 제외"
+            },
+            {
+              "type": "bullet",
+              "text": "사용자: 플레이어, 운영자, 시스템"
+            }
+          ]
+        },
+        {
+          "heading": "입력·출력",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "신고 사유·지급 내역 → OPEN/UNDER_REVIEW/UPHELD/DISMISSED·REVOKED"
+            }
+          ]
+        },
+        {
+          "heading": "처리 규칙·예외·권한",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "이 기능은 최신 MVP 범위에서 제외된다. 기획상 능력치 포함 회수·소모 체력 제외·처치 보스 부활 없음. 이전 제안서의 MVP 포함 문구는 채택하지 않는다."
+            }
+          ]
+        },
+        {
+          "heading": "검증 기준",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "향후 도입 시 기한 경계·운영자 권한·중복 회수·보스 부활 없음 검증이 필요하다."
+            }
+          ]
+        },
+        {
+          "heading": "미정·의존성",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "사용한 아이템 롤백 범위·운영자 절차 미정('여전히 가정' 5행). 신고 1인당 하루 3건, 기각 3회 누적 시 7일 신고 권한 정지는 03 3-3의 규칙이지만 F-07이 MVP에서 빠져 이번에 구현하지 않음."
+            }
+          ]
+        },
+        {
+          "heading": "출처",
+          "level": 2,
+          "content": [
+            {
+              "type": "bullet",
+              "text": "docs/decisions/mvp-scope.md — 제외 F-07·제안서(v2)와 다른 점; 03 R8·3-2 REWARDED → REVOKED·3-3 보호 기간·신고 행"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "명세 ID": "JN-027",
+      "기능": "건강 앱 러닝 연동·세션 제출",
+      "epic": "확장",
+      "범위": "후순위·제외",
+      "명세 상태": "세부 결정 필요",
+      "사용자": [
+        "플레이어",
+        "시스템"
+      ],
+      "스토리": "MVP 제외",
+      "원본 기능 ID": "F-02",
+      "LLM": "없음",
+      "상태 전이": "(없음) → SUBMITTED (MVP 제외)",
+      "화면": null,
+      "세부 페이지": "러닝 연동",
+      "설명": [
+        "(MVP 제외) 건강 앱 러닝 세션을 운동 종료 48시간 안에 제출",
+        "러닝 일일 상한 10km",
+        "수동 입력 인정 X"
+      ],
+      "미정 사항": "연동 공급자·속도 상한·동기화/API 계약·동의 설계 미정.",
+      "구현여부": false,
+      "구현 확인": "코드 미확인",
+      "근거 문서": "docs/decisions/mvp-scope.md; 제외 러닝; 03 3-2 첫 행·3-3 48시간 행, R13·R17; 제안서 Ⅳ-11 F-02",
+      "출처 링크": "https://github.com/AIServiceT2/HealthService_d/blob/main/docs/decisions/mvp-scope.md",
+      "순서": 9,
+      "notion_url": "https://app.notion.com/p/413262013787813dbbe7c0c7a11456ea",
+      "detail": [
+        {
+          "heading": "기능 목적",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "허용된 건강 앱 러닝 세션을 선택해 운동 종료 후 48시간 안에 제출하는 확장 기능이다."
+            },
+            {
+              "type": "bullet",
+              "text": "범위: 후순위·제외"
+            },
+            {
+              "type": "bullet",
+              "text": "원본 매핑: F-02 / MVP 제외"
+            },
+            {
+              "type": "bullet",
+              "text": "사용자: 플레이어, 시스템"
+            }
+          ]
+        },
+        {
+          "heading": "입력·출력",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "연동 러닝·기록 방식·거리/시간 → SUBMITTED"
+            }
+          ]
+        },
+        {
+          "heading": "처리 규칙·예외·권한",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "러닝 일일 상한 10km는 고객 답변이다(client-meeting-1 질의응답 3, 03 R1). 수동 입력·속도 상한 초과 기록은 인정하지 않는다(03 R13). 속도 상한 수치는 미정. GPS 경로·심박은 수집하지 않는다."
+            }
+          ]
+        },
+        {
+          "heading": "검증 기준",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "향후 48시간 경계·수동 입력 거부·동일 세션 중복·권한 철회를 검증한다."
+            }
+          ]
+        },
+        {
+          "heading": "미정·의존성",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "연동 공급자·속도 상한·동기화/API 계약·동의 설계 미정."
+            }
+          ]
+        },
+        {
+          "heading": "출처",
+          "level": 2,
+          "content": [
+            {
+              "type": "bullet",
+              "text": "docs/decisions/mvp-scope.md — 제외 러닝; 03 3-2 첫 행·3-3 48시간 행, R13·R17; 제안서 Ⅳ-11 F-02"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "명세 ID": "JN-028",
+      "기능": "연동 세션 반려 후 재제출",
+      "epic": "확장",
+      "범위": "후순위·제외",
+      "명세 상태": "세부 결정 필요",
+      "사용자": [
+        "플레이어"
+      ],
+      "스토리": "MVP 제외",
+      "원본 기능 ID": "F-02",
+      "LLM": "없음",
+      "상태 전이": "REJECTED → SUBMITTED (MVP 제외)",
+      "화면": null,
+      "세부 페이지": "재제출",
+      "설명": [
+        "(MVP 제외) 반려된 러닝 연동 세션만 최대 2회 재제출",
+        "카메라 세션은 재제출 X"
+      ],
+      "미정 사항": "러닝 연동 자체가 후순위(MVP 제외). 재제출 때 고칠 수 있는 정보 범위는 미정. 상한 예약은 유지(03 R1·3-2).",
+      "구현여부": false,
+      "구현 확인": "코드 미확인",
+      "근거 문서": "docs/domain/03-rules-states-llm.md; 3-2 재제출; mvp-scope 제외",
+      "출처 링크": "https://github.com/AIServiceT2/HealthService_d/blob/main/docs/domain/03-rules-states-llm.md",
+      "순서": 24,
+      "notion_url": "https://app.notion.com/p/413262013787812ba9c4ffd169b23415",
+      "detail": [
+        {
+          "heading": "기능 목적",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "반려된 연동 세션에 한해 최대 2회 새 버전을 제출한다."
+            },
+            {
+              "type": "bullet",
+              "text": "범위: 후순위·제외"
+            },
+            {
+              "type": "bullet",
+              "text": "원본 매핑: F-02 / MVP 제외"
+            },
+            {
+              "type": "bullet",
+              "text": "사용자: 플레이어"
+            }
+          ]
+        },
+        {
+          "heading": "입력·출력",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "REJECTED 연동 세션·수정 정보 → SUBMITTED 새 버전"
+            }
+          ]
+        },
+        {
+          "heading": "처리 규칙·예외·권한",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "이전 기록·반려 사유를 보존하고 드랍·상한 예약을 유지한다. 카메라 세션은 재제출 불가이며 새 운동을 해야 한다."
+            }
+          ]
+        },
+        {
+          "heading": "검증 기준",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "향후 카메라 재제출 거부·최대 2회 제한·이력 보존·중복 보상 방지를 검증한다. 세 번째 반려를 받으면 CLOSED가 되는지 확인한다(03 R6, 3-2 REJECTED → CLOSED)."
+            }
+          ]
+        },
+        {
+          "heading": "미정·의존성",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "러닝 연동 자체가 후순위(MVP 제외). 재제출 때 고칠 수 있는 정보 범위는 미정. 상한 예약은 유지(03 R1·3-2)."
+            }
+          ]
+        },
+        {
+          "heading": "출처",
+          "level": 2,
+          "content": [
+            {
+              "type": "bullet",
+              "text": "docs/domain/03-rules-states-llm.md — 3-2 재제출; mvp-scope 제외"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "명세 ID": "JN-029",
+      "기능": "걸음 수·자연 회복·던전 체력 제한",
+      "epic": "확장",
+      "범위": "후순위·제외",
+      "명세 상태": "세부 결정 필요",
+      "사용자": [
+        "플레이어",
+        "시스템"
+      ],
+      "스토리": "MVP 제외",
+      "원본 기능 ID": "F-09",
+      "LLM": "없음",
+      "상태 전이": "직접 전이 없음 / 연계 스토리 참고",
+      "화면": null,
+      "세부 페이지": "체력",
+      "설명": [
+        "(MVP 제외) 건강 앱 걸음 수로 체력 회복",
+        "하루 10,000보 상한",
+        "체력이 부족하면 던전 도전만 제한"
+      ],
+      "미정 사항": "동기화 허용 2일은 [가정](03 3-3), 자연 회복량은 예시 값만 있음. 체력 공식·연동·동의·마감 처리 미정.",
+      "구현여부": false,
+      "구현 확인": "코드 미확인",
+      "근거 문서": "docs/decisions/mvp-scope.md; F-09 제외; R14·R15; 03 3-3",
+      "출처 링크": "https://github.com/AIServiceT2/HealthService_d/blob/main/docs/decisions/mvp-scope.md",
+      "순서": 4,
+      "notion_url": "https://app.notion.com/p/41326201378781319d89dd12eaa84876",
+      "detail": [
+        {
+          "heading": "기능 목적",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "건강 앱 걸음 수를 체력 회복에 사용하며 체력 부족은 던전 도전만 제한한다."
+            },
+            {
+              "type": "bullet",
+              "text": "범위: 후순위·제외"
+            },
+            {
+              "type": "bullet",
+              "text": "원본 매핑: F-09 / MVP 제외"
+            },
+            {
+              "type": "bullet",
+              "text": "사용자: 플레이어, 시스템"
+            }
+          ]
+        },
+        {
+          "heading": "입력·출력",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "허용된 걸음 집계·날짜·현재 체력 → 체력 회복"
+            }
+          ]
+        },
+        {
+          "heading": "처리 규칙·예외·권한",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "하루 10,000보 상한·최대 체력 초과분 이월 없음. 걷지 않아도 시간당 일정량씩 자연 회복한다(예시 5, 수치 미정. 03 3-3). 체력이 없어도 운동 제출·성장·레이드 공격은 가능하다는 확장 규칙이다."
+            }
+          ]
+        },
+        {
+          "heading": "검증 기준",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "향후 중복 동기화로 이중 회복되지 않고 걸은 날짜 상한을 적용하는지 확인한다."
+            }
+          ]
+        },
+        {
+          "heading": "미정·의존성",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "동기화 허용 2일은 [가정](03 3-3), 자연 회복량은 예시 값만 있음. 체력 공식·연동·동의·마감 처리 미정."
+            }
+          ]
+        },
+        {
+          "heading": "출처",
+          "level": 2,
+          "content": [
+            {
+              "type": "bullet",
+              "text": "docs/decisions/mvp-scope.md — F-09 제외; R14·R15; 03 3-3"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "명세 ID": "JN-030",
+      "기능": "스쿼트 외 운동·약점 배율",
+      "epic": "확장",
+      "범위": "후순위·제외",
+      "명세 상태": "세부 결정 필요",
+      "사용자": [
+        "플레이어",
+        "시스템"
+      ],
+      "스토리": "MVP 제외",
+      "원본 기능 ID": "F-10 / F-11 / F-03",
+      "LLM": "없음",
+      "상태 전이": "직접 전이 없음 / 연계 스토리 참고",
+      "화면": null,
+      "세부 페이지": null,
+      "설명": [
+        "(MVP 제외) 푸시업·플랭크 등 운동 추가, 부위별 약점 배율",
+        "MVP는 스쿼트 1종만"
+      ],
+      "미정 사항": "나머지 운동 상한·판정 기준·약점 공식·M2 도입 여부 미정.",
+      "구현여부": false,
+      "구현 확인": "코드 미확인",
+      "근거 문서": "docs/decisions/mvp-scope.md; 제외 스쿼트 외 운동·약점 배율",
+      "출처 링크": "https://github.com/AIServiceT2/HealthService_d/blob/main/docs/decisions/mvp-scope.md",
+      "순서": 8,
+      "notion_url": "https://app.notion.com/p/413262013787812d8b14d6ef4e262110",
+      "detail": [
+        {
+          "heading": "기능 목적",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "푸시업·플랭크 등 운동과 부위별 스킬·약점 배율을 확장한다."
+            },
+            {
+              "type": "bullet",
+              "text": "범위: 후순위·제외"
+            },
+            {
+              "type": "bullet",
+              "text": "원본 매핑: F-10 / F-11 / F-03 / MVP 제외"
+            },
+            {
+              "type": "bullet",
+              "text": "사용자: 플레이어, 시스템"
+            }
+          ]
+        },
+        {
+          "heading": "입력·출력",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "운동별 판정·상한·타격 단위·약점 → 렙/시간·보상·스킬"
+            }
+          ]
+        },
+        {
+          "heading": "처리 규칙·예외·권한",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "현재는 스쿼트 1종만 범위에 포함한다. 모델 테스트·운동별 카탈로그 없이 다른 운동을 확정 지원으로 표기하지 않는다."
+            }
+          ]
+        },
+        {
+          "heading": "검증 기준",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "향후 운동별 촬영 각도·경계 동작·일일 상한·타격 수의 일관성을 검증한다."
+            }
+          ]
+        },
+        {
+          "heading": "미정·의존성",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "나머지 운동 상한·판정 기준·약점 공식·M2 도입 여부 미정."
+            }
+          ]
+        },
+        {
+          "heading": "출처",
+          "level": 2,
+          "content": [
+            {
+              "type": "bullet",
+              "text": "docs/decisions/mvp-scope.md — 제외 스쿼트 외 운동·약점 배율"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "명세 ID": "JN-031",
+      "기능": "휴식 경고·공격 실패",
+      "epic": "확장",
+      "범위": "후순위·제외",
+      "명세 상태": "세부 결정 필요",
+      "사용자": [
+        "플레이어"
+      ],
+      "스토리": "MVP 제외",
+      "원본 기능 ID": "F-11 일부",
+      "LLM": "없음",
+      "상태 전이": "직접 전이 없음 / 연계 스토리 참고",
+      "화면": null,
+      "세부 페이지": null,
+      "설명": [
+        "(MVP 제외) 오래 쉬면 경고, 경고 3회를 넘기면 공격 실패 표시"
+      ],
+      "미정 사항": "휴식 시간 기준·실패 시 운동 기록·능력치 처리 미정.",
+      "구현여부": false,
+      "구현 확인": "코드 미확인",
+      "근거 문서": "docs/decisions/mvp-scope.md; 제외 휴식 경고; 고객 미팅 가정",
+      "출처 링크": "https://github.com/AIServiceT2/HealthService_d/blob/main/docs/decisions/mvp-scope.md",
+      "순서": 12,
+      "notion_url": "https://app.notion.com/p/413262013787813f85f4c5e632892112",
+      "detail": [
+        {
+          "heading": "기능 목적",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "장시간 휴식 시 경고하고 경고 3회 초과 시 공격 실패를 표시하는 이전 기획이다."
+            },
+            {
+              "type": "bullet",
+              "text": "범위: 후순위·제외"
+            },
+            {
+              "type": "bullet",
+              "text": "원본 매핑: F-11 일부 / MVP 제외"
+            },
+            {
+              "type": "bullet",
+              "text": "사용자: 플레이어"
+            }
+          ]
+        },
+        {
+          "heading": "입력·출력",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "렙 간격·휴식 시간·경고 횟수 → 경고/공격 실패"
+            }
+          ]
+        },
+        {
+          "heading": "처리 규칙·예외·권한",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "즉시 렙 피드백과 분리하여 MVP에서 제외한다. 공격 실패 때문에 운동 기록·성장이 사라진다고 임의 확정하지 않는다."
+            }
+          ]
+        },
+        {
+          "heading": "검증 기준",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "향후 경고 임계값·3회 초과 경계·운동 기록 보존을 정책 확정 후 검증한다."
+            }
+          ]
+        },
+        {
+          "heading": "미정·의존성",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "휴식 시간 기준·실패 시 운동 기록·능력치 처리 미정."
+            }
+          ]
+        },
+        {
+          "heading": "출처",
+          "level": 2,
+          "content": [
+            {
+              "type": "bullet",
+              "text": "docs/decisions/mvp-scope.md — 제외 휴식 경고; 고객 미팅 가정"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "명세 ID": "JN-032",
+      "기능": "오각형 성장 리포트",
+      "epic": "확장",
+      "범위": "후순위·제외",
+      "명세 상태": "세부 결정 필요",
+      "사용자": [
+        "플레이어",
+        "시스템"
+      ],
+      "스토리": "MVP 제외",
+      "원본 기능 ID": "F-12",
+      "LLM": "L5",
+      "상태 전이": "직접 전이 없음 / 연계 스토리 참고",
+      "화면": "리포트 페이지",
+      "세부 페이지": "성장 리포트",
+      "설명": [
+        "(MVP 제외) 능력치 변화 그래프와 주간 운동 요약(L5)"
+      ],
+      "미정 사항": "다섯 번째 능력치 축·집계·수치 검증·기본 문구 미정.",
+      "구현여부": false,
+      "구현 확인": "코드 미확인",
+      "근거 문서": "docs/decisions/mvp-scope.md; F-12 제외; 제안서 Ⅳ-13 L5",
+      "출처 링크": "https://github.com/AIServiceT2/HealthService_d/blob/main/docs/decisions/mvp-scope.md",
+      "순서": 33,
+      "notion_url": "https://app.notion.com/p/41326201378781cbb79aef21814f4b5f",
+      "detail": [
+        {
+          "heading": "기능 목적",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "능력치 변화 그래프와 주간 운동 요약을 함께 제공하는 후순위 기능이다."
+            },
+            {
+              "type": "bullet",
+              "text": "범위: 후순위·제외"
+            },
+            {
+              "type": "bullet",
+              "text": "원본 매핑: F-12 / MVP 제외"
+            },
+            {
+              "type": "bullet",
+              "text": "사용자: 플레이어, 시스템"
+            }
+          ]
+        },
+        {
+          "heading": "입력·출력",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "능력치 주간 변화·운동별 횟수·레이드 참여 → 그래프·ai_report"
+            }
+          ]
+        },
+        {
+          "heading": "처리 규칙·예외·권한",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "숫자는 그래프와 일치해야 하고 닉네임·길드명·메모를 LLM에 보내지 않는 기획이다."
+            }
+          ]
+        },
+        {
+          "heading": "검증 기준",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "향후 서사 수치와 집계 불일치 후보를 거부하고 생성 실패 시 대체 안내를 검증한다."
+            }
+          ]
+        },
+        {
+          "heading": "미정·의존성",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "다섯 번째 능력치 축·집계·수치 검증·기본 문구 미정."
+            }
+          ]
+        },
+        {
+          "heading": "출처",
+          "level": 2,
+          "content": [
+            {
+              "type": "bullet",
+              "text": "docs/decisions/mvp-scope.md — F-12 제외; 제안서 Ⅳ-13 L5"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "명세 ID": "JN-033",
+      "기능": "음성 운동 조작",
+      "epic": "확장",
+      "범위": "후순위·제외",
+      "명세 상태": "세부 결정 필요",
+      "사용자": [
+        "플레이어"
+      ],
+      "스토리": "MVP 제외",
+      "원본 기능 ID": "F-14",
+      "LLM": "없음",
+      "상태 전이": "직접 전이 없음 / 연계 스토리 참고",
+      "화면": null,
+      "세부 페이지": null,
+      "설명": [
+        "(MVP 제외) 음성으로 카메라 시작·종료 등 조작"
+      ],
+      "미정 사항": "명령어·인식 방식·마이크 데이터 처리·도입 시점 미정.",
+      "구현여부": false,
+      "구현 확인": "코드 미확인",
+      "근거 문서": "docs/proposal/draft.md; F-14; mvp-scope; 고객 피드백 18",
+      "출처 링크": "https://github.com/AIServiceT2/HealthService_d/blob/main/docs/proposal/draft.md",
+      "순서": 13,
+      "notion_url": "https://app.notion.com/p/4132620137878123845dd9b7b9d06b10",
+      "detail": [
+        {
+          "heading": "기능 목적",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "카메라 시작·종료 등 운동 중 음성 조작을 지원하는 부가 기능이다."
+            },
+            {
+              "type": "bullet",
+              "text": "범위: 후순위·제외"
+            },
+            {
+              "type": "bullet",
+              "text": "원본 매핑: F-14 / MVP 제외"
+            },
+            {
+              "type": "bullet",
+              "text": "사용자: 플레이어"
+            }
+          ]
+        },
+        {
+          "heading": "입력·출력",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "음성 명령 → 조작 결과(명령 목록 미정)"
+            }
+          ]
+        },
+        {
+          "heading": "처리 규칙·예외·권한",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "현재 목표 횟수·세트를 먼저 정하는 흐름을 사용한다. 움직임 감지로 터치를 대체하는 제안은 채택하지 않았다."
+            }
+          ]
+        },
+        {
+          "heading": "검증 기준",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "향후 시끄러운 환경의 오인식·권한 거부·잘못된 종료를 검증한다."
+            }
+          ]
+        },
+        {
+          "heading": "미정·의존성",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "명령어·인식 방식·마이크 데이터 처리·도입 시점 미정."
+            }
+          ]
+        },
+        {
+          "heading": "출처",
+          "level": 2,
+          "content": [
+            {
+              "type": "bullet",
+              "text": "docs/proposal/draft.md — F-14; mvp-scope; 고객 피드백 18"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "명세 ID": "JN-034",
+      "기능": "주간 플랜",
+      "epic": "확장",
+      "범위": "후순위·제외",
+      "명세 상태": "세부 결정 필요",
+      "사용자": [
+        "플레이어"
+      ],
+      "스토리": "고객 추가 확인",
+      "원본 기능 ID": "기능 ID 미부여",
+      "LLM": "없음",
+      "상태 전이": "직접 전이 없음 / 연계 스토리 참고",
+      "화면": null,
+      "세부 페이지": "주간 플랜",
+      "설명": [
+        "(MVP 제외) 초보자를 위한 주간 운동 계획",
+        "고객 요구 확인 필요"
+      ],
+      "미정 사항": "고객 필요성·운동량 정책·입출력·개인화 범위 전부 미정.",
+      "구현여부": false,
+      "구현 확인": "코드 미확인",
+      "근거 문서": "docs/decisions/mvp-scope.md; 고객 요청 제외 표; client-meeting 피드백 4",
+      "출처 링크": "https://github.com/AIServiceT2/HealthService_d/blob/main/docs/decisions/mvp-scope.md",
+      "순서": 34,
+      "notion_url": "https://app.notion.com/p/41326201378781208ecafa7d68f280bd",
+      "detail": [
+        {
+          "heading": "기능 목적",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "초보 운동인의 주간 계획을 돕는 고객 제안을 추적한다."
+            },
+            {
+              "type": "bullet",
+              "text": "범위: 후순위·제외"
+            },
+            {
+              "type": "bullet",
+              "text": "원본 매핑: 기능 ID 미부여 / 고객 추가 확인"
+            },
+            {
+              "type": "bullet",
+              "text": "사용자: 플레이어"
+            }
+          ]
+        },
+        {
+          "heading": "입력·출력",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "개인 목표·계획 정보 → 주간 플랜(세부 미정)"
+            }
+          ]
+        },
+        {
+          "heading": "처리 규칙·예외·권한",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "고객 피드백은 있으나 기능 채택은 미정이며 MVP 백로그에 포함되지 않는다."
+            }
+          ]
+        },
+        {
+          "heading": "검증 기준",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "아직 확정 인수 조건 없음. 고객 요구 확인 후 별도 스토리를 작성한다."
+            }
+          ]
+        },
+        {
+          "heading": "미정·의존성",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "고객 필요성·운동량 정책·입출력·개인화 범위 전부 미정."
+            }
+          ]
+        },
+        {
+          "heading": "출처",
+          "level": 2,
+          "content": [
+            {
+              "type": "bullet",
+              "text": "docs/decisions/mvp-scope.md — 고객 요청 제외 표; client-meeting 피드백 4"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "명세 ID": "JN-035",
+      "기능": "주간 레이드 운영·랭킹 확정",
+      "epic": "확장",
+      "범위": "범위 확인",
+      "명세 상태": "제안·검토",
+      "사용자": [
+        "플레이어",
+        "길드장",
+        "운영자"
+      ],
+      "스토리": "범위 미정",
+      "원본 기능 ID": "F-05 확장",
+      "LLM": "없음",
+      "상태 전이": "직접 전이 없음 / 연계 스토리 참고",
+      "화면": null,
+      "세부 페이지": "주간 레이드",
+      "설명": [
+        "(범위 확인) 길드 주간 보스·개인 기여·길드 랭킹",
+        "주 시작·마감·공동 보상 정책 미정"
+      ],
+      "미정 사항": "주 시작·마감·확정 최대 기한·보스 종류·랭킹과 공동 보상 정책 미정.",
+      "구현여부": false,
+      "구현 확인": "코드 미확인",
+      "근거 문서": "docs/domain/03-rules-states-llm.md; 3-3 주간 레이드; PRD US-04 미정; 제안서 Ⅱ-4; 03 R8",
+      "출처 링크": "https://github.com/AIServiceT2/HealthService_d/blob/main/docs/domain/03-rules-states-llm.md",
+      "순서": 6,
+      "notion_url": "https://app.notion.com/p/41326201378781be89f9d909b53e2a67",
+      "detail": [
+        {
+          "heading": "기능 목적",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "길드 주간 보스와 개인 기여·길드 랭킹·주간 결과를 관리하는 전체 기획을 추적한다."
+            },
+            {
+              "type": "bullet",
+              "text": "범위: 범위 확인"
+            },
+            {
+              "type": "bullet",
+              "text": "원본 매핑: F-05 확장 / 범위 미정"
+            },
+            {
+              "type": "bullet",
+              "text": "사용자: 플레이어, 길드장, 운영자"
+            }
+          ]
+        },
+        {
+          "heading": "입력·출력",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "주간 참여·보스 상태·피해 → ACTIVE/DEFEATED/ARCHIVED·기여/랭킹"
+            }
+          ]
+        },
+        {
+          "heading": "처리 규칙·예외·권한",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "핵심 지급 시 피해 반영과 구분한다. 보스 약점 부위 교체·약점 배율은 MVP 제외다(mvp-scope 제외 표). MVP에서는 지급 때 보스 또는 던전 피해 반영(US-04)만 다루며, 공략 대상을 무엇으로 할지는 미정(PRD 미정 표)."
+            }
+          ]
+        },
+        {
+          "heading": "검증 기준",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "도입 시 같은 지급의 중복 기여 방지·주간 경계·결과 확정 시점을 검증한다."
+            }
+          ]
+        },
+        {
+          "heading": "미정·의존성",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "주 시작·마감·확정 최대 기한·보스 종류·랭킹과 공동 보상 정책 미정."
+            }
+          ]
+        },
+        {
+          "heading": "출처",
+          "level": 2,
+          "content": [
+            {
+              "type": "bullet",
+              "text": "docs/domain/03-rules-states-llm.md — 3-3 주간 레이드; PRD US-04 미정; 제안서 Ⅱ-4; 03 R8"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "명세 ID": "JN-036",
+      "기능": "카탈로그·판정 기준 운영 관리",
+      "epic": "공통·운영",
+      "범위": "범위 확인",
+      "명세 상태": "제안·검토",
+      "사용자": [
+        "운영자"
+      ],
+      "스토리": "공통 전제",
+      "원본 기능 ID": "F-03 / F-10 / F-11",
+      "LLM": "없음",
+      "상태 전이": "직접 전이 없음 / 연계 스토리 참고",
+      "화면": null,
+      "세부 페이지": "카탈로그 관리",
+      "설명": [
+        "(범위 확인) 판정 기준·보상·타격 단위·일일 상한을 버전으로 관리",
+        "바꿔도 기존 스냅샷은 그대로"
+      ],
+      "미정 사항": "편집 UI 필요 여부·운영자 권한·배포/활성화·수치 공식 미정.",
+      "구현여부": false,
+      "구현 확인": "코드 미확인",
+      "근거 문서": "docs/requirements/backlog.md; US-02 스냅샷; 제안서 운영자 역할",
+      "출처 링크": "https://github.com/AIServiceT2/HealthService_d/blob/main/docs/requirements/backlog.md",
+      "순서": 36,
+      "notion_url": "https://app.notion.com/p/41326201378781519dd5c5610d70f336",
+      "detail": [
+        {
+          "heading": "기능 목적",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "운동 판정 기준·보상·타격 단위·일일 상한을 버전으로 관리한다."
+            },
+            {
+              "type": "bullet",
+              "text": "범위: 범위 확인"
+            },
+            {
+              "type": "bullet",
+              "text": "원본 매핑: F-03 / F-10 / F-11 / 공통 전제"
+            },
+            {
+              "type": "bullet",
+              "text": "사용자: 운영자"
+            }
+          ]
+        },
+        {
+          "heading": "입력·출력",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "운동 기준·보상 규칙·버전 → 적용 카탈로그"
+            }
+          ]
+        },
+        {
+          "heading": "처리 규칙·예외·권한",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "카탈로그 변경은 이미 계산된 스냅샷을 바꾸지 않는다. 관리자 전용 UI를 MVP 확정 기능으로 추가하지 않는다."
+            }
+          ]
+        },
+        {
+          "heading": "검증 기준",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "카탈로그 변경 전 계산 건과 변경 후 계산 건이 각각의 버전을 유지하는지 검증한다."
+            }
+          ]
+        },
+        {
+          "heading": "미정·의존성",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "편집 UI 필요 여부·운영자 권한·배포/활성화·수치 공식 미정."
+            }
+          ]
+        },
+        {
+          "heading": "출처",
+          "level": 2,
+          "content": [
+            {
+              "type": "bullet",
+              "text": "docs/requirements/backlog.md — US-02 스냅샷; 제안서 운영자 역할"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "명세 ID": "JN-037",
+      "기능": "개인정보 최소 전송·LLM 입력 통제",
+      "epic": "공통·운영",
+      "범위": "MVP 필수",
+      "명세 상태": "세부 결정 필요",
+      "사용자": [
+        "시스템"
+      ],
+      "스토리": "US-01 / US-02 / US-07",
+      "원본 기능 ID": "공통 R11 / 제안서 Ⅳ-13",
+      "LLM": "없음",
+      "상태 전이": "직접 전이 없음 / 연계 스토리 참고",
+      "화면": "공통",
+      "세부 페이지": "개인정보·LLM 입력",
+      "설명": [
+        "영상 저장·전송 X, 얼굴 좌표 제거",
+        "LLM에 닉네임·길드명·좌표 원본 전송 X",
+        "확인자에게 얼굴·나이·길드명 비공개"
+      ],
+      "미정 사항": "좌표 보관·삭제 기간·동의 및 처리방침·LLM 제공사 조건·메모 마스킹 미정. 법적 적합성을 검증 완료로 표시하지 않는다.",
+      "구현여부": false,
+      "구현 확인": "코드 미확인",
+      "근거 문서": "docs/DATA-MODEL.md; LLM에 보내지 않을 정보; R11; STACK",
+      "출처 링크": "https://github.com/AIServiceT2/HealthService_d/blob/main/docs/DATA-MODEL.md",
+      "순서": 37,
+      "notion_url": "https://app.notion.com/p/4132620137878159ad18d333a558496a",
+      "detail": [
+        {
+          "heading": "기능 목적",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "영상·얼굴·사용자 식별 정보의 전송 경계를 구분하여 기능별 허용 데이터만 전달한다."
+            },
+            {
+              "type": "bullet",
+              "text": "범위: MVP 필수"
+            },
+            {
+              "type": "bullet",
+              "text": "원본 매핑: 공통 R11 / 제안서 Ⅳ-13 / US-01 / US-02 / US-07"
+            },
+            {
+              "type": "bullet",
+              "text": "사용자: 시스템"
+            }
+          ]
+        },
+        {
+          "heading": "입력·출력",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "기기 좌표·서버 기록·공유 데이터 → 목적별 최소 payload"
+            }
+          ]
+        },
+        {
+          "heading": "처리 규칙·예외·권한",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "영상 저장·기기 밖 전송 금지, 얼굴 좌표 제거. 확인자에게 얼굴·나이·길드명 비공개. LLM에는 식별 정보(닉네임·길드명)와 관절 좌표 원본을 보내지 않는다. L3·L4에는 수치·메모·얼굴 정보도 보내지 않고, L1·L2에는 메모 속 이름·연락처·장소와 건강 앱 원본 데이터를 보내지 않는다. 관절 좌표는 L1·L2·L4에 요약 통계로만 보낸다 (출처: PRD 7절, 03 3-4)."
+            }
+          ]
+        },
+        {
+          "heading": "검증 기준",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "네트워크 요청과 저장 필드를 확인하여 금지 데이터가 없고 미배정 검토자 접근이 거부됨을 검증한다."
+            }
+          ]
+        },
+        {
+          "heading": "미정·의존성",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "좌표 보관·삭제 기간·동의 및 처리방침·LLM 제공사 조건·메모 마스킹 미정. 법적 적합성을 검증 완료로 표시하지 않는다."
+            }
+          ]
+        },
+        {
+          "heading": "출처",
+          "level": 2,
+          "content": [
+            {
+              "type": "bullet",
+              "text": "docs/DATA-MODEL.md — LLM에 보내지 않을 정보; R11; STACK"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "명세 ID": "JN-038",
+      "기능": "제외된 게임·연출 확장 묶음",
+      "epic": "확장",
+      "범위": "후순위·제외",
+      "명세 상태": "세부 결정 필요",
+      "사용자": [
+        "플레이어"
+      ],
+      "스토리": "MVP 제외",
+      "원본 기능 ID": "기능 ID 미부여 (영향: F-06 화면)",
+      "LLM": "없음",
+      "상태 전이": "직접 전이 없음 / 연계 스토리 참고",
+      "화면": null,
+      "세부 페이지": "제외 범위",
+      "설명": [
+        "(MVP 제외) 숙련도 이펙트·상자 연출·콤보·여러 지역·막타 보너스 등 제외 목록 보존"
+      ],
+      "미정 사항": "구현 계획·규칙·일정 미정. 제외 목록 보존용 행이며 개별 구현 기능 단위가 아님.",
+      "구현여부": false,
+      "구현 확인": "코드 미확인",
+      "근거 문서": "docs/decisions/mvp-scope.md; 제외 표",
+      "출처 링크": "https://github.com/AIServiceT2/HealthService_d/blob/main/docs/decisions/mvp-scope.md",
+      "순서": 38,
+      "notion_url": "https://app.notion.com/p/4132620137878154a6acebdb0705b8e6",
+      "detail": [
+        {
+          "heading": "기능 목적",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "숙련도 이펙트·상자 연출·스킬 연계 콤보·여러 지역·막타 보너스 등 제외 범위를 보존한다."
+            },
+            {
+              "type": "bullet",
+              "text": "범위: 후순위·제외"
+            },
+            {
+              "type": "bullet",
+              "text": "원본 매핑: 기능 ID 미부여 (영향: F-06 화면) / MVP 제외"
+            },
+            {
+              "type": "bullet",
+              "text": "사용자: 플레이어"
+            }
+          ]
+        },
+        {
+          "heading": "입력·출력",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "확장 규칙·자산 → 확장 게임 경험(미정)"
+            }
+          ]
+        },
+        {
+          "heading": "처리 규칙·예외·권한",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "거래·강화·제작·직업·길드 채팅·자유 대화 NPC·검토용 3D·고도 도용 탐지·웨어러블 직접 연동·GPS/심박 수집도 현 MVP 제외다."
+            }
+          ]
+        },
+        {
+          "heading": "검증 기준",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "현재 범위에 유입되지 않는지 검토한다. 도입 시 기능별 스토리와 인수 조건을 별도 정의한다."
+            }
+          ]
+        },
+        {
+          "heading": "미정·의존성",
+          "level": 2,
+          "content": [
+            {
+              "type": "paragraph",
+              "text": "구현 계획·규칙·일정 미정. 제외 목록 보존용 행이며 개별 구현 기능 단위가 아님."
+            }
+          ]
+        },
+        {
+          "heading": "출처",
+          "level": 2,
+          "content": [
+            {
+              "type": "bullet",
+              "text": "docs/decisions/mvp-scope.md — 제외 표"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

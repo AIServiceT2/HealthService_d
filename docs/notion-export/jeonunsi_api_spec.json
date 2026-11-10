@@ -1,0 +1,4529 @@
+{
+  "title": "전운시 API 명세서",
+  "exported_at": "2026-11-10T05:12:16.006Z",
+  "source": "https://app.notion.com/p/a79535bfed3f452090a0f0bdb86945a6",
+  "common": {
+    "auth": "공개 API 외에는 Authorization: Bearer <access_token>",
+    "time": "ISO-8601(UTC), 일일 상한 날짜는 KST",
+    "pagination": "?cursor=&limit= (기본 20, 최대 50)",
+    "error_body": {
+      "code": "string",
+      "message": "string",
+      "details": "object"
+    },
+    "if_match": "If-Match에는 제출건 version(ETag)",
+    "internal": "/internal은 서버 내부 호출 전용"
+  },
+  "count": 70,
+  "apis": [
+    {
+      "id": "API-001",
+      "name": "회원 가입",
+      "method": "POST",
+      "endpoint": "/auth/signup",
+      "group": "auth",
+      "auth": "NONE",
+      "scope": "MVP 필수",
+      "status": "미착수",
+      "features": [
+        "JN-009 회원 가입·로그인과 본인 권한"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Content-Type",
+            "값": "application/json",
+            "필수": "예"
+          }
+        ],
+        "params": [],
+        "body": {
+          "provider": "EMAIL",
+          "email": "user@example.com",
+          "password": "example-password",
+          "nickname": "민규",
+          "birthDate": "2010-03-14"
+        },
+        "notes": [
+          "provider는 로그인 방식이 미정이라 일단 EMAIL만 받습니다. password는 8~64자, nickname은 2~12자입니다. 14세 미만은 가입할 수 없습니다(R16 가정)."
+        ]
+      },
+      "responses": [
+        {
+          "status": 201,
+          "body": {
+            "userId": "5f1c2d3e-..."
+          },
+          "notes": []
+        }
+      ],
+      "errors": [
+        {
+          "code": "VALIDATION_FAILED",
+          "status": 400,
+          "message": "입력값이 올바르지 않습니다. (형식 오류·14세 미만·이메일 중복)"
+        }
+      ],
+      "other_sections": [],
+      "notion_url": "https://app.notion.com/p/41326201378781159161c9bd92c854c1"
+    },
+    {
+      "id": "API-002",
+      "name": "로그인",
+      "method": "POST",
+      "endpoint": "/auth/login",
+      "group": "auth",
+      "auth": "NONE",
+      "scope": "MVP 필수",
+      "status": "미착수",
+      "features": [
+        "JN-009 회원 가입·로그인과 본인 권한"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Content-Type",
+            "값": "application/json",
+            "필수": "예"
+          }
+        ],
+        "params": [],
+        "body": {
+          "provider": "EMAIL",
+          "email": "user@example.com",
+          "password": "example-password"
+        },
+        "notes": [
+          "토큰 수명 가안은 access 30분, refresh 14일입니다."
+        ]
+      },
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "accessToken": "eyJ...",
+            "accessTokenExpiresIn": 1800,
+            "refreshToken": "string",
+            "user": {
+              "id": "uuid",
+              "nickname": "민규",
+              "guildId": null
+            }
+          },
+          "notes": []
+        }
+      ],
+      "errors": [
+        {
+          "code": "VALIDATION_FAILED",
+          "status": 400,
+          "message": "입력값이 올바르지 않습니다."
+        },
+        {
+          "code": "UNAUTHENTICATED",
+          "status": 401,
+          "message": "이메일 또는 비밀번호가 일치하지 않습니다."
+        }
+      ],
+      "other_sections": [],
+      "notion_url": "https://app.notion.com/p/41326201378781c184a3cc3354662f9b"
+    },
+    {
+      "id": "API-003",
+      "name": "토큰 재발급",
+      "method": "POST",
+      "endpoint": "/auth/refresh",
+      "group": "auth",
+      "auth": "NONE",
+      "scope": "MVP 필수",
+      "status": "미착수",
+      "features": [
+        "JN-009 회원 가입·로그인과 본인 권한"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Content-Type",
+            "값": "application/json",
+            "필수": "예"
+          }
+        ],
+        "params": [],
+        "body": {
+          "refreshToken": "string"
+        },
+        "notes": [
+          "refresh 토큰도 함께 새로 발급(rotation)하고 이전 토큰은 폐기합니다."
+        ]
+      },
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "accessToken": "eyJ...",
+            "accessTokenExpiresIn": 1800,
+            "refreshToken": "string"
+          },
+          "notes": []
+        }
+      ],
+      "errors": [
+        {
+          "code": "UNAUTHENTICATED",
+          "status": 401,
+          "message": "refresh 토큰이 만료되었거나 폐기되었습니다."
+        }
+      ],
+      "other_sections": [],
+      "notion_url": "https://app.notion.com/p/4132620137878175b53fc982f17af561"
+    },
+    {
+      "id": "API-004",
+      "name": "로그아웃",
+      "method": "POST",
+      "endpoint": "/auth/logout",
+      "group": "auth",
+      "auth": "PLAYER",
+      "scope": "MVP 필수",
+      "status": "미착수",
+      "features": [
+        "JN-009 회원 가입·로그인과 본인 권한"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Authorization",
+            "값": "Bearer <access_token>",
+            "필수": "예"
+          },
+          {
+            "헤더": "Content-Type",
+            "값": "application/json",
+            "필수": "예"
+          }
+        ],
+        "params": [],
+        "body": {
+          "refreshToken": "string"
+        },
+        "notes": [
+          "전달한 refresh 토큰을 폐기합니다."
+        ]
+      },
+      "responses": [
+        {
+          "status": 204,
+          "body": null,
+          "notes": [
+            "본문 없음"
+          ]
+        }
+      ],
+      "errors": [
+        {
+          "code": "UNAUTHENTICATED",
+          "status": 401,
+          "message": "Bearer 토큰이 필요하거나 유효하지 않습니다."
+        }
+      ],
+      "other_sections": [],
+      "notion_url": "https://app.notion.com/p/41326201378781239f33c3c0aad7e6cf"
+    },
+    {
+      "id": "API-005",
+      "name": "내 계정 조회",
+      "method": "GET",
+      "endpoint": "/me",
+      "group": "auth",
+      "auth": "PLAYER",
+      "scope": "MVP 필수",
+      "status": "미착수",
+      "features": [
+        "JN-009 회원 가입·로그인과 본인 권한"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Authorization",
+            "값": "Bearer <access_token>",
+            "필수": "예"
+          }
+        ],
+        "params": [],
+        "body": null,
+        "notes": [
+          "Body 없음"
+        ]
+      },
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "id": "uuid",
+            "nickname": "민규",
+            "birthDate": "2010-03-14",
+            "roles": [
+              "PLAYER"
+            ],
+            "guildId": "uuid",
+            "isGuildLeader": false,
+            "hasCharacter": true
+          },
+          "notes": []
+        }
+      ],
+      "errors": [
+        {
+          "code": "UNAUTHENTICATED",
+          "status": 401,
+          "message": "Bearer 토큰이 필요하거나 유효하지 않습니다."
+        }
+      ],
+      "other_sections": [],
+      "notion_url": "https://app.notion.com/p/4132620137878112b62fc01fe2b00a0c"
+    },
+    {
+      "id": "API-006",
+      "name": "캐릭터 생성",
+      "method": "POST",
+      "endpoint": "/characters",
+      "group": "character",
+      "auth": "PLAYER",
+      "scope": "MVP 필수",
+      "status": "미착수",
+      "features": [
+        "JN-010 캐릭터 생성·성장 조회"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Authorization",
+            "값": "Bearer <access_token>",
+            "필수": "예"
+          },
+          {
+            "헤더": "Content-Type",
+            "값": "application/json",
+            "필수": "예"
+          }
+        ],
+        "params": [],
+        "body": {
+          "avatarId": "AVATAR_01"
+        },
+        "notes": [
+          "avatarId는 선택이며 선택 범위는 미정입니다. 닉네임은 USER에 있어 받지 않습니다. 사용자당 캐릭터는 1개입니다."
+        ]
+      },
+      "responses": [
+        {
+          "status": 201,
+          "body": {
+            "userId": "uuid",
+            "avatarId": "AVATAR_01",
+            "exp": 0,
+            "level": 1
+          },
+          "notes": []
+        }
+      ],
+      "errors": [
+        {
+          "code": "VALIDATION_FAILED",
+          "status": 400,
+          "message": "입력값이 올바르지 않습니다."
+        },
+        {
+          "code": "INVALID_STATE",
+          "status": 409,
+          "message": "이미 캐릭터가 있습니다."
+        }
+      ],
+      "other_sections": [],
+      "notion_url": "https://app.notion.com/p/4132620137878107adbee7c830a7da9a"
+    },
+    {
+      "id": "API-007",
+      "name": "내 캐릭터·성장 조회",
+      "method": "GET",
+      "endpoint": "/characters/me",
+      "group": "character",
+      "auth": "PLAYER",
+      "scope": "MVP 필수",
+      "status": "미착수",
+      "features": [
+        "JN-010 캐릭터 생성·성장 조회",
+        "JN-021 24시간 보호·아이템 잠금·능력치 확정"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Authorization",
+            "값": "Bearer <access_token>",
+            "필수": "예"
+          }
+        ],
+        "params": [],
+        "body": null,
+        "notes": [
+          "Body 없음"
+        ]
+      },
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "userId": "uuid",
+            "avatarId": "AVATAR_01",
+            "level": 3,
+            "exp": {
+              "confirmed": 1200,
+              "pending": 150
+            },
+            "stats": [],
+            "lockedItemCount": 2
+          },
+          "notes": [
+            "level은 exp로 계산한 값입니다. exp.pending은 24시간 보호 기간 중인 경험치입니다. 능력치 축이 미정이라 stats는 빈 배열입니다."
+          ]
+        }
+      ],
+      "errors": [
+        {
+          "code": "NOT_FOUND",
+          "status": 404,
+          "message": "캐릭터가 아직 없습니다."
+        }
+      ],
+      "other_sections": [],
+      "notion_url": "https://app.notion.com/p/4132620137878189b73de8903ea78647"
+    },
+    {
+      "id": "API-008",
+      "name": "캐릭터 수정",
+      "method": "PATCH",
+      "endpoint": "/characters/me",
+      "group": "character",
+      "auth": "PLAYER",
+      "scope": "MVP 필수",
+      "status": "미착수",
+      "features": [
+        "JN-010 캐릭터 생성·성장 조회"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Authorization",
+            "값": "Bearer <access_token>",
+            "필수": "예"
+          },
+          {
+            "헤더": "Content-Type",
+            "값": "application/json",
+            "필수": "예"
+          }
+        ],
+        "params": [],
+        "body": {
+          "avatarId": "AVATAR_02"
+        },
+        "notes": [
+          "수정 가능한 필드는 미정입니다."
+        ]
+      },
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "userId": "uuid",
+            "avatarId": "AVATAR_02",
+            "exp": 1350,
+            "level": 3
+          },
+          "notes": []
+        }
+      ],
+      "errors": [
+        {
+          "code": "VALIDATION_FAILED",
+          "status": 400,
+          "message": "입력값이 올바르지 않습니다."
+        },
+        {
+          "code": "NOT_FOUND",
+          "status": 404,
+          "message": "캐릭터가 아직 없습니다."
+        }
+      ],
+      "other_sections": [],
+      "notion_url": "https://app.notion.com/p/413262013787810b8411e9e5cde19011"
+    },
+    {
+      "id": "API-009",
+      "name": "길드 생성",
+      "method": "POST",
+      "endpoint": "/guilds",
+      "group": "guild",
+      "auth": "PLAYER",
+      "scope": "MVP 필수",
+      "status": "미착수",
+      "features": [
+        "JN-011 길드 가입·길드장 관리"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Authorization",
+            "값": "Bearer <access_token>",
+            "필수": "예"
+          },
+          {
+            "헤더": "Content-Type",
+            "값": "application/json",
+            "필수": "예"
+          }
+        ],
+        "params": [],
+        "body": {
+          "name": "부산 스쿼터즈"
+        },
+        "notes": [
+          "name은 2~20자입니다. 만든 사람이 길드장이 됩니다."
+        ]
+      },
+      "responses": [
+        {
+          "status": 201,
+          "body": {
+            "guildId": "uuid",
+            "name": "부산 스쿼터즈",
+            "leaderUserId": "uuid"
+          },
+          "notes": []
+        }
+      ],
+      "errors": [
+        {
+          "code": "VALIDATION_FAILED",
+          "status": 400,
+          "message": "입력값이 올바르지 않습니다."
+        },
+        {
+          "code": "INVALID_STATE",
+          "status": 409,
+          "message": "이미 다른 길드에 소속되어 있습니다."
+        }
+      ],
+      "other_sections": [],
+      "notion_url": "https://app.notion.com/p/41326201378781eb9677c5db7e325156"
+    },
+    {
+      "id": "API-010",
+      "name": "길드 정보 조회",
+      "method": "GET",
+      "endpoint": "/guilds/{guildId}",
+      "group": "guild",
+      "auth": "GUILD_MEMBER",
+      "scope": "MVP 필수",
+      "status": "미착수",
+      "features": [
+        "JN-011 길드 가입·길드장 관리"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Authorization",
+            "값": "Bearer <access_token>",
+            "필수": "예"
+          }
+        ],
+        "params": [],
+        "body": null,
+        "notes": [
+          {
+            "type": "table",
+            "rows": [
+              {
+                "Path": "guildId",
+                "설명": "길드 ID (uuid)"
+              }
+            ]
+          },
+          "Body 없음"
+        ]
+      },
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "id": "uuid",
+            "name": "부산 스쿼터즈",
+            "leader": {
+              "userId": "uuid",
+              "nickname": "민규"
+            },
+            "memberCount": 12
+          },
+          "notes": []
+        }
+      ],
+      "errors": [
+        {
+          "code": "FORBIDDEN",
+          "status": 403,
+          "message": "길드 소속원만 조회할 수 있습니다."
+        },
+        {
+          "code": "NOT_FOUND",
+          "status": 404,
+          "message": "길드를 찾을 수 없습니다."
+        }
+      ],
+      "other_sections": [],
+      "notion_url": "https://app.notion.com/p/41326201378781ecbcfaea6a7aa6068d"
+    },
+    {
+      "id": "API-011",
+      "name": "길드원 목록",
+      "method": "GET",
+      "endpoint": "/guilds/{guildId}/members",
+      "group": "guild",
+      "auth": "GUILD_MEMBER",
+      "scope": "MVP 필수",
+      "status": "미착수",
+      "features": [
+        "JN-011 길드 가입·길드장 관리",
+        "JN-007 애매한 건을 지인·길드장에게 확인 요청"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Authorization",
+            "값": "Bearer <access_token>",
+            "필수": "예"
+          }
+        ],
+        "params": [
+          {
+            "파라미터": "guildId",
+            "위치": "Path",
+            "설명": "길드 ID"
+          },
+          {
+            "파라미터": "cursor",
+            "위치": "Query",
+            "설명": "다음 페이지 커서 (선택)"
+          },
+          {
+            "파라미터": "limit",
+            "위치": "Query",
+            "설명": "기본 20, 최대 50 (선택)"
+          }
+        ],
+        "body": null,
+        "notes": [
+          "Body 없음"
+        ]
+      },
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "items": [
+              {
+                "userId": "uuid",
+                "nickname": "민규",
+                "role": "LEADER"
+              },
+              {
+                "userId": "uuid",
+                "nickname": "지은",
+                "role": "MEMBER"
+              }
+            ],
+            "nextCursor": null
+          },
+          "notes": []
+        }
+      ],
+      "errors": [
+        {
+          "code": "FORBIDDEN",
+          "status": 403,
+          "message": "길드 소속원만 조회할 수 있습니다."
+        }
+      ],
+      "other_sections": [],
+      "notion_url": "https://app.notion.com/p/4132620137878148b967cf260051d296"
+    },
+    {
+      "id": "API-012",
+      "name": "길드 초대 코드 발급",
+      "method": "POST",
+      "endpoint": "/guilds/{guildId}/invitations",
+      "group": "guild",
+      "auth": "GUILD_LEADER",
+      "scope": "MVP 필수",
+      "status": "미착수",
+      "features": [
+        "JN-011 길드 가입·길드장 관리"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Authorization",
+            "값": "Bearer <access_token>",
+            "필수": "예"
+          },
+          {
+            "헤더": "Content-Type",
+            "값": "application/json",
+            "필수": "예"
+          }
+        ],
+        "params": [],
+        "body": {
+          "expiresInHours": 72
+        },
+        "notes": [
+          "expiresInHours는 선택이며 기본값은 미정입니다. GUILD_INVITATION 테이블에 저장합니다."
+        ]
+      },
+      "responses": [
+        {
+          "status": 201,
+          "body": {
+            "inviteCode": "A7K2QX",
+            "expiresAt": "2026-11-12T05:00:00Z"
+          },
+          "notes": []
+        }
+      ],
+      "errors": [
+        {
+          "code": "FORBIDDEN",
+          "status": 403,
+          "message": "길드장만 초대 코드를 발급할 수 있습니다."
+        }
+      ],
+      "other_sections": [],
+      "notion_url": "https://app.notion.com/p/413262013787819cbf2bfcca1269d208"
+    },
+    {
+      "id": "API-013",
+      "name": "초대 코드로 길드 가입",
+      "method": "POST",
+      "endpoint": "/guilds/join",
+      "group": "guild",
+      "auth": "PLAYER",
+      "scope": "MVP 필수",
+      "status": "미착수",
+      "features": [
+        "JN-011 길드 가입·길드장 관리"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Authorization",
+            "값": "Bearer <access_token>",
+            "필수": "예"
+          },
+          {
+            "헤더": "Content-Type",
+            "값": "application/json",
+            "필수": "예"
+          }
+        ],
+        "params": [],
+        "body": {
+          "inviteCode": "A7K2QX"
+        }
+      },
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "guildId": "uuid"
+          },
+          "notes": []
+        }
+      ],
+      "errors": [
+        {
+          "code": "VALIDATION_FAILED",
+          "status": 400,
+          "message": "초대 코드 형식이 올바르지 않습니다."
+        },
+        {
+          "code": "NOT_FOUND",
+          "status": 404,
+          "message": "초대 코드를 찾을 수 없습니다."
+        },
+        {
+          "code": "INVALID_STATE",
+          "status": 409,
+          "message": "만료된 코드이거나 이미 길드에 소속되어 있습니다."
+        }
+      ],
+      "other_sections": [],
+      "notion_url": "https://app.notion.com/p/41326201378781889fdce467507dbefe"
+    },
+    {
+      "id": "API-014",
+      "name": "길드 탈퇴",
+      "method": "DELETE",
+      "endpoint": "/guilds/{guildId}/members/me",
+      "group": "guild",
+      "auth": "GUILD_MEMBER",
+      "scope": "MVP 필수",
+      "status": "미착수",
+      "features": [
+        "JN-011 길드 가입·길드장 관리"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Authorization",
+            "값": "Bearer <access_token>",
+            "필수": "예"
+          }
+        ],
+        "params": [
+          {
+            "파라미터": "guildId",
+            "위치": "Path",
+            "설명": "길드 ID"
+          }
+        ],
+        "body": null,
+        "notes": [
+          "Body 없음. 탈퇴 제한 정책은 미정입니다."
+        ]
+      },
+      "responses": [
+        {
+          "status": 204,
+          "body": null,
+          "notes": [
+            "본문 없음"
+          ]
+        }
+      ],
+      "errors": [
+        {
+          "code": "INVALID_STATE",
+          "status": 409,
+          "message": "길드장은 위임 후 탈퇴할 수 있습니다."
+        }
+      ],
+      "other_sections": [],
+      "notion_url": "https://app.notion.com/p/41326201378781ffbde2e4b7f88878aa"
+    },
+    {
+      "id": "API-015",
+      "name": "길드원 내보내기",
+      "method": "DELETE",
+      "endpoint": "/guilds/{guildId}/members/{userId}",
+      "group": "guild",
+      "auth": "GUILD_LEADER",
+      "scope": "MVP 필수",
+      "status": "미착수",
+      "features": [
+        "JN-011 길드 가입·길드장 관리"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Authorization",
+            "값": "Bearer <access_token>",
+            "필수": "예"
+          }
+        ],
+        "params": [
+          {
+            "파라미터": "guildId",
+            "위치": "Path",
+            "설명": "길드 ID"
+          },
+          {
+            "파라미터": "userId",
+            "위치": "Path",
+            "설명": "내보낼 길드원 ID"
+          }
+        ],
+        "body": null,
+        "notes": [
+          "Body 없음"
+        ]
+      },
+      "responses": [
+        {
+          "status": 204,
+          "body": null,
+          "notes": [
+            "본문 없음"
+          ]
+        }
+      ],
+      "errors": [
+        {
+          "code": "FORBIDDEN",
+          "status": 403,
+          "message": "길드장만 내보낼 수 있으며 본인은 지정할 수 없습니다."
+        },
+        {
+          "code": "NOT_FOUND",
+          "status": 404,
+          "message": "해당 길드원을 찾을 수 없습니다."
+        }
+      ],
+      "other_sections": [],
+      "notion_url": "https://app.notion.com/p/413262013787814c801df647855d090f"
+    },
+    {
+      "id": "API-016",
+      "name": "길드장 위임",
+      "method": "POST",
+      "endpoint": "/guilds/{guildId}/leader",
+      "group": "guild",
+      "auth": "GUILD_LEADER",
+      "scope": "MVP 필수",
+      "status": "미착수",
+      "features": [
+        "JN-011 길드 가입·길드장 관리"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Authorization",
+            "값": "Bearer <access_token>",
+            "필수": "예"
+          },
+          {
+            "헤더": "Content-Type",
+            "값": "application/json",
+            "필수": "예"
+          }
+        ],
+        "params": [],
+        "body": {
+          "userId": "uuid"
+        },
+        "notes": [
+          "새 길드장은 같은 길드원이어야 합니다. 위임 상세 정책은 미정입니다."
+        ]
+      },
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "guildId": "uuid",
+            "leaderUserId": "uuid"
+          },
+          "notes": []
+        }
+      ],
+      "errors": [
+        {
+          "code": "FORBIDDEN",
+          "status": 403,
+          "message": "길드장만 위임할 수 있습니다."
+        },
+        {
+          "code": "NOT_FOUND",
+          "status": 404,
+          "message": "해당 길드원을 찾을 수 없습니다."
+        }
+      ],
+      "other_sections": [],
+      "notion_url": "https://app.notion.com/p/41326201378781768b57e5b765cafdc3"
+    },
+    {
+      "id": "API-017",
+      "name": "확인 요청 가능한 지인 목록",
+      "method": "GET",
+      "endpoint": "/me/acquaintances",
+      "group": "guild",
+      "auth": "PLAYER",
+      "scope": "MVP 필수",
+      "status": "미착수",
+      "features": [
+        "JN-007 애매한 건을 지인·길드장에게 확인 요청",
+        "JN-011 길드 가입·길드장 관리"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Authorization",
+            "값": "Bearer <access_token>",
+            "필수": "예"
+          }
+        ],
+        "params": [],
+        "body": null,
+        "notes": [
+          "Body 없음"
+        ]
+      },
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "items": [
+              {
+                "userId": "uuid",
+                "nickname": "지은",
+                "relation": "GUILD_MEMBER"
+              },
+              {
+                "userId": "uuid",
+                "nickname": "준석",
+                "relation": "GUILD_LEADER"
+              }
+            ]
+          },
+          "notes": [
+            "본인은 목록에서 빠집니다. \"지인\" 정의는 미정이며 가안은 같은 길드원입니다."
+          ]
+        }
+      ],
+      "errors": [
+        {
+          "code": "UNAUTHENTICATED",
+          "status": 401,
+          "message": "Bearer 토큰이 필요하거나 유효하지 않습니다."
+        }
+      ],
+      "other_sections": [],
+      "notion_url": "https://app.notion.com/p/4132620137878150b7a8d80c5d55271d"
+    },
+    {
+      "id": "API-018",
+      "name": "운동 목록·판정 기준·튜토리얼",
+      "method": "GET",
+      "endpoint": "/exercises",
+      "group": "session",
+      "auth": "PLAYER",
+      "scope": "MVP 필수",
+      "status": "미착수",
+      "features": [
+        "JN-012 운동 선택·튜토리얼·목표 설정",
+        "JN-036 카탈로그·판정 기준 운영 관리"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Authorization",
+            "값": "Bearer <access_token>",
+            "필수": "예"
+          }
+        ],
+        "params": [],
+        "body": null,
+        "notes": [
+          "Body 없음"
+        ]
+      },
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "catalogVersion": "2026.11-1",
+            "items": [
+              {
+                "code": "SQUAT",
+                "name": "스쿼트",
+                "dailyCap": 200,
+                "criteria": {
+                  "kneeAngleMax": null
+                },
+                "recommendedCameraAngle": null,
+                "tutorialUrl": "https://..."
+              }
+            ]
+          },
+          "notes": [
+            "MVP 운동은 스쿼트 1종입니다. 가동범위 수치·권장 촬영 각도는 미정이라 null입니다."
+          ]
+        }
+      ],
+      "errors": [
+        {
+          "code": "UNAUTHENTICATED",
+          "status": 401,
+          "message": "Bearer 토큰이 필요하거나 유효하지 않습니다."
+        }
+      ],
+      "other_sections": [],
+      "notion_url": "https://app.notion.com/p/4132620137878138923fce845636322a"
+    },
+    {
+      "id": "API-019",
+      "name": "내 일일 상한 조회",
+      "method": "GET",
+      "endpoint": "/me/daily-caps",
+      "group": "session",
+      "auth": "PLAYER",
+      "scope": "MVP 필수",
+      "status": "미착수",
+      "features": [
+        "JN-015 일일 상한·중복 제출·서버 재검증"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Authorization",
+            "값": "Bearer <access_token>",
+            "필수": "예"
+          }
+        ],
+        "params": [],
+        "body": null,
+        "notes": [
+          "Body 없음"
+        ]
+      },
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "date": "2026-11-09",
+            "items": [
+              {
+                "exerciseCode": "SQUAT",
+                "cap": 200,
+                "reserved": 30,
+                "remaining": 170
+              }
+            ]
+          },
+          "notes": [
+            "date는 KST 기준입니다. reserved는 해제되지 않은(released_at IS NULL) DAILY_CAP_RESERVATION 합계입니다."
+          ]
+        }
+      ],
+      "errors": [
+        {
+          "code": "UNAUTHENTICATED",
+          "status": 401,
+          "message": "Bearer 토큰이 필요하거나 유효하지 않습니다."
+        }
+      ],
+      "other_sections": [],
+      "notion_url": "https://app.notion.com/p/41326201378781fb9256f76aa76fdfbb"
+    },
+    {
+      "id": "API-020",
+      "name": "운동 세션 시작",
+      "method": "POST",
+      "endpoint": "/workout-sessions",
+      "group": "session",
+      "auth": "PLAYER",
+      "scope": "MVP 필수",
+      "status": "미착수",
+      "features": [
+        "JN-012 운동 선택·튜토리얼·목표 설정",
+        "JN-013 무작위 동작 확인"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Authorization",
+            "값": "Bearer <access_token>",
+            "필수": "예"
+          },
+          {
+            "헤더": "Content-Type",
+            "값": "application/json",
+            "필수": "예"
+          }
+        ],
+        "params": [],
+        "body": {
+          "exerciseCode": "SQUAT",
+          "goal": {
+            "reps": 30,
+            "sets": 1
+          },
+          "target": {
+            "type": "DUNGEON",
+            "id": "uuid"
+          },
+          "device": {
+            "os": "android",
+            "model": "SM-S921N"
+          }
+        },
+        "notes": [
+          "target.type은 DUNGEON | BOSS이며 데모 대상은 미정입니다. 세션 시작 시 무작위 동작 지시(liveness)를 함께 내려줍니다."
+        ]
+      },
+      "responses": [
+        {
+          "status": 201,
+          "body": {
+            "sessionId": "uuid",
+            "status": "ACTIVE",
+            "catalogVersion": "2026.11-1",
+            "remainingDailyCap": 170,
+            "liveness": {
+              "challengeId": "uuid",
+              "action": "RAISE_LEFT_HAND",
+              "timeoutSec": 10
+            },
+            "chunkSpec": {
+              "maxFrames": 300,
+              "maxBytes": 262144
+            }
+          },
+          "notes": []
+        }
+      ],
+      "errors": [
+        {
+          "code": "VALIDATION_FAILED",
+          "status": 400,
+          "message": "입력값이 올바르지 않습니다."
+        },
+        {
+          "code": "DAILY_CAP_EXCEEDED",
+          "status": 422,
+          "message": "오늘 일일 상한에 도달했습니다. (경고용, 세션 차단 여부 미정)"
+        }
+      ],
+      "other_sections": [],
+      "notion_url": "https://app.notion.com/p/4132620137878179b19fe4c27bd3e76b"
+    },
+    {
+      "id": "API-021",
+      "name": "무작위 동작 확인 결과 전송",
+      "method": "POST",
+      "endpoint": "/workout-sessions/{id}/liveness",
+      "group": "session",
+      "auth": "OWNER",
+      "scope": "MVP 필수",
+      "status": "미착수",
+      "features": [
+        "JN-013 무작위 동작 확인",
+        "JN-001 운동하면 렙을 세어 자동 제출"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Authorization",
+            "값": "Bearer <access_token>",
+            "필수": "예"
+          },
+          {
+            "헤더": "Content-Type",
+            "값": "application/json",
+            "필수": "예"
+          }
+        ],
+        "params": [
+          {
+            "파라미터": "id",
+            "위치": "Path",
+            "설명": "세션 ID"
+          }
+        ],
+        "body": {
+          "challengeId": "uuid",
+          "detectedAction": "RAISE_LEFT_HAND",
+          "score": 0.93,
+          "detectedAt": "2026-11-09T05:01:12Z"
+        },
+        "notes": [
+          "결과는 WORKOUT_SESSION.liveness_passed에 저장합니다. 동작 종류·판정 기준·실패 시 재시작/제출 허용 여부는 미정입니다."
+        ]
+      },
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "passed": true,
+            "retryAllowed": false
+          },
+          "notes": []
+        }
+      ],
+      "errors": [
+        {
+          "code": "VALIDATION_FAILED",
+          "status": 400,
+          "message": "입력값이 올바르지 않습니다."
+        },
+        {
+          "code": "INVALID_STATE",
+          "status": 409,
+          "message": "종료된 세션이거나 이미 확인을 끝냈습니다."
+        },
+        {
+          "code": "LIVENESS_FAILED",
+          "status": 422,
+          "message": "지시한 동작을 확인하지 못했습니다."
+        }
+      ],
+      "other_sections": [],
+      "notion_url": "https://app.notion.com/p/413262013787812e8b6fe05a58c83c8e"
+    },
+    {
+      "id": "API-022",
+      "name": "관절 좌표 청크 업로드",
+      "method": "PUT",
+      "endpoint": "/workout-sessions/{id}/pose-chunks/{seq}",
+      "group": "session",
+      "auth": "OWNER",
+      "scope": "MVP 필수",
+      "status": "미착수",
+      "features": [
+        "JN-001 운동하면 렙을 세어 자동 제출",
+        "JN-014 온디바이스 렙 인식·즉시 피드백",
+        "JN-016 카메라 중단·재연결·제출 재시도",
+        "JN-037 개인정보 최소 전송·LLM 입력 통제"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Authorization",
+            "값": "Bearer <access_token>",
+            "필수": "예"
+          },
+          {
+            "헤더": "Content-Type",
+            "값": "application/json",
+            "필수": "예"
+          }
+        ],
+        "params": [
+          {
+            "파라미터": "id",
+            "위치": "Path",
+            "설명": "세션 ID"
+          },
+          {
+            "파라미터": "seq",
+            "위치": "Path",
+            "설명": "청크 순번"
+          }
+        ],
+        "body": {
+          "seq": 3,
+          "frames": [
+            {
+              "t": 1731128472123,
+              "kp": [
+                [
+                  0.51,
+                  0.32,
+                  0.98
+                ],
+                [
+                  0.49,
+                  0.45,
+                  0.97
+                ]
+              ]
+            }
+          ]
+        },
+        "notes": [
+          "kp는 [x, y, visibility] 배열이며 얼굴 랜드마크는 빼고 보냅니다. 청크 크기 가안은 300프레임/256KB입니다. 같은 seq를 다시 보내면 덮어씁니다(POSE_CHUNK). 좌표 보관·삭제 기간은 미정입니다."
+        ]
+      },
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "received": [
+              1,
+              2,
+              3
+            ]
+          },
+          "notes": []
+        }
+      ],
+      "errors": [
+        {
+          "code": "VALIDATION_FAILED",
+          "status": 400,
+          "message": "청크 크기를 넘었거나 얼굴 좌표가 포함되었습니다."
+        },
+        {
+          "code": "INVALID_STATE",
+          "status": 409,
+          "message": "이미 종료된 세션입니다."
+        }
+      ],
+      "other_sections": [],
+      "notion_url": "https://app.notion.com/p/4132620137878145a1f9ed4055295eb5"
+    },
+    {
+      "id": "API-023",
+      "name": "세션 일시중지",
+      "method": "POST",
+      "endpoint": "/workout-sessions/{id}/pause",
+      "group": "session",
+      "auth": "OWNER",
+      "scope": "MVP 필수",
+      "status": "미착수",
+      "features": [
+        "JN-016 카메라 중단·재연결·제출 재시도"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Authorization",
+            "값": "Bearer <access_token>",
+            "필수": "예"
+          },
+          {
+            "헤더": "Content-Type",
+            "값": "application/json",
+            "필수": "예"
+          }
+        ],
+        "params": [
+          {
+            "파라미터": "id",
+            "위치": "Path",
+            "설명": "세션 ID"
+          }
+        ],
+        "body": {
+          "reason": "CAMERA_LOST",
+          "at": "2026-11-09T05:03:00Z"
+        },
+        "notes": [
+          "reason은 CAMERA_LOST | APP_BACKGROUND입니다. 중단된 동안 촬영·추론은 멈추고 불완전 기록을 자동 제출하지 않습니다."
+        ]
+      },
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "sessionId": "uuid",
+            "status": "PAUSED"
+          },
+          "notes": []
+        }
+      ],
+      "errors": [
+        {
+          "code": "INVALID_STATE",
+          "status": 409,
+          "message": "진행 중(ACTIVE)인 세션이 아닙니다."
+        }
+      ],
+      "other_sections": [],
+      "notion_url": "https://app.notion.com/p/4132620137878164ada4dddb6f36a702"
+    },
+    {
+      "id": "API-024",
+      "name": "세션 재개",
+      "method": "POST",
+      "endpoint": "/workout-sessions/{id}/resume",
+      "group": "session",
+      "auth": "OWNER",
+      "scope": "MVP 필수",
+      "status": "미착수",
+      "features": [
+        "JN-016 카메라 중단·재연결·제출 재시도"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Authorization",
+            "값": "Bearer <access_token>",
+            "필수": "예"
+          }
+        ],
+        "params": [
+          {
+            "파라미터": "id",
+            "위치": "Path",
+            "설명": "세션 ID"
+          }
+        ],
+        "body": null,
+        "notes": [
+          "Body 없음. 재개 허용 시간은 미정입니다."
+        ]
+      },
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "sessionId": "uuid",
+            "status": "ACTIVE",
+            "receivedChunks": [
+              1,
+              2,
+              3
+            ]
+          },
+          "notes": [
+            "빠진 seq부터 다시 보내면 됩니다."
+          ]
+        }
+      ],
+      "errors": [
+        {
+          "code": "INVALID_STATE",
+          "status": 409,
+          "message": "일시중지(PAUSED) 상태가 아니거나 재개 허용 시간이 지났습니다."
+        }
+      ],
+      "other_sections": [],
+      "notion_url": "https://app.notion.com/p/41326201378781689e8ce15bd12a8604"
+    },
+    {
+      "id": "API-025",
+      "name": "세션 상태 조회",
+      "method": "GET",
+      "endpoint": "/workout-sessions/{id}",
+      "group": "session",
+      "auth": "OWNER",
+      "scope": "MVP 필수",
+      "status": "미착수",
+      "features": [
+        "JN-016 카메라 중단·재연결·제출 재시도"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Authorization",
+            "값": "Bearer <access_token>",
+            "필수": "예"
+          }
+        ],
+        "params": [
+          {
+            "파라미터": "id",
+            "위치": "Path",
+            "설명": "세션 ID"
+          }
+        ],
+        "body": null,
+        "notes": [
+          "Body 없음. 응답이 유실됐을 때 이 API로 기존 접수 여부를 먼저 확인합니다."
+        ]
+      },
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "sessionId": "uuid",
+            "status": "ACTIVE",
+            "exerciseCode": "SQUAT",
+            "livenessPassed": true,
+            "receivedChunks": [
+              1,
+              2,
+              3
+            ],
+            "submissionId": null
+          },
+          "notes": [
+            "status는 ACTIVE | PAUSED | SUBMITTED | DISCARDED입니다. 제출 후에는 submissionId가 채워집니다."
+          ]
+        }
+      ],
+      "errors": [
+        {
+          "code": "FORBIDDEN",
+          "status": 403,
+          "message": "본인 세션만 조회할 수 있습니다."
+        },
+        {
+          "code": "NOT_FOUND",
+          "status": 404,
+          "message": "세션을 찾을 수 없습니다."
+        }
+      ],
+      "other_sections": [],
+      "notion_url": "https://app.notion.com/p/4132620137878102a4edd8b37df72aa2"
+    },
+    {
+      "id": "API-026",
+      "name": "세션 종료·운동 제출",
+      "method": "POST",
+      "endpoint": "/workout-sessions/{id}/submit",
+      "group": "submission",
+      "auth": "OWNER",
+      "scope": "MVP 필수",
+      "status": "미착수",
+      "features": [
+        "JN-001 운동하면 렙을 세어 자동 제출",
+        "JN-014 온디바이스 렙 인식·즉시 피드백",
+        "JN-015 일일 상한·중복 제출·서버 재검증"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Authorization",
+            "값": "Bearer <access_token>",
+            "필수": "예"
+          },
+          {
+            "헤더": "Content-Type",
+            "값": "application/json",
+            "필수": "예"
+          },
+          {
+            "헤더": "Idempotency-Key",
+            "값": "uuid",
+            "필수": "예"
+          }
+        ],
+        "params": [
+          {
+            "파라미터": "id",
+            "위치": "Path",
+            "설명": "세션 ID"
+          }
+        ],
+        "body": {
+          "totalChunks": 12,
+          "endedAt": "2026-11-09T05:10:00Z",
+          "clientRepCount": 30,
+          "reps": [
+            {
+              "repNo": 1,
+              "ts": "2026-11-09T05:05:02Z",
+              "counted": true
+            },
+            {
+              "repNo": 2,
+              "ts": "2026-11-09T05:05:05Z",
+              "counted": false
+            }
+          ],
+          "aiConfidence": 0.94
+        },
+        "notes": [
+          "서버는 받은 관절 좌표로 렙 수를 다시 계산해 인정량(countedReps)으로 쓰고, 앱이 보낸 렙 수가 더 크면 거부합니다. 그날 상한 200회에 이미 도달했으면 제출건은 만들고 reservedReps는 0입니다. 같은 Idempotency-Key로 다시 보내면 첫 결과를 돌려줍니다."
+        ]
+      },
+      "responses": [
+        {
+          "status": 202,
+          "body": {
+            "submissionId": "uuid",
+            "status": "SUBMITTED",
+            "countedReps": 30,
+            "reservedReps": 30,
+            "version": 0
+          },
+          "notes": []
+        }
+      ],
+      "errors": [
+        {
+          "code": "VALIDATION_FAILED",
+          "status": 400,
+          "message": "누락된 청크가 있거나 입력값이 올바르지 않습니다."
+        },
+        {
+          "code": "DUPLICATE_SUBMISSION",
+          "status": 409,
+          "message": "같은 시간대에 활성 제출건이 있습니다."
+        },
+        {
+          "code": "INVALID_STATE",
+          "status": 409,
+          "message": "이미 제출했거나 폐기된 세션입니다."
+        },
+        {
+          "code": "SERVER_RECOUNT_MISMATCH",
+          "status": 422,
+          "message": "인정 렙 수가 서버 재계산 값보다 큽니다."
+        }
+      ],
+      "other_sections": [],
+      "notion_url": "https://app.notion.com/p/41326201378781c0bf9cc959a7808f5a"
+    },
+    {
+      "id": "API-027",
+      "name": "세션 폐기",
+      "method": "DELETE",
+      "endpoint": "/workout-sessions/{id}",
+      "group": "session",
+      "auth": "OWNER",
+      "scope": "MVP 필수",
+      "status": "미착수",
+      "features": [
+        "JN-016 카메라 중단·재연결·제출 재시도"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Authorization",
+            "값": "Bearer <access_token>",
+            "필수": "예"
+          }
+        ],
+        "params": [
+          {
+            "파라미터": "id",
+            "위치": "Path",
+            "설명": "세션 ID"
+          }
+        ],
+        "body": null,
+        "notes": [
+          "Body 없음. 세션 상태를 DISCARDED로 바꾸고 받은 좌표 청크를 지웁니다."
+        ]
+      },
+      "responses": [
+        {
+          "status": 204,
+          "body": null,
+          "notes": [
+            "본문 없음"
+          ]
+        }
+      ],
+      "errors": [
+        {
+          "code": "INVALID_STATE",
+          "status": 409,
+          "message": "이미 제출된 세션입니다."
+        }
+      ],
+      "other_sections": [],
+      "notion_url": "https://app.notion.com/p/41326201378781e6901cf6feaa206c42"
+    },
+    {
+      "id": "API-028",
+      "name": "제출 상태 조회",
+      "method": "GET",
+      "endpoint": "/submissions/{id}",
+      "group": "submission",
+      "auth": "OWNER",
+      "scope": "MVP 필수",
+      "status": "미착수",
+      "features": [
+        "JN-001 운동하면 렙을 세어 자동 제출",
+        "JN-009 회원 가입·로그인과 본인 권한"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Authorization",
+            "값": "Bearer <access_token>",
+            "필수": "예"
+          }
+        ],
+        "params": [
+          {
+            "파라미터": "id",
+            "위치": "Path",
+            "설명": "제출 ID"
+          }
+        ],
+        "body": null,
+        "notes": [
+          "Body 없음"
+        ]
+      },
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "id": "uuid",
+            "sessionId": "uuid",
+            "exerciseCode": "SQUAT",
+            "status": "PREPARED",
+            "version": 3,
+            "approvalPath": null,
+            "startedAt": "2026-11-09T05:00:00Z",
+            "endedAt": "2026-11-09T05:10:00Z",
+            "countedReps": 30,
+            "reservedReps": 30,
+            "confidence": 0.94,
+            "livenessPassed": true
+          },
+          "notes": [
+            "응답 헤더 ETag: \"3\" (제출건 version, 취소·확인 요청 시 If-Match에 사용)",
+            "status는 SUBMITTED~REVOKED 9개 상태, approvalPath는 AI_AUTO | REVIEWER입니다."
+          ]
+        }
+      ],
+      "errors": [
+        {
+          "code": "FORBIDDEN",
+          "status": 403,
+          "message": "본인 제출건만 조회할 수 있습니다."
+        },
+        {
+          "code": "NOT_FOUND",
+          "status": 404,
+          "message": "제출건을 찾을 수 없습니다."
+        }
+      ],
+      "other_sections": [],
+      "notion_url": "https://app.notion.com/p/41326201378781579841c76e0b9d26fc"
+    },
+    {
+      "id": "API-029",
+      "name": "내 제출 목록",
+      "method": "GET",
+      "endpoint": "/me/submissions",
+      "group": "submission",
+      "auth": "PLAYER",
+      "scope": "MVP 필수",
+      "status": "미착수",
+      "features": [
+        "JN-001 운동하면 렙을 세어 자동 제출"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Authorization",
+            "값": "Bearer <access_token>",
+            "필수": "예"
+          }
+        ],
+        "params": [
+          {
+            "파라미터": "status",
+            "위치": "Query",
+            "설명": "상태 필터 (선택)"
+          },
+          {
+            "파라미터": "from / to",
+            "위치": "Query",
+            "설명": "기간 (선택, 예: 2026-11-01)"
+          },
+          {
+            "파라미터": "cursor / limit",
+            "위치": "Query",
+            "설명": "페이지 (선택)"
+          }
+        ],
+        "body": null,
+        "notes": [
+          "Body 없음"
+        ]
+      },
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "items": [
+              {
+                "id": "uuid",
+                "exerciseCode": "SQUAT",
+                "status": "REWARDED",
+                "countedReps": 30,
+                "startedAt": "2026-11-09T05:00:00Z"
+              }
+            ],
+            "nextCursor": null
+          },
+          "notes": [
+            "항목 형식은 API-028(제출 상태 조회)과 같습니다."
+          ]
+        }
+      ],
+      "errors": [
+        {
+          "code": "UNAUTHENTICATED",
+          "status": 401,
+          "message": "Bearer 토큰이 필요하거나 유효하지 않습니다."
+        }
+      ],
+      "other_sections": [],
+      "notion_url": "https://app.notion.com/p/4132620137878160b9f0dc1fbee36fb4"
+    },
+    {
+      "id": "API-030",
+      "name": "승인 전 제출 취소",
+      "method": "POST",
+      "endpoint": "/submissions/{id}/cancel",
+      "group": "submission",
+      "auth": "OWNER",
+      "scope": "MVP 필수",
+      "status": "미착수",
+      "features": [
+        "JN-006 승인 전 제출 취소",
+        "JN-015 일일 상한·중복 제출·서버 재검증"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Authorization",
+            "값": "Bearer <access_token>",
+            "필수": "예"
+          },
+          {
+            "헤더": "Content-Type",
+            "값": "application/json",
+            "필수": "예"
+          },
+          {
+            "헤더": "If-Match",
+            "값": "\"3\" (제출건 version)",
+            "필수": "예"
+          }
+        ],
+        "params": [
+          {
+            "파라미터": "id",
+            "위치": "Path",
+            "설명": "제출 ID"
+          }
+        ],
+        "body": {
+          "reason": "자세가 이상해서 다시 하고 싶어요"
+        },
+        "notes": [
+          "reason은 선택입니다. SUBMITTED / PREPARED / PENDING_REVIEW 상태에서만 취소할 수 있고, 취소하면 상한 예약을 해제합니다. 승인과 동시에 오면 하나만 성공합니다."
+        ]
+      },
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "submissionId": "uuid",
+            "status": "CANCELED",
+            "releasedReps": 30,
+            "version": 4
+          },
+          "notes": []
+        }
+      ],
+      "errors": [
+        {
+          "code": "FORBIDDEN",
+          "status": 403,
+          "message": "신청자 본인만 취소할 수 있습니다."
+        },
+        {
+          "code": "INVALID_STATE",
+          "status": 409,
+          "message": "이미 승인되었거나 종료된 제출건입니다."
+        },
+        {
+          "code": "CONCURRENT_UPDATE",
+          "status": 412,
+          "message": "다른 요청이 먼저 처리되었습니다. 최신 상태로 다시 시도하세요."
+        }
+      ],
+      "other_sections": [],
+      "notion_url": "https://app.notion.com/p/41326201378781899fd0fffd703b5fe5"
+    },
+    {
+      "id": "API-031",
+      "name": "보상 스냅샷 계산·고정",
+      "method": "POST",
+      "endpoint": "/internal/submissions/{id}/snapshot",
+      "group": "snapshot",
+      "auth": "SYSTEM",
+      "scope": "MVP 필수",
+      "status": "미착수",
+      "features": [
+        "JN-022 보상 스냅샷·카탈로그 버전 고정",
+        "JN-002 보상·타격 수 미리보기"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Idempotency-Key",
+            "값": "uuid",
+            "필수": "예"
+          }
+        ],
+        "params": [
+          {
+            "파라미터": "id",
+            "위치": "Path",
+            "설명": "제출 ID"
+          }
+        ],
+        "body": null,
+        "notes": [
+          "Body 없음. 서버 내부 호출 전용입니다. 계산 후 상태가 SUBMITTED → PREPARED로 바뀝니다. 카탈로그가 바뀌거나 LLM을 다시 만들어도 스냅샷 수치는 바뀌지 않습니다. 스쿼트 1회 = 1타입니다."
+        ]
+      },
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "submissionId": "uuid",
+            "catalogVersion": "2026.11-1",
+            "hitCount": 30,
+            "exp": 150,
+            "totalDamage": 900,
+            "weaknessMultiplier": 1,
+            "dropCount": 1
+          },
+          "notes": [
+            "경험치·피해 공식·드랍 확률은 미정입니다. 약점 배율 기본값 가안은 1.0입니다. 능력치 경험치는 축이 미정이라 빠져 있습니다."
+          ]
+        }
+      ],
+      "errors": [
+        {
+          "code": "INVALID_STATE",
+          "status": 409,
+          "message": "SUBMITTED 상태가 아닙니다."
+        }
+      ],
+      "other_sections": [],
+      "notion_url": "https://app.notion.com/p/4132620137878116b25bf51fcfbee1ec"
+    },
+    {
+      "id": "API-032",
+      "name": "보상·타격 수 미리보기",
+      "method": "GET",
+      "endpoint": "/submissions/{id}/reward-preview",
+      "group": "snapshot",
+      "auth": "OWNER",
+      "scope": "MVP 필수",
+      "status": "미착수",
+      "features": [
+        "JN-002 보상·타격 수 미리보기",
+        "JN-022 보상 스냅샷·카탈로그 버전 고정",
+        "JN-017 L3 전투 서사 생성·출력 검사"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Authorization",
+            "값": "Bearer <access_token>",
+            "필수": "예"
+          }
+        ],
+        "params": [
+          {
+            "파라미터": "id",
+            "위치": "Path",
+            "설명": "제출 ID"
+          }
+        ],
+        "body": null,
+        "notes": [
+          "Body 없음"
+        ]
+      },
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "status": "PREPARED",
+            "snapshot": {
+              "catalogVersion": "2026.11-1",
+              "hitCount": 30,
+              "exp": 150,
+              "totalDamage": 900,
+              "weaknessMultiplier": 1,
+              "dropCount": 1
+            },
+            "narrative": {
+              "level": "L3",
+              "text": "너의 30번의 타격이...",
+              "isFallback": false
+            }
+          },
+          "notes": [
+            "아직 스냅샷이 없으면 202 와 { \"status\": \"SUBMITTED\", \"retryAfterSec\": 2 }를 돌려줍니다. LLM이 실패하면 기본 문구와 isFallback: true가 나갑니다."
+          ]
+        }
+      ],
+      "errors": [
+        {
+          "code": "FORBIDDEN",
+          "status": 403,
+          "message": "제출한 본인만 볼 수 있습니다."
+        },
+        {
+          "code": "NOT_FOUND",
+          "status": 404,
+          "message": "제출건을 찾을 수 없습니다."
+        }
+      ],
+      "other_sections": [],
+      "notion_url": "https://app.notion.com/p/413262013787819a8e77c100b63889c5"
+    },
+    {
+      "id": "API-033",
+      "name": "자동 승인 판정",
+      "method": "POST",
+      "endpoint": "/internal/submissions/{id}/auto-approval",
+      "group": "review",
+      "auth": "SYSTEM",
+      "scope": "MVP 필수",
+      "status": "미착수",
+      "features": [
+        "JN-003 AI 확신도 기준 이상이면 바로 승인",
+        "JN-013 무작위 동작 확인"
+      ],
+      "request": {
+        "headers": [],
+        "params": [
+          {
+            "파라미터": "id",
+            "위치": "Path",
+            "설명": "제출 ID"
+          }
+        ],
+        "body": null,
+        "notes": [
+          "Body 없음. 서버 내부 호출 전용입니다. 확신도가 기준(90%) 이상이고 무작위 동작 확인을 통과한 PREPARED 건만 APPROVED가 됩니다. 미달이면 PREPARED에 남고 신청자가 확인 요청을 보낼 수 있습니다."
+        ]
+      },
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "decision": "AUTO_APPROVED",
+            "confidence": 0.94,
+            "threshold": 0.9,
+            "livenessPassed": true,
+            "submissionStatus": "APPROVED",
+            "approvalPath": "AI_AUTO"
+          },
+          "notes": [
+            "decision은 AUTO_APPROVED | NEEDS_REVIEW입니다. 확신도 기준과 계산 방법은 미정입니다."
+          ]
+        }
+      ],
+      "errors": [
+        {
+          "code": "INVALID_STATE",
+          "status": 409,
+          "message": "PREPARED 상태가 아닙니다."
+        },
+        {
+          "code": "CONCURRENT_UPDATE",
+          "status": 412,
+          "message": "취소가 먼저 처리되었습니다."
+        }
+      ],
+      "other_sections": [],
+      "notion_url": "https://app.notion.com/p/41326201378781178416e2197ea976e8"
+    },
+    {
+      "id": "API-034",
+      "name": "확인 요청 공유 내용 미리보기",
+      "method": "GET",
+      "endpoint": "/submissions/{id}/review-share-preview",
+      "group": "review",
+      "auth": "OWNER",
+      "scope": "MVP 필수",
+      "status": "미착수",
+      "features": [
+        "JN-007 애매한 건을 지인·길드장에게 확인 요청",
+        "JN-019 L1 기록 요약·L2 이상치 설명"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Authorization",
+            "값": "Bearer <access_token>",
+            "필수": "예"
+          }
+        ],
+        "params": [
+          {
+            "파라미터": "id",
+            "위치": "Path",
+            "설명": "제출 ID"
+          }
+        ],
+        "body": null,
+        "notes": [
+          "Body 없음. 확인자에게 보낼 내용을 신청자가 먼저 확인하는 화면용입니다."
+        ]
+      },
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "skeletonReplayUrl": "https://...",
+            "summary": "스쿼트 30회, 10분 동안...",
+            "anomalies": [
+              {
+                "type": "TEMPO_TOO_FAST",
+                "repNos": [
+                  12,
+                  13
+                ],
+                "description": "..."
+              }
+            ],
+            "painNotice": "통증이 있으면 운동을 멈추세요"
+          },
+          "notes": [
+            "skeletonReplayUrl은 영상·얼굴 없는 관절 선 리플레이입니다. summary는 L1, anomalies는 L2입니다. 통증 안내 고정 문구는 미정입니다."
+          ]
+        }
+      ],
+      "errors": [
+        {
+          "code": "FORBIDDEN",
+          "status": 403,
+          "message": "신청자 본인만 볼 수 있습니다."
+        },
+        {
+          "code": "INVALID_STATE",
+          "status": 409,
+          "message": "이미 자동 승인되었거나 PREPARED 상태가 아닙니다."
+        }
+      ],
+      "other_sections": [],
+      "notion_url": "https://app.notion.com/p/4132620137878118abb1d4b7a22195c2"
+    },
+    {
+      "id": "API-035",
+      "name": "지인·길드장에게 확인 요청",
+      "method": "POST",
+      "endpoint": "/submissions/{id}/review-requests",
+      "group": "review",
+      "auth": "OWNER",
+      "scope": "MVP 필수",
+      "status": "미착수",
+      "features": [
+        "JN-007 애매한 건을 지인·길드장에게 확인 요청"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Authorization",
+            "값": "Bearer <access_token>",
+            "필수": "예"
+          },
+          {
+            "헤더": "Content-Type",
+            "값": "application/json",
+            "필수": "예"
+          },
+          {
+            "헤더": "If-Match",
+            "값": "\"3\" (제출건 version)",
+            "필수": "예"
+          }
+        ],
+        "params": [
+          {
+            "파라미터": "id",
+            "위치": "Path",
+            "설명": "제출 ID"
+          }
+        ],
+        "body": {
+          "reviewerUserId": "uuid",
+          "sharePreviewConfirmed": true
+        },
+        "notes": [
+          "reviewerUserId는 지인 또는 길드장 1명이며 신청자 본인은 안 됩니다. sharePreviewConfirmed는 API-034 미리보기를 확인했는지 여부입니다. 확인 요청은 제출건당 최대 1건입니다."
+        ]
+      },
+      "responses": [
+        {
+          "status": 201,
+          "body": {
+            "submissionId": "uuid",
+            "submissionStatus": "PENDING_REVIEW",
+            "version": 4,
+            "reviewer": {
+              "userId": "uuid",
+              "nickname": "지은"
+            },
+            "requestedAt": "2026-11-09T05:12:00Z"
+          },
+          "notes": []
+        }
+      ],
+      "errors": [
+        {
+          "code": "VALIDATION_FAILED",
+          "status": 400,
+          "message": "본인을 지정했거나 미리보기를 확인하지 않았습니다."
+        },
+        {
+          "code": "FORBIDDEN",
+          "status": 403,
+          "message": "지인이나 길드장이 아닌 사람에게는 요청할 수 없습니다."
+        },
+        {
+          "code": "INVALID_STATE",
+          "status": 409,
+          "message": "이미 확인 요청을 보냈거나 PREPARED 상태가 아닙니다."
+        },
+        {
+          "code": "CONCURRENT_UPDATE",
+          "status": 412,
+          "message": "다른 요청이 먼저 처리되었습니다."
+        }
+      ],
+      "other_sections": [],
+      "notion_url": "https://app.notion.com/p/41326201378781cca5a1d93964b405e0"
+    },
+    {
+      "id": "API-036",
+      "name": "받은 확인 요청 목록",
+      "method": "GET",
+      "endpoint": "/me/review-requests",
+      "group": "review",
+      "auth": "REVIEWER",
+      "scope": "MVP 필수",
+      "status": "미착수",
+      "features": [
+        "JN-020 사람 확인 자료 열람·승인"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Authorization",
+            "값": "Bearer <access_token>",
+            "필수": "예"
+          }
+        ],
+        "params": [
+          {
+            "파라미터": "status",
+            "위치": "Query",
+            "설명": "기본 PENDING (선택)"
+          },
+          {
+            "파라미터": "cursor / limit",
+            "위치": "Query",
+            "설명": "페이지 (선택)"
+          }
+        ],
+        "body": null,
+        "notes": [
+          "Body 없음"
+        ]
+      },
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "items": [
+              {
+                "submissionId": "uuid",
+                "requester": {
+                  "userId": "uuid",
+                  "nickname": "민규"
+                },
+                "exerciseCode": "SQUAT",
+                "countedReps": 30,
+                "requestedAt": "2026-11-09T05:12:00Z"
+              }
+            ],
+            "nextCursor": null
+          },
+          "notes": []
+        }
+      ],
+      "errors": [
+        {
+          "code": "UNAUTHENTICATED",
+          "status": 401,
+          "message": "Bearer 토큰이 필요하거나 유효하지 않습니다."
+        }
+      ],
+      "other_sections": [],
+      "notion_url": "https://app.notion.com/p/41326201378781a691b5faf19e96df69"
+    },
+    {
+      "id": "API-037",
+      "name": "확인 자료 열람",
+      "method": "GET",
+      "endpoint": "/review-requests/{id}",
+      "group": "review",
+      "auth": "REVIEWER",
+      "scope": "MVP 필수",
+      "status": "미착수",
+      "features": [
+        "JN-020 사람 확인 자료 열람·승인",
+        "JN-019 L1 기록 요약·L2 이상치 설명",
+        "JN-037 개인정보 최소 전송·LLM 입력 통제"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Authorization",
+            "값": "Bearer <access_token>",
+            "필수": "예"
+          }
+        ],
+        "params": [
+          {
+            "파라미터": "id",
+            "위치": "Path",
+            "설명": "제출 ID (확인 요청은 제출건당 1건이라 제출 ID로 식별)"
+          }
+        ],
+        "body": null,
+        "notes": [
+          "Body 없음. 얼굴·나이·길드명은 내려주지 않습니다."
+        ]
+      },
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "submissionId": "uuid",
+            "status": "PENDING_REVIEW",
+            "version": 4,
+            "requester": {
+              "nickname": "민규"
+            },
+            "exerciseCode": "SQUAT",
+            "countedReps": 30,
+            "confidence": 0.82,
+            "skeletonReplayUrl": "https://...",
+            "summary": "...",
+            "anomalies": [
+              {
+                "type": "TEMPO_TOO_FAST",
+                "repNos": [
+                  12
+                ],
+                "description": "..."
+              }
+            ],
+            "painNotice": "..."
+          },
+          "notes": [
+            "응답 헤더 ETag: \"4\""
+          ]
+        }
+      ],
+      "errors": [
+        {
+          "code": "FORBIDDEN",
+          "status": 403,
+          "message": "요청받은 확인자만 열람할 수 있습니다."
+        },
+        {
+          "code": "NOT_FOUND",
+          "status": 404,
+          "message": "확인 요청을 찾을 수 없습니다."
+        }
+      ],
+      "other_sections": [],
+      "notion_url": "https://app.notion.com/p/41326201378781d6920aeda17285de4b"
+    },
+    {
+      "id": "API-038",
+      "name": "확인자 승인",
+      "method": "POST",
+      "endpoint": "/review-requests/{id}/approve",
+      "group": "review",
+      "auth": "REVIEWER",
+      "scope": "MVP 필수",
+      "status": "미착수",
+      "features": [
+        "JN-020 사람 확인 자료 열람·승인"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Authorization",
+            "값": "Bearer <access_token>",
+            "필수": "예"
+          },
+          {
+            "헤더": "If-Match",
+            "값": "\"4\" (제출건 version)",
+            "필수": "예"
+          }
+        ],
+        "params": [
+          {
+            "파라미터": "id",
+            "위치": "Path",
+            "설명": "제출 ID"
+          }
+        ],
+        "body": null,
+        "notes": [
+          "Body 없음. 요청받은 확인자만 승인할 수 있고 신청자 본인은 승인할 수 없습니다. 취소와 동시에 오면 한 경로만 성공합니다."
+        ]
+      },
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "submissionId": "uuid",
+            "submissionStatus": "APPROVED",
+            "approvalPath": "REVIEWER",
+            "version": 5
+          },
+          "notes": []
+        }
+      ],
+      "errors": [
+        {
+          "code": "FORBIDDEN",
+          "status": 403,
+          "message": "요청받은 확인자만 승인할 수 있습니다."
+        },
+        {
+          "code": "INVALID_STATE",
+          "status": 409,
+          "message": "취소되었거나 이미 처리된 요청입니다."
+        },
+        {
+          "code": "CONCURRENT_UPDATE",
+          "status": 412,
+          "message": "다른 요청이 먼저 처리되었습니다."
+        }
+      ],
+      "other_sections": [],
+      "notion_url": "https://app.notion.com/p/4132620137878119a0c2d336f90d1a7e"
+    },
+    {
+      "id": "API-039",
+      "name": "확인자 반려",
+      "method": "POST",
+      "endpoint": "/review-requests/{id}/reject",
+      "group": "review",
+      "auth": "REVIEWER",
+      "scope": "MVP 필수",
+      "status": "미착수",
+      "features": [
+        "JN-008 확인자가 사유와 함께 반려",
+        "JN-015 일일 상한·중복 제출·서버 재검증"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Authorization",
+            "값": "Bearer <access_token>",
+            "필수": "예"
+          },
+          {
+            "헤더": "Content-Type",
+            "값": "application/json",
+            "필수": "예"
+          },
+          {
+            "헤더": "If-Match",
+            "값": "\"4\" (제출건 version)",
+            "필수": "예"
+          }
+        ],
+        "params": [
+          {
+            "파라미터": "id",
+            "위치": "Path",
+            "설명": "제출 ID"
+          }
+        ],
+        "body": {
+          "reasonCode": "RECORD_ANOMALY",
+          "reasonText": "12~15회가 너무 빠름"
+        },
+        "notes": [
+          "reasonCode(API-040 목록의 코드)와 reasonText는 둘 다 필수입니다. 반려하면 REJECTED → CLOSED로 가고 카메라 세션을 닫고 상한 예약을 해제합니다. AI 판정이나 ai_flags만으로는 반려되지 않습니다."
+        ]
+      },
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "submissionId": "uuid",
+            "submissionStatus": "CLOSED",
+            "releasedReps": 30,
+            "cameraSessionClosed": true,
+            "version": 6
+          },
+          "notes": []
+        }
+      ],
+      "errors": [
+        {
+          "code": "VALIDATION_FAILED",
+          "status": 400,
+          "message": "반려 사유 코드와 설명이 필요합니다."
+        },
+        {
+          "code": "FORBIDDEN",
+          "status": 403,
+          "message": "요청받은 확인자만 반려할 수 있습니다."
+        },
+        {
+          "code": "INVALID_STATE",
+          "status": 409,
+          "message": "PENDING_REVIEW 상태가 아닙니다."
+        },
+        {
+          "code": "CONCURRENT_UPDATE",
+          "status": 412,
+          "message": "다른 요청이 먼저 처리되었습니다."
+        }
+      ],
+      "other_sections": [],
+      "notion_url": "https://app.notion.com/p/4132620137878165b956e70c50fb6aea"
+    },
+    {
+      "id": "API-040",
+      "name": "반려 사유 코드 목록",
+      "method": "GET",
+      "endpoint": "/reject-reasons",
+      "group": "review",
+      "auth": "NONE",
+      "scope": "MVP 필수",
+      "status": "미착수",
+      "features": [
+        "JN-008 확인자가 사유와 함께 반려"
+      ],
+      "request": {
+        "headers": [],
+        "params": [],
+        "body": null,
+        "notes": [
+          "헤더·Body 없음"
+        ]
+      },
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "items": [
+              {
+                "code": "RECORD_ANOMALY",
+                "label": "기록 이상"
+              },
+              {
+                "code": "IDENTITY_FAILED",
+                "label": "본인 확인 실패"
+              },
+              {
+                "code": "SUSPECTED_THEFT",
+                "label": "도용 의심"
+              }
+            ]
+          },
+          "notes": [
+            "code 값은 예시입니다(REJECT_REASON 테이블)."
+          ]
+        }
+      ],
+      "errors": [],
+      "other_sections": [],
+      "notion_url": "https://app.notion.com/p/41326201378781c78642e423c092a5f6"
+    },
+    {
+      "id": "API-041",
+      "name": "보상·피해 1회 반영",
+      "method": "POST",
+      "endpoint": "/internal/submissions/{id}/grant",
+      "group": "reward",
+      "auth": "SYSTEM",
+      "scope": "MVP 필수",
+      "status": "미착수",
+      "features": [
+        "JN-004 보상을 한 번만 반영",
+        "JN-023 던전·보스 피해 반영",
+        "JN-021 24시간 보호·아이템 잠금·능력치 확정"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Idempotency-Key",
+            "값": "uuid",
+            "필수": "예"
+          }
+        ],
+        "params": [
+          {
+            "파라미터": "id",
+            "위치": "Path",
+            "설명": "제출 ID"
+          }
+        ],
+        "body": null,
+        "notes": [
+          "Body 없음. 서버 내부 호출 전용입니다. 스냅샷 값만큼 경험치·아이템·피해를 한 트랜잭션으로 반영하고 APPROVED → REWARDED로 바꿉니다. 중간에 실패하면 아무것도 반영되지 않습니다. REWARD_LEDGER의 키가 제출 ID이고, 재호출하면 첫 결과를 alreadyGranted: true로 돌려줍니다. 얻은 아이템은 24시간 LOCKED입니다."
+        ]
+      },
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "submissionId": "uuid",
+            "alreadyGranted": false,
+            "applied": {
+              "exp": 150,
+              "items": [
+                {
+                  "itemId": "uuid",
+                  "status": "LOCKED"
+                }
+              ],
+              "damage": {
+                "targetType": "DUNGEON",
+                "targetId": "uuid",
+                "amount": 900
+              }
+            },
+            "rewardedAt": "2026-11-09T05:15:00Z"
+          },
+          "notes": [
+            "데모 공략 대상(던전/보스)·체력·피해 공식은 미정입니다. 능력치 경험치 반영은 능력치 모델이 정해진 뒤 추가합니다."
+          ]
+        }
+      ],
+      "errors": [
+        {
+          "code": "INVALID_STATE",
+          "status": 409,
+          "message": "APPROVED 상태가 아닙니다."
+        },
+        {
+          "code": "ALREADY_REWARDED",
+          "status": 409,
+          "message": "다른 요청으로 이미 지급되었습니다."
+        }
+      ],
+      "other_sections": [],
+      "notion_url": "https://app.notion.com/p/413262013787819e9a3ec2f5f79509ef"
+    },
+    {
+      "id": "API-042",
+      "name": "24시간 잠금 해제·능력치 확정 (배치)",
+      "method": "POST",
+      "endpoint": "/internal/reward-locks/release",
+      "group": "reward",
+      "auth": "SYSTEM",
+      "scope": "MVP 필수",
+      "status": "미착수",
+      "features": [
+        "JN-021 24시간 보호·아이템 잠금·능력치 확정"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Content-Type",
+            "값": "application/json",
+            "필수": "예"
+          }
+        ],
+        "params": [],
+        "body": {
+          "now": "2026-11-10T05:15:00Z"
+        },
+        "notes": [
+          "now는 선택(테스트용 기준 시각)입니다. rewarded_at + 24시간이 지난 LOCKED 아이템을 풀고 확정 대기 능력치를 확정합니다. 해제 후 상태명·작업 실행 방식·24시간 경계 처리는 미정입니다."
+        ]
+      },
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "releasedItems": 5,
+            "confirmedStats": 3
+          },
+          "notes": []
+        }
+      ],
+      "errors": [],
+      "other_sections": [],
+      "notion_url": "https://app.notion.com/p/41326201378781f0ba8ef19efd6ef3c4"
+    },
+    {
+      "id": "API-043",
+      "name": "내 지급 내역",
+      "method": "GET",
+      "endpoint": "/me/rewards",
+      "group": "reward",
+      "auth": "PLAYER",
+      "scope": "MVP 필수",
+      "status": "미착수",
+      "features": [
+        "JN-004 보상을 한 번만 반영"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Authorization",
+            "값": "Bearer <access_token>",
+            "필수": "예"
+          }
+        ],
+        "params": [
+          {
+            "파라미터": "cursor / limit",
+            "위치": "Query",
+            "설명": "페이지 (선택)"
+          }
+        ],
+        "body": null,
+        "notes": [
+          "Body 없음"
+        ]
+      },
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "items": [
+              {
+                "submissionId": "uuid",
+                "exp": 150,
+                "items": [
+                  {
+                    "itemId": "uuid",
+                    "status": "LOCKED"
+                  }
+                ],
+                "damage": 900,
+                "rewardedAt": "2026-11-09T05:15:00Z",
+                "protectionEndsAt": "2026-11-10T05:15:00Z"
+              }
+            ],
+            "nextCursor": null
+          },
+          "notes": [
+            "protectionEndsAt은 rewardedAt + 24시간으로 계산한 값입니다."
+          ]
+        }
+      ],
+      "errors": [
+        {
+          "code": "UNAUTHENTICATED",
+          "status": 401,
+          "message": "Bearer 토큰이 필요하거나 유효하지 않습니다."
+        }
+      ],
+      "other_sections": [],
+      "notion_url": "https://app.notion.com/p/41326201378781f09939d5755d75b161"
+    },
+    {
+      "id": "API-044",
+      "name": "인벤토리 조회",
+      "method": "GET",
+      "endpoint": "/me/inventory",
+      "group": "reward",
+      "auth": "PLAYER",
+      "scope": "MVP 필수",
+      "status": "미착수",
+      "features": [
+        "JN-021 24시간 보호·아이템 잠금·능력치 확정"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Authorization",
+            "값": "Bearer <access_token>",
+            "필수": "예"
+          }
+        ],
+        "params": [],
+        "body": null,
+        "notes": [
+          "Body 없음"
+        ]
+      },
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "items": [
+              {
+                "itemId": "uuid",
+                "submissionId": "uuid",
+                "status": "LOCKED",
+                "unlockAt": "2026-11-10T05:15:00Z"
+              }
+            ]
+          },
+          "notes": [
+            "아이템 카탈로그와 LOCKED 해제 뒤 상태명은 미정입니다."
+          ]
+        }
+      ],
+      "errors": [
+        {
+          "code": "UNAUTHENTICATED",
+          "status": 401,
+          "message": "Bearer 토큰이 필요하거나 유효하지 않습니다."
+        }
+      ],
+      "other_sections": [],
+      "notion_url": "https://app.notion.com/p/4132620137878161815bc6025474ddd0"
+    },
+    {
+      "id": "API-045",
+      "name": "던전 상태 조회",
+      "method": "GET",
+      "endpoint": "/dungeons/{dungeonId}",
+      "group": "battle",
+      "auth": "PLAYER",
+      "scope": "MVP 필수",
+      "status": "미착수",
+      "features": [
+        "JN-023 던전·보스 피해 반영"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Authorization",
+            "값": "Bearer <access_token>",
+            "필수": "예"
+          }
+        ],
+        "params": [
+          {
+            "파라미터": "dungeonId",
+            "위치": "Path",
+            "설명": "던전 ID"
+          }
+        ],
+        "body": null,
+        "notes": [
+          "Body 없음"
+        ]
+      },
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "id": "uuid",
+            "name": "초원 던전",
+            "enemy": {
+              "name": "고블린",
+              "hpMax": 5000,
+              "hp": 3200
+            },
+            "myProgress": {
+              "totalDamage": 1800
+            }
+          },
+          "notes": [
+            "적 모델·체력은 미정이며, 던전 테이블은 아직 DB에 없습니다."
+          ]
+        }
+      ],
+      "errors": [
+        {
+          "code": "NOT_FOUND",
+          "status": 404,
+          "message": "던전을 찾을 수 없습니다."
+        }
+      ],
+      "other_sections": [],
+      "notion_url": "https://app.notion.com/p/41326201378781cfbf21f7daae8434bc"
+    },
+    {
+      "id": "API-046",
+      "name": "길드 보스 상태 조회",
+      "method": "GET",
+      "endpoint": "/guilds/{guildId}/boss",
+      "group": "battle",
+      "auth": "GUILD_MEMBER",
+      "scope": "MVP 필수",
+      "status": "미착수",
+      "features": [
+        "JN-023 던전·보스 피해 반영",
+        "JN-035 주간 레이드 운영·랭킹 확정"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Authorization",
+            "값": "Bearer <access_token>",
+            "필수": "예"
+          }
+        ],
+        "params": [
+          {
+            "파라미터": "guildId",
+            "위치": "Path",
+            "설명": "길드 ID"
+          }
+        ],
+        "body": null,
+        "notes": [
+          "Body 없음"
+        ]
+      },
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "bossId": "uuid",
+            "status": "ACTIVE",
+            "hpMax": 50000,
+            "hp": 32000,
+            "guildTotalDamage": 18000,
+            "weekStart": "2026-11-09",
+            "weekEnd": "2026-11-15"
+          },
+          "notes": [
+            "status는 ACTIVE | DEFEATED입니다. 보스 모델·체력·주 시작/마감은 미정입니다."
+          ]
+        }
+      ],
+      "errors": [
+        {
+          "code": "FORBIDDEN",
+          "status": 403,
+          "message": "길드 소속원만 조회할 수 있습니다."
+        },
+        {
+          "code": "NOT_FOUND",
+          "status": 404,
+          "message": "이번 주 보스가 없습니다."
+        }
+      ],
+      "other_sections": [],
+      "notion_url": "https://app.notion.com/p/41326201378781ca9a5adc11190ae7fe"
+    },
+    {
+      "id": "API-047",
+      "name": "결과 카드·서사·교정 코멘트 조회",
+      "method": "GET",
+      "endpoint": "/submissions/{id}/result",
+      "group": "result",
+      "auth": "OWNER",
+      "scope": "MVP 필수",
+      "status": "미착수",
+      "features": [
+        "JN-005 리플레이·결과 카드·교정 코멘트 보기",
+        "JN-017 L3 전투 서사 생성·출력 검사",
+        "JN-018 L4 자세 교정 코멘트"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Authorization",
+            "값": "Bearer <access_token>",
+            "필수": "예"
+          }
+        ],
+        "params": [
+          {
+            "파라미터": "id",
+            "위치": "Path",
+            "설명": "제출 ID"
+          }
+        ],
+        "body": null,
+        "notes": [
+          "Body 없음. REWARDED 건만 볼 수 있고 상태는 바꾸지 않습니다."
+        ]
+      },
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "card": {
+              "exerciseCode": "SQUAT",
+              "countedReps": 30,
+              "hitCount": 30,
+              "exp": 150,
+              "totalDamage": 900,
+              "drops": [
+                {
+                  "itemId": "uuid",
+                  "status": "LOCKED"
+                }
+              ],
+              "rewardedAt": "2026-11-09T05:15:00Z"
+            },
+            "narrative": {
+              "level": "L3",
+              "text": "...",
+              "isFallback": false
+            },
+            "formComment": {
+              "level": "L4",
+              "text": "다음엔 무릎이 안쪽으로 모이지 않게...",
+              "isFallback": false
+            }
+          },
+          "notes": [
+            "hitCount는 리플레이 타격 수와 같습니다. 일일 상한 초과로 0타면 \"일일 상한 초과\" 카드입니다."
+          ]
+        }
+      ],
+      "errors": [
+        {
+          "code": "FORBIDDEN",
+          "status": 403,
+          "message": "본인만 볼 수 있습니다."
+        },
+        {
+          "code": "NOT_FOUND",
+          "status": 404,
+          "message": "제출건을 찾을 수 없습니다."
+        },
+        {
+          "code": "INVALID_STATE",
+          "status": 409,
+          "message": "아직 보상이 지급되지 않았습니다."
+        }
+      ],
+      "other_sections": [],
+      "notion_url": "https://app.notion.com/p/41326201378781eb9340eb05d27aafd5"
+    },
+    {
+      "id": "API-048",
+      "name": "전투 리플레이 조회",
+      "method": "GET",
+      "endpoint": "/submissions/{id}/replay",
+      "group": "result",
+      "auth": "OWNER",
+      "scope": "MVP 필수",
+      "status": "미착수",
+      "features": [
+        "JN-005 리플레이·결과 카드·교정 코멘트 보기"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Authorization",
+            "값": "Bearer <access_token>",
+            "필수": "예"
+          }
+        ],
+        "params": [
+          {
+            "파라미터": "id",
+            "위치": "Path",
+            "설명": "제출 ID"
+          }
+        ],
+        "body": null,
+        "notes": [
+          "Body 없음. 리플레이는 30초를 넘지 않습니다. 길드원 공개 여부는 미정입니다."
+        ]
+      },
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "hitCount": 30,
+            "events": [
+              {
+                "repIndex": 1,
+                "t": 3.2,
+                "type": "HIT",
+                "damage": 30
+              },
+              {
+                "repIndex": 2,
+                "t": 6.1,
+                "type": "MISS",
+                "reason": "ROM_NOT_MET"
+              }
+            ],
+            "skeletonUrl": "https://..."
+          },
+          "notes": []
+        }
+      ],
+      "errors": [
+        {
+          "code": "FORBIDDEN",
+          "status": 403,
+          "message": "본인만 볼 수 있습니다."
+        },
+        {
+          "code": "NOT_FOUND",
+          "status": 404,
+          "message": "제출건을 찾을 수 없습니다."
+        },
+        {
+          "code": "INVALID_STATE",
+          "status": 409,
+          "message": "아직 보상이 지급되지 않았습니다."
+        }
+      ],
+      "other_sections": [],
+      "notion_url": "https://app.notion.com/p/413262013787810092faefc07f40868b"
+    },
+    {
+      "id": "API-049",
+      "name": "L3 전투 서사 생성",
+      "method": "POST",
+      "endpoint": "/internal/llm/narratives",
+      "group": "llm",
+      "auth": "SYSTEM",
+      "scope": "MVP 필수",
+      "status": "미착수",
+      "features": [
+        "JN-017 L3 전투 서사 생성·출력 검사",
+        "JN-037 개인정보 최소 전송·LLM 입력 통제"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Content-Type",
+            "값": "application/json",
+            "필수": "예"
+          }
+        ],
+        "params": [],
+        "body": {
+          "submissionId": "uuid"
+        },
+        "notes": [
+          "서버 내부 호출 전용입니다. LLM에는 스킬명·운동 종류·적 이름·약점 적중 여부만 보내고 수치·메모·관절 좌표·닉네임·길드명은 보내지 않습니다. 출력에 숫자·다른 스킬명·아이템명이 있으면 다시 만들고, 2번 실패하면 기본 문구를 씁니다. 결과는 ai_story에 저장합니다."
+        ]
+      },
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "level": "L3",
+            "text": "너의 일격이 고블린을 몰아붙였다...",
+            "isFallback": false
+          },
+          "notes": [
+            "제공사·모델·기본 문구·호출 제한은 미정입니다."
+          ]
+        }
+      ],
+      "errors": [
+        {
+          "code": "RATE_LIMITED",
+          "status": 429,
+          "message": "LLM 호출 한도를 넘었습니다."
+        }
+      ],
+      "other_sections": [],
+      "notion_url": "https://app.notion.com/p/41326201378781f4b44aeb4cc4459478"
+    },
+    {
+      "id": "API-050",
+      "name": "L4 자세 교정 코멘트 생성",
+      "method": "POST",
+      "endpoint": "/internal/llm/form-comments",
+      "group": "llm",
+      "auth": "SYSTEM",
+      "scope": "MVP 필수",
+      "status": "미착수",
+      "features": [
+        "JN-018 L4 자세 교정 코멘트",
+        "JN-037 개인정보 최소 전송·LLM 입력 통제"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Content-Type",
+            "값": "application/json",
+            "필수": "예"
+          }
+        ],
+        "params": [],
+        "body": {
+          "submissionId": "uuid",
+          "poseSummary": {
+            "kneeAngle": {
+              "avg": 92.4,
+              "min": 78,
+              "max": 110.2
+            },
+            "hipAngle": {
+              "avg": 85.1,
+              "min": 70.3,
+              "max": 101.7
+            }
+          }
+        },
+        "notes": [
+          "서버 내부 호출 전용입니다. 관절 좌표 원본 대신 각도 요약 통계만 보냅니다(입력 계약 미정). 진단·처방처럼 들리는 표현은 걸러내고 실패하면 기본 문구를 씁니다. 결과는 ai_form_tip에 저장합니다."
+        ]
+      },
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "level": "L4",
+            "text": "다음 세션에서는 내려갈 때 무릎이 안쪽으로 모이지 않게 해 보세요.",
+            "isFallback": false
+          },
+          "notes": []
+        }
+      ],
+      "errors": [
+        {
+          "code": "RATE_LIMITED",
+          "status": 429,
+          "message": "LLM 호출 한도를 넘었습니다."
+        }
+      ],
+      "other_sections": [],
+      "notion_url": "https://app.notion.com/p/413262013787817f850eece19b7e3716"
+    },
+    {
+      "id": "API-051",
+      "name": "L1 기록 요약·L2 이상치 설명 생성",
+      "method": "POST",
+      "endpoint": "/internal/llm/review-summaries",
+      "group": "llm",
+      "auth": "SYSTEM",
+      "scope": "MVP 필수",
+      "status": "미착수",
+      "features": [
+        "JN-019 L1 기록 요약·L2 이상치 설명",
+        "JN-002 보상·타격 수 미리보기",
+        "JN-037 개인정보 최소 전송·LLM 입력 통제"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Content-Type",
+            "값": "application/json",
+            "필수": "예"
+          }
+        ],
+        "params": [],
+        "body": {
+          "submissionId": "uuid"
+        },
+        "notes": [
+          "서버 내부 호출 전용입니다. 닉네임·길드명, 메모 속 이름·연락처·장소, 관절 좌표 원본은 보내지 않고 렙 간격은 통계로만 보냅니다. 결과는 ai_summary·ai_flags에 저장하며 보조 정보일 뿐 상태를 바꾸지 않습니다. 자동 승인 건에도 만들지는 미정입니다."
+        ]
+      },
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "summary": "스쿼트 30회, 평균 3초 간격...",
+            "anomalies": [
+              {
+                "type": "TEMPO_TOO_FAST",
+                "repNos": [
+                  12,
+                  13
+                ],
+                "description": "..."
+              }
+            ]
+          },
+          "notes": []
+        }
+      ],
+      "errors": [
+        {
+          "code": "RATE_LIMITED",
+          "status": 429,
+          "message": "LLM 호출 한도를 넘었습니다."
+        }
+      ],
+      "other_sections": [],
+      "notion_url": "https://app.notion.com/p/41326201378781cb80efc19d3df2ee29"
+    },
+    {
+      "id": "API-052",
+      "name": "유지율 집계",
+      "method": "GET",
+      "endpoint": "/admin/metrics/retention",
+      "group": "admin",
+      "auth": "OPERATOR",
+      "scope": "범위 확인",
+      "status": "미착수",
+      "features": [
+        "JN-024 운동 이력·성과 지표 집계"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Authorization",
+            "값": "Bearer <access_token>",
+            "필수": "예"
+          }
+        ],
+        "params": [
+          {
+            "파라미터": "cohort",
+            "위치": "Query",
+            "설명": "가입 주차 (ISO 주, 예: 2026-45)"
+          },
+          {
+            "파라미터": "days",
+            "위치": "Query",
+            "설명": "7 또는 30"
+          }
+        ],
+        "body": null,
+        "notes": [
+          "Body 없음"
+        ]
+      },
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "cohort": "2026-45",
+            "days": 7,
+            "size": 120,
+            "retained": 48,
+            "rate": 0.4
+          },
+          "notes": [
+            "유지율 목표·지표 분모·기간·MVP 포함 여부는 미정입니다."
+          ]
+        }
+      ],
+      "errors": [
+        {
+          "code": "FORBIDDEN",
+          "status": 403,
+          "message": "운영자만 조회할 수 있습니다."
+        }
+      ],
+      "other_sections": [],
+      "notion_url": "https://app.notion.com/p/41326201378781efbbffdefe971ffc82"
+    },
+    {
+      "id": "API-053",
+      "name": "제출·레이드 참여 집계",
+      "method": "GET",
+      "endpoint": "/admin/metrics/submissions",
+      "group": "admin",
+      "auth": "OPERATOR",
+      "scope": "범위 확인",
+      "status": "미착수",
+      "features": [
+        "JN-024 운동 이력·성과 지표 집계"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Authorization",
+            "값": "Bearer <access_token>",
+            "필수": "예"
+          }
+        ],
+        "params": [
+          {
+            "파라미터": "from / to",
+            "위치": "Query",
+            "설명": "기간 (예: 2026-10-01 ~ 2026-11-09)"
+          },
+          {
+            "파라미터": "groupBy",
+            "위치": "Query",
+            "설명": "week"
+          }
+        ],
+        "body": null,
+        "notes": [
+          "Body 없음"
+        ]
+      },
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "items": [
+              {
+                "week": "2026-45",
+                "submissions": 340,
+                "approved": 310,
+                "raidParticipants": 85
+              }
+            ]
+          },
+          "notes": []
+        }
+      ],
+      "errors": [
+        {
+          "code": "FORBIDDEN",
+          "status": 403,
+          "message": "운영자만 조회할 수 있습니다."
+        }
+      ],
+      "other_sections": [],
+      "notion_url": "https://app.notion.com/p/413262013787818b8e10f6d29af62c21"
+    },
+    {
+      "id": "API-054",
+      "name": "내 주간 운동 이력",
+      "method": "GET",
+      "endpoint": "/me/stats/weekly",
+      "group": "admin",
+      "auth": "PLAYER",
+      "scope": "범위 확인",
+      "status": "미착수",
+      "features": [
+        "JN-024 운동 이력·성과 지표 집계"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Authorization",
+            "값": "Bearer <access_token>",
+            "필수": "예"
+          }
+        ],
+        "params": [
+          {
+            "파라미터": "week",
+            "위치": "Query",
+            "설명": "ISO 주차 (생략 시 이번 주)"
+          }
+        ],
+        "body": null,
+        "notes": [
+          "Body 없음"
+        ]
+      },
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "week": "2026-45",
+            "days": [
+              {
+                "date": "2026-11-09",
+                "reps": 60
+              },
+              {
+                "date": "2026-11-10",
+                "reps": 0
+              }
+            ],
+            "totalReps": 60,
+            "submissions": 2
+          },
+          "notes": []
+        }
+      ],
+      "errors": [
+        {
+          "code": "UNAUTHENTICATED",
+          "status": 401,
+          "message": "Bearer 토큰이 필요하거나 유효하지 않습니다."
+        }
+      ],
+      "other_sections": [],
+      "notion_url": "https://app.notion.com/p/4132620137878107b564fc9a6d67dfe3"
+    },
+    {
+      "id": "API-055",
+      "name": "AI 판정 문의 등록",
+      "method": "POST",
+      "endpoint": "/submissions/{id}/inquiries",
+      "group": "admin",
+      "auth": "OWNER",
+      "scope": "범위 확인",
+      "status": "미착수",
+      "features": [
+        "JN-025 AI 판정 문의"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Authorization",
+            "값": "Bearer <access_token>",
+            "필수": "예"
+          },
+          {
+            "헤더": "Content-Type",
+            "값": "application/json",
+            "필수": "예"
+          }
+        ],
+        "params": [
+          {
+            "파라미터": "id",
+            "위치": "Path",
+            "설명": "제출 ID"
+          }
+        ],
+        "body": {
+          "message": "분명히 제대로 했는데 인정이 안 됐어요"
+        },
+        "notes": [
+          "message는 1~1000자입니다. 문의는 제출건 상태를 바꾸지 않습니다. 문의 테이블은 MVP 포함이 확정되면 DB에 추가합니다."
+        ]
+      },
+      "responses": [
+        {
+          "status": 201,
+          "body": {
+            "inquiryId": "uuid",
+            "status": "OPEN",
+            "createdAt": "2026-11-09T06:00:00Z"
+          },
+          "notes": []
+        }
+      ],
+      "errors": [
+        {
+          "code": "VALIDATION_FAILED",
+          "status": 400,
+          "message": "문의 내용이 비어 있거나 너무 깁니다."
+        },
+        {
+          "code": "FORBIDDEN",
+          "status": 403,
+          "message": "본인 제출건에만 문의할 수 있습니다."
+        }
+      ],
+      "other_sections": [],
+      "notion_url": "https://app.notion.com/p/413262013787817392a5dc8157773751"
+    },
+    {
+      "id": "API-056",
+      "name": "문의 목록",
+      "method": "GET",
+      "endpoint": "/admin/inquiries",
+      "group": "admin",
+      "auth": "OPERATOR",
+      "scope": "범위 확인",
+      "status": "미착수",
+      "features": [
+        "JN-025 AI 판정 문의"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Authorization",
+            "값": "Bearer <access_token>",
+            "필수": "예"
+          }
+        ],
+        "params": [
+          {
+            "파라미터": "status",
+            "위치": "Query",
+            "설명": "기본 OPEN (선택)"
+          },
+          {
+            "파라미터": "cursor / limit",
+            "위치": "Query",
+            "설명": "페이지 (선택)"
+          }
+        ],
+        "body": null,
+        "notes": [
+          "Body 없음"
+        ]
+      },
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "items": [
+              {
+                "inquiryId": "uuid",
+                "submissionId": "uuid",
+                "message": "...",
+                "status": "OPEN",
+                "createdAt": "2026-11-09T06:00:00Z"
+              }
+            ],
+            "nextCursor": null
+          },
+          "notes": []
+        }
+      ],
+      "errors": [
+        {
+          "code": "FORBIDDEN",
+          "status": 403,
+          "message": "운영자만 조회할 수 있습니다."
+        }
+      ],
+      "other_sections": [],
+      "notion_url": "https://app.notion.com/p/41326201378781a88e38ea6bf481dbde"
+    },
+    {
+      "id": "API-057",
+      "name": "문의 답변",
+      "method": "POST",
+      "endpoint": "/admin/inquiries/{id}/answer",
+      "group": "admin",
+      "auth": "OPERATOR",
+      "scope": "범위 확인",
+      "status": "미착수",
+      "features": [
+        "JN-025 AI 판정 문의"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Authorization",
+            "값": "Bearer <access_token>",
+            "필수": "예"
+          },
+          {
+            "헤더": "Content-Type",
+            "값": "application/json",
+            "필수": "예"
+          }
+        ],
+        "params": [
+          {
+            "파라미터": "id",
+            "위치": "Path",
+            "설명": "문의 ID"
+          }
+        ],
+        "body": {
+          "answer": "해당 세션은 무릎 각도가 기준에 못 미쳤습니다..."
+        }
+      },
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "inquiryId": "uuid",
+            "status": "ANSWERED",
+            "answeredAt": "2026-11-09T07:00:00Z"
+          },
+          "notes": []
+        }
+      ],
+      "errors": [
+        {
+          "code": "FORBIDDEN",
+          "status": 403,
+          "message": "운영자만 답변할 수 있습니다."
+        },
+        {
+          "code": "INVALID_STATE",
+          "status": 409,
+          "message": "이미 답변한 문의입니다."
+        }
+      ],
+      "other_sections": [],
+      "notion_url": "https://app.notion.com/p/41326201378781c08008cf72f0914caf"
+    },
+    {
+      "id": "API-058",
+      "name": "카탈로그 버전 목록",
+      "method": "GET",
+      "endpoint": "/admin/catalogs",
+      "group": "admin",
+      "auth": "OPERATOR",
+      "scope": "범위 확인",
+      "status": "미착수",
+      "features": [
+        "JN-036 카탈로그·판정 기준 운영 관리"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Authorization",
+            "값": "Bearer <access_token>",
+            "필수": "예"
+          }
+        ],
+        "params": [],
+        "body": null,
+        "notes": [
+          "Body 없음"
+        ]
+      },
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "items": [
+              {
+                "version": "2026.11-1",
+                "status": "ACTIVE",
+                "createdAt": "2026-11-01T00:00:00Z",
+                "activatedAt": "2026-11-02T00:00:00Z"
+              },
+              {
+                "version": "2026.11-2",
+                "status": "DRAFT",
+                "createdAt": "2026-11-09T00:00:00Z",
+                "activatedAt": null
+              }
+            ]
+          },
+          "notes": [
+            "편집 UI 필요 여부·운영자 권한은 미정입니다."
+          ]
+        }
+      ],
+      "errors": [
+        {
+          "code": "FORBIDDEN",
+          "status": 403,
+          "message": "운영자만 조회할 수 있습니다."
+        }
+      ],
+      "other_sections": [],
+      "notion_url": "https://app.notion.com/p/413262013787816dac20d6405e14a69d"
+    },
+    {
+      "id": "API-059",
+      "name": "카탈로그 새 버전 작성",
+      "method": "POST",
+      "endpoint": "/admin/catalogs",
+      "group": "admin",
+      "auth": "OPERATOR",
+      "scope": "범위 확인",
+      "status": "미착수",
+      "features": [
+        "JN-036 카탈로그·판정 기준 운영 관리"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Authorization",
+            "값": "Bearer <access_token>",
+            "필수": "예"
+          },
+          {
+            "헤더": "Content-Type",
+            "값": "application/json",
+            "필수": "예"
+          }
+        ],
+        "params": [],
+        "body": {
+          "exercises": [
+            {
+              "code": "SQUAT",
+              "name": "스쿼트",
+              "dailyCap": 200,
+              "criteria": {
+                "kneeAngleMax": 100
+              }
+            }
+          ],
+          "rewards": {
+            "expPerHit": 5,
+            "dropRate": 0.05
+          },
+          "hitUnit": {
+            "repsPerHit": 1
+          }
+        },
+        "notes": [
+          "수치 공식은 미정이며 값은 예시입니다."
+        ]
+      },
+      "responses": [
+        {
+          "status": 201,
+          "body": {
+            "version": "2026.11-2",
+            "status": "DRAFT"
+          },
+          "notes": []
+        }
+      ],
+      "errors": [
+        {
+          "code": "VALIDATION_FAILED",
+          "status": 400,
+          "message": "입력값이 올바르지 않습니다."
+        },
+        {
+          "code": "FORBIDDEN",
+          "status": 403,
+          "message": "운영자만 작성할 수 있습니다."
+        }
+      ],
+      "other_sections": [],
+      "notion_url": "https://app.notion.com/p/413262013787814390bcc462e37ba0e8"
+    },
+    {
+      "id": "API-060",
+      "name": "카탈로그 버전 활성화",
+      "method": "POST",
+      "endpoint": "/admin/catalogs/{version}/activate",
+      "group": "admin",
+      "auth": "OPERATOR",
+      "scope": "범위 확인",
+      "status": "미착수",
+      "features": [
+        "JN-036 카탈로그·판정 기준 운영 관리"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Authorization",
+            "값": "Bearer <access_token>",
+            "필수": "예"
+          }
+        ],
+        "params": [
+          {
+            "파라미터": "version",
+            "위치": "Path",
+            "설명": "카탈로그 버전"
+          }
+        ],
+        "body": null,
+        "notes": [
+          "Body 없음. 이미 만든 스냅샷은 이전 버전을 그대로 유지합니다."
+        ]
+      },
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "version": "2026.11-2",
+            "status": "ACTIVE",
+            "activatedAt": "2026-11-10T00:00:00Z"
+          },
+          "notes": []
+        }
+      ],
+      "errors": [
+        {
+          "code": "FORBIDDEN",
+          "status": 403,
+          "message": "운영자만 활성화할 수 있습니다."
+        },
+        {
+          "code": "INVALID_STATE",
+          "status": 409,
+          "message": "DRAFT 상태가 아닙니다."
+        }
+      ],
+      "other_sections": [],
+      "notion_url": "https://app.notion.com/p/41326201378781f9995fd618c7a01801"
+    },
+    {
+      "id": "API-061",
+      "name": "신고 접수",
+      "method": "POST",
+      "endpoint": "/submissions/{id}/reports",
+      "group": "reserved",
+      "auth": "PLAYER",
+      "scope": "후순위·제외",
+      "status": "미착수",
+      "features": [
+        "JN-026 신고 접수·운영자 판정·보상 회수"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Authorization",
+            "값": "Bearer <access_token>",
+            "필수": "예"
+          },
+          {
+            "헤더": "Content-Type",
+            "값": "application/json",
+            "필수": "예"
+          }
+        ],
+        "params": [],
+        "body": {
+          "reason": "영상과 횟수가 맞지 않아요"
+        },
+        "notes": [
+          "(예상 형태) 1인당 하루 3건·기각 누적 시 7일 정지 등 구기획 규칙은 재확정이 필요합니다."
+        ]
+      },
+      "responses": [
+        {
+          "status": 501,
+          "body": {
+            "code": "NOT_IMPLEMENTED",
+            "message": "MVP 범위 제외"
+          },
+          "notes": []
+        }
+      ],
+      "errors": [
+        {
+          "code": "NOT_IMPLEMENTED",
+          "status": 501,
+          "message": "아직 제공하지 않는 기능입니다."
+        }
+      ],
+      "other_sections": [
+        {
+          "heading": null,
+          "content": [
+            {
+              "type": "quote",
+              "text": "MVP 제외 — 경로만 예약하고 호출하면 501을 돌려줍니다."
+            }
+          ]
+        }
+      ],
+      "notion_url": "https://app.notion.com/p/41326201378781ab8b7fc41587a2e4f8"
+    },
+    {
+      "id": "API-062",
+      "name": "운영자 신고 판정·보상 회수",
+      "method": "POST",
+      "endpoint": "/admin/reports/{id}/decide",
+      "group": "reserved",
+      "auth": "OPERATOR",
+      "scope": "후순위·제외",
+      "status": "미착수",
+      "features": [
+        "JN-026 신고 접수·운영자 판정·보상 회수"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Authorization",
+            "값": "Bearer <access_token>",
+            "필수": "예"
+          },
+          {
+            "헤더": "Content-Type",
+            "값": "application/json",
+            "필수": "예"
+          }
+        ],
+        "params": [],
+        "body": {
+          "decision": "UPHELD",
+          "note": "도용 확인"
+        },
+        "notes": [
+          "(예상 형태) UPHELD이면 REWARDED → REVOKED로 보상을 회수합니다. 사용한 아이템 롤백 범위·운영자 절차는 미정입니다."
+        ]
+      },
+      "responses": [
+        {
+          "status": 501,
+          "body": {
+            "code": "NOT_IMPLEMENTED",
+            "message": "MVP 범위 제외"
+          },
+          "notes": []
+        }
+      ],
+      "errors": [
+        {
+          "code": "NOT_IMPLEMENTED",
+          "status": 501,
+          "message": "아직 제공하지 않는 기능입니다."
+        }
+      ],
+      "other_sections": [
+        {
+          "heading": null,
+          "content": [
+            {
+              "type": "quote",
+              "text": "MVP 제외 — 경로만 예약하고 호출하면 501을 돌려줍니다."
+            }
+          ]
+        }
+      ],
+      "notion_url": "https://app.notion.com/p/413262013787811d94f0c8cfe7f5423f"
+    },
+    {
+      "id": "API-063",
+      "name": "건강 앱 러닝 세션 제출",
+      "method": "POST",
+      "endpoint": "/integrations/health/{provider}/runs/{runId}/submit",
+      "group": "reserved",
+      "auth": "PLAYER",
+      "scope": "후순위·제외",
+      "status": "미착수",
+      "features": [
+        "JN-027 건강 앱 러닝 연동·세션 제출"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Authorization",
+            "값": "Bearer <access_token>",
+            "필수": "예"
+          }
+        ],
+        "params": [
+          {
+            "파라미터": "provider",
+            "위치": "Path",
+            "설명": "연동 공급자 (미정)"
+          },
+          {
+            "파라미터": "runId",
+            "위치": "Path",
+            "설명": "러닝 세션 ID"
+          }
+        ],
+        "body": null,
+        "notes": [
+          "Body 없음 (연동 세션에서 거리·시간을 읽음). 운동 종료 48시간 안에만 제출, 러닝 일일 상한 10km 예정입니다."
+        ]
+      },
+      "responses": [
+        {
+          "status": 501,
+          "body": {
+            "code": "NOT_IMPLEMENTED",
+            "message": "MVP 범위 제외"
+          },
+          "notes": []
+        }
+      ],
+      "errors": [
+        {
+          "code": "NOT_IMPLEMENTED",
+          "status": 501,
+          "message": "아직 제공하지 않는 기능입니다."
+        }
+      ],
+      "other_sections": [
+        {
+          "heading": null,
+          "content": [
+            {
+              "type": "quote",
+              "text": "MVP 제외 — 경로만 예약하고 호출하면 501을 돌려줍니다."
+            }
+          ]
+        }
+      ],
+      "notion_url": "https://app.notion.com/p/413262013787811fb308de2f7424b1a9"
+    },
+    {
+      "id": "API-064",
+      "name": "연동 세션 재제출",
+      "method": "POST",
+      "endpoint": "/submissions/{id}/resubmit",
+      "group": "reserved",
+      "auth": "OWNER",
+      "scope": "후순위·제외",
+      "status": "미착수",
+      "features": [
+        "JN-028 연동 세션 반려 후 재제출"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Authorization",
+            "값": "Bearer <access_token>",
+            "필수": "예"
+          }
+        ],
+        "params": [
+          {
+            "파라미터": "id",
+            "위치": "Path",
+            "설명": "반려된 연동 제출 ID"
+          }
+        ],
+        "body": null,
+        "notes": [
+          "Body 미정 (수정 가능 정보 미정). REJECTED → SUBMITTED, 최대 2회. 카메라 세션은 재제출할 수 없습니다."
+        ]
+      },
+      "responses": [
+        {
+          "status": 501,
+          "body": {
+            "code": "NOT_IMPLEMENTED",
+            "message": "MVP 범위 제외"
+          },
+          "notes": []
+        }
+      ],
+      "errors": [
+        {
+          "code": "NOT_IMPLEMENTED",
+          "status": 501,
+          "message": "아직 제공하지 않는 기능입니다."
+        }
+      ],
+      "other_sections": [
+        {
+          "heading": null,
+          "content": [
+            {
+              "type": "quote",
+              "text": "MVP 제외 — 경로만 예약하고 호출하면 501을 돌려줍니다."
+            }
+          ]
+        }
+      ],
+      "notion_url": "https://app.notion.com/p/41326201378781538fb3e4ebbe01004f"
+    },
+    {
+      "id": "API-065",
+      "name": "걸음 수 동기화",
+      "method": "POST",
+      "endpoint": "/integrations/health/{provider}/steps/sync",
+      "group": "reserved",
+      "auth": "PLAYER",
+      "scope": "후순위·제외",
+      "status": "미착수",
+      "features": [
+        "JN-029 걸음 수·자연 회복·던전 체력 제한"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Authorization",
+            "값": "Bearer <access_token>",
+            "필수": "예"
+          },
+          {
+            "헤더": "Content-Type",
+            "값": "application/json",
+            "필수": "예"
+          }
+        ],
+        "params": [],
+        "body": {
+          "days": [
+            {
+              "date": "2026-11-08",
+              "steps": 8200
+            }
+          ]
+        },
+        "notes": [
+          "(예상 형태) 하루 10,000보 상한, 2일 전까지 동기화 허용은 가정입니다."
+        ]
+      },
+      "responses": [
+        {
+          "status": 501,
+          "body": {
+            "code": "NOT_IMPLEMENTED",
+            "message": "MVP 범위 제외"
+          },
+          "notes": []
+        }
+      ],
+      "errors": [
+        {
+          "code": "NOT_IMPLEMENTED",
+          "status": 501,
+          "message": "아직 제공하지 않는 기능입니다."
+        }
+      ],
+      "other_sections": [
+        {
+          "heading": null,
+          "content": [
+            {
+              "type": "quote",
+              "text": "MVP 제외 — 경로만 예약하고 호출하면 501을 돌려줍니다."
+            }
+          ]
+        }
+      ],
+      "notion_url": "https://app.notion.com/p/413262013787818c87c0f88ea59a4019"
+    },
+    {
+      "id": "API-066",
+      "name": "체력·자연 회복 조회",
+      "method": "GET",
+      "endpoint": "/characters/me/stamina",
+      "group": "reserved",
+      "auth": "PLAYER",
+      "scope": "후순위·제외",
+      "status": "미착수",
+      "features": [
+        "JN-029 걸음 수·자연 회복·던전 체력 제한"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Authorization",
+            "값": "Bearer <access_token>",
+            "필수": "예"
+          }
+        ],
+        "params": [],
+        "body": null,
+        "notes": [
+          "Body 없음. 자연 회복량·체력 공식은 미정입니다."
+        ]
+      },
+      "responses": [
+        {
+          "status": 501,
+          "body": {
+            "code": "NOT_IMPLEMENTED",
+            "message": "MVP 범위 제외"
+          },
+          "notes": []
+        }
+      ],
+      "errors": [
+        {
+          "code": "NOT_IMPLEMENTED",
+          "status": 501,
+          "message": "아직 제공하지 않는 기능입니다."
+        }
+      ],
+      "other_sections": [
+        {
+          "heading": null,
+          "content": [
+            {
+              "type": "quote",
+              "text": "MVP 제외 — 경로만 예약하고 호출하면 501을 돌려줍니다."
+            }
+          ]
+        }
+      ],
+      "notion_url": "https://app.notion.com/p/41326201378781ac8e46f04a46c58abb"
+    },
+    {
+      "id": "API-067",
+      "name": "오각형 성장 리포트",
+      "method": "GET",
+      "endpoint": "/me/reports/growth",
+      "group": "reserved",
+      "auth": "PLAYER",
+      "scope": "후순위·제외",
+      "status": "미착수",
+      "features": [
+        "JN-032 오각형 성장 리포트"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Authorization",
+            "값": "Bearer <access_token>",
+            "필수": "예"
+          }
+        ],
+        "params": [
+          {
+            "파라미터": "week",
+            "위치": "Query",
+            "설명": "ISO 주차 (예: 2026-45)"
+          }
+        ],
+        "body": null,
+        "notes": [
+          "Body 없음. 다섯 번째 능력치 축·집계·기본 문구는 미정입니다."
+        ]
+      },
+      "responses": [
+        {
+          "status": 501,
+          "body": {
+            "code": "NOT_IMPLEMENTED",
+            "message": "MVP 범위 제외"
+          },
+          "notes": []
+        }
+      ],
+      "errors": [
+        {
+          "code": "NOT_IMPLEMENTED",
+          "status": 501,
+          "message": "아직 제공하지 않는 기능입니다."
+        }
+      ],
+      "other_sections": [
+        {
+          "heading": null,
+          "content": [
+            {
+              "type": "quote",
+              "text": "MVP 제외 — 경로만 예약하고 호출하면 501을 돌려줍니다."
+            }
+          ]
+        }
+      ],
+      "notion_url": "https://app.notion.com/p/41326201378781699d86fa9df0d4179f"
+    },
+    {
+      "id": "API-068",
+      "name": "주간 플랜",
+      "method": "GET",
+      "endpoint": "/me/weekly-plans",
+      "group": "reserved",
+      "auth": "PLAYER",
+      "scope": "후순위·제외",
+      "status": "미착수",
+      "features": [
+        "JN-034 주간 플랜"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Authorization",
+            "값": "Bearer <access_token>",
+            "필수": "예"
+          }
+        ],
+        "params": [],
+        "body": null,
+        "notes": [
+          "Body 없음. 고객 필요성·운동량 정책·개인화 범위가 전부 미정입니다."
+        ]
+      },
+      "responses": [
+        {
+          "status": 501,
+          "body": {
+            "code": "NOT_IMPLEMENTED",
+            "message": "MVP 범위 제외"
+          },
+          "notes": []
+        }
+      ],
+      "errors": [
+        {
+          "code": "NOT_IMPLEMENTED",
+          "status": 501,
+          "message": "아직 제공하지 않는 기능입니다."
+        }
+      ],
+      "other_sections": [
+        {
+          "heading": null,
+          "content": [
+            {
+              "type": "quote",
+              "text": "MVP 제외 — 경로만 예약하고 호출하면 501을 돌려줍니다."
+            }
+          ]
+        }
+      ],
+      "notion_url": "https://app.notion.com/p/413262013787815a950ee74387993310"
+    },
+    {
+      "id": "API-069",
+      "name": "주간 레이드 결과 조회",
+      "method": "GET",
+      "endpoint": "/guilds/{guildId}/raids/{week}",
+      "group": "reserved",
+      "auth": "GUILD_MEMBER",
+      "scope": "범위 확인",
+      "status": "미착수",
+      "features": [
+        "JN-035 주간 레이드 운영·랭킹 확정"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Authorization",
+            "값": "Bearer <access_token>",
+            "필수": "예"
+          }
+        ],
+        "params": [
+          {
+            "파라미터": "guildId",
+            "위치": "Path",
+            "설명": "길드 ID"
+          },
+          {
+            "파라미터": "week",
+            "위치": "Path",
+            "설명": "ISO 주차 (예: 2026-45)"
+          }
+        ],
+        "body": null,
+        "notes": [
+          "Body 없음. 주 시작·마감·확정 최대 기한·보스 종류·공동 보상은 미정입니다."
+        ]
+      },
+      "responses": [
+        {
+          "status": 501,
+          "body": {
+            "code": "NOT_IMPLEMENTED",
+            "message": "범위 미확정"
+          },
+          "notes": []
+        }
+      ],
+      "errors": [
+        {
+          "code": "NOT_IMPLEMENTED",
+          "status": 501,
+          "message": "아직 제공하지 않는 기능입니다."
+        }
+      ],
+      "other_sections": [
+        {
+          "heading": null,
+          "content": [
+            {
+              "type": "quote",
+              "text": "범위 확인 — 경로만 예약하고 호출하면 501을 돌려줍니다."
+            }
+          ]
+        }
+      ],
+      "notion_url": "https://app.notion.com/p/41326201378781259ba8c652042c7eac"
+    },
+    {
+      "id": "API-070",
+      "name": "주간 랭킹 조회",
+      "method": "GET",
+      "endpoint": "/raids/{week}/rankings",
+      "group": "reserved",
+      "auth": "PLAYER",
+      "scope": "범위 확인",
+      "status": "미착수",
+      "features": [
+        "JN-035 주간 레이드 운영·랭킹 확정"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Authorization",
+            "값": "Bearer <access_token>",
+            "필수": "예"
+          }
+        ],
+        "params": [
+          {
+            "파라미터": "week",
+            "위치": "Path",
+            "설명": "ISO 주차"
+          },
+          {
+            "파라미터": "scope",
+            "위치": "Query",
+            "설명": "GUILD 또는 PERSONAL"
+          },
+          {
+            "파라미터": "cursor",
+            "위치": "Query",
+            "설명": "페이지 (선택)"
+          }
+        ],
+        "body": null,
+        "notes": [
+          "Body 없음. 랭킹 정책은 미정입니다."
+        ]
+      },
+      "responses": [
+        {
+          "status": 501,
+          "body": {
+            "code": "NOT_IMPLEMENTED",
+            "message": "범위 미확정"
+          },
+          "notes": []
+        }
+      ],
+      "errors": [
+        {
+          "code": "NOT_IMPLEMENTED",
+          "status": 501,
+          "message": "아직 제공하지 않는 기능입니다."
+        }
+      ],
+      "other_sections": [
+        {
+          "heading": null,
+          "content": [
+            {
+              "type": "quote",
+              "text": "범위 확인 — 경로만 예약하고 호출하면 501을 돌려줍니다."
+            }
+          ]
+        }
+      ],
+      "notion_url": "https://app.notion.com/p/41326201378781a8b6e9ee72fb50496b"
+    }
+  ]
+}

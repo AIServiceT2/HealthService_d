@@ -1,0 +1,1030 @@
+{
+  "title": "전운시 DB (ERD)",
+  "exported_at": "2026-11-10T05:12:16.006Z",
+  "source": "https://app.notion.com/p/41326201378781cbb4c3c015193d2f88",
+  "table_count": 15,
+  "tables": [
+    {
+      "name": "EXERCISE_TYPE",
+      "label": "운동 종류",
+      "columns": [
+        {
+          "name": "code",
+          "type": "VARCHAR",
+          "constraints": [
+            "PK"
+          ],
+          "description": "운동 종류 코드 (SQUAT 등)"
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR",
+          "constraints": [
+            "NOT NULL"
+          ],
+          "description": "운동 종류 이름 (스쿼트 등)"
+        },
+        {
+          "name": "daily_cap",
+          "type": "INT",
+          "constraints": [
+            "NOT NULL"
+          ],
+          "description": "운동별 일일 인정 횟수 상한 (스쿼트 200회)"
+        }
+      ]
+    },
+    {
+      "name": "REJECT_REASON",
+      "label": "반려 사유",
+      "columns": [
+        {
+          "name": "code",
+          "type": "VARCHAR",
+          "constraints": [
+            "PK"
+          ],
+          "description": "반려 사유 코드"
+        },
+        {
+          "name": "label",
+          "type": "VARCHAR",
+          "constraints": [
+            "NOT NULL"
+          ],
+          "description": "반려 사유 이름 (기록 이상 / 본인 확인 실패 / 도용 의심)"
+        }
+      ]
+    },
+    {
+      "name": "USER",
+      "label": "사용자",
+      "columns": [
+        {
+          "name": "id",
+          "type": "UUID",
+          "constraints": [
+            "PK"
+          ],
+          "description": "사용자 고유 식별자"
+        },
+        {
+          "name": "nickname",
+          "type": "VARCHAR",
+          "constraints": [
+            "NOT NULL"
+          ],
+          "description": "사용자 닉네임 (LLM에 전달하지 않음)"
+        },
+        {
+          "name": "birth_date",
+          "type": "DATE",
+          "constraints": [
+            "NOT NULL"
+          ],
+          "description": "생년월일 (14세 미만 가입 불가)"
+        },
+        {
+          "name": "guild_id",
+          "type": "UUID",
+          "constraints": [
+            "FK",
+            "NULL 허용"
+          ],
+          "description": "소속 길드 ID"
+        }
+      ]
+    },
+    {
+      "name": "GUILD",
+      "label": "길드",
+      "columns": [
+        {
+          "name": "id",
+          "type": "UUID",
+          "constraints": [
+            "PK"
+          ],
+          "description": "길드 고유 식별자"
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR",
+          "constraints": [
+            "NOT NULL"
+          ],
+          "description": "길드 이름 (LLM 및 확인자 화면에 전달하지 않음)"
+        },
+        {
+          "name": "leader_user_id",
+          "type": "UUID",
+          "constraints": [
+            "FK",
+            "NOT NULL"
+          ],
+          "description": "길드장 사용자 ID"
+        }
+      ]
+    },
+    {
+      "name": "CHARACTER",
+      "label": "캐릭터",
+      "columns": [
+        {
+          "name": "user_id",
+          "type": "UUID",
+          "constraints": [
+            "PK",
+            "FK"
+          ],
+          "description": "캐릭터 소유 사용자 ID"
+        },
+        {
+          "name": "exp",
+          "type": "INT",
+          "constraints": [
+            "NOT NULL",
+            "DEFAULT 0"
+          ],
+          "description": "캐릭터 경험치 (레벨은 경험치를 기준으로 계산)"
+        },
+        {
+          "name": "avatar_id",
+          "type": "VARCHAR",
+          "constraints": [
+            "NULL"
+          ],
+          "description": "선택한 아바타 (선택 범위 미정)"
+        }
+      ]
+    },
+    {
+      "name": "WORKOUT_SUBMISSION",
+      "label": "운동 제출",
+      "columns": [
+        {
+          "name": "id",
+          "type": "UUID",
+          "constraints": [
+            "PK"
+          ],
+          "description": "운동 제출 고유 식별자"
+        },
+        {
+          "name": "user_id",
+          "type": "UUID",
+          "constraints": [
+            "FK",
+            "NOT NULL"
+          ],
+          "description": "운동 신청 사용자 ID"
+        },
+        {
+          "name": "session_id",
+          "type": "UUID",
+          "constraints": [
+            "FK",
+            "UNIQUE",
+            "NOT NULL"
+          ],
+          "description": "운동 세션 ID (세션당 제출 1건)"
+        },
+        {
+          "name": "exercise_code",
+          "type": "VARCHAR",
+          "constraints": [
+            "FK",
+            "NOT NULL"
+          ],
+          "description": "운동 종류 코드"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR",
+          "constraints": [
+            "NOT NULL"
+          ],
+          "description": "제출 상태 (SUBMITTED ~ REVOKED, 총 9개 상태)"
+        },
+        {
+          "name": "started_at",
+          "type": "TIMESTAMP",
+          "constraints": [
+            "NOT NULL"
+          ],
+          "description": "운동 시작 시각"
+        },
+        {
+          "name": "ended_at",
+          "type": "TIMESTAMP",
+          "constraints": [
+            "NOT NULL"
+          ],
+          "description": "운동 종료 시각"
+        },
+        {
+          "name": "counted_reps",
+          "type": "INT",
+          "constraints": [
+            "NOT NULL"
+          ],
+          "description": "서버에서 재계산한 최종 인정 횟수"
+        },
+        {
+          "name": "version",
+          "type": "INT",
+          "constraints": [
+            "NOT NULL",
+            "DEFAULT 0"
+          ],
+          "description": "상태 변경마다 1 증가 (If-Match 동시 수정 검사)"
+        },
+        {
+          "name": "confidence",
+          "type": "FLOAT",
+          "constraints": [
+            "NOT NULL"
+          ],
+          "description": "AI 신뢰도 (0~1, 기준 미확정)"
+        },
+        {
+          "name": "approval_path",
+          "type": "VARCHAR",
+          "constraints": [
+            "NOT NULL"
+          ],
+          "description": "승인 방식 (AI_AUTO / REVIEWER)"
+        },
+        {
+          "name": "ai_story",
+          "type": "TEXT",
+          "constraints": [
+            "NULL"
+          ],
+          "description": "AI 생성 스토리 (L3)"
+        },
+        {
+          "name": "ai_form_tip",
+          "type": "TEXT",
+          "constraints": [
+            "NULL"
+          ],
+          "description": "AI 생성 운동 자세 팁 (L4)"
+        },
+        {
+          "name": "ai_summary",
+          "type": "TEXT",
+          "constraints": [
+            "NULL"
+          ],
+          "description": "AI 분석 요약 (L1)"
+        },
+        {
+          "name": "ai_flags",
+          "type": "TEXT",
+          "constraints": [
+            "NULL"
+          ],
+          "description": "AI 분석 특이사항 (L2)"
+        }
+      ]
+    },
+    {
+      "name": "REP_EVENT",
+      "label": "반복 운동 기록",
+      "columns": [
+        {
+          "name": "submission_id",
+          "type": "UUID",
+          "constraints": [
+            "PK",
+            "FK"
+          ],
+          "description": "운동 제출 ID"
+        },
+        {
+          "name": "rep_no",
+          "type": "INT",
+          "constraints": [
+            "PK"
+          ],
+          "description": "반복 운동 번호"
+        },
+        {
+          "name": "ts",
+          "type": "TIMESTAMP",
+          "constraints": [
+            "NOT NULL"
+          ],
+          "description": "반복 운동 발생 시각"
+        },
+        {
+          "name": "counted",
+          "type": "BOOLEAN",
+          "constraints": [
+            "NOT NULL"
+          ],
+          "description": "운동 인정 여부"
+        },
+        {
+          "name": "keypoints",
+          "type": "JSONB",
+          "constraints": [
+            "NULL"
+          ],
+          "description": "관절 좌표 데이터 (얼굴 정보 제외)"
+        }
+      ]
+    },
+    {
+      "name": "SUBMISSION_SNAPSHOT",
+      "label": "제출 보상 스냅샷",
+      "columns": [
+        {
+          "name": "submission_id",
+          "type": "UUID",
+          "constraints": [
+            "PK",
+            "FK"
+          ],
+          "description": "운동 제출 ID"
+        },
+        {
+          "name": "catalog_version",
+          "type": "VARCHAR",
+          "constraints": [
+            "NOT NULL"
+          ],
+          "description": "적용된 카탈로그 버전"
+        },
+        {
+          "name": "hit_count",
+          "type": "INT",
+          "constraints": [
+            "NOT NULL"
+          ],
+          "description": "적중 횟수"
+        },
+        {
+          "name": "exp",
+          "type": "INT",
+          "constraints": [
+            "NOT NULL"
+          ],
+          "description": "지급 예정 경험치"
+        },
+        {
+          "name": "total_damage",
+          "type": "INT",
+          "constraints": [
+            "NOT NULL"
+          ],
+          "description": "총 피해량"
+        },
+        {
+          "name": "weakness_multiplier",
+          "type": "FLOAT",
+          "constraints": [
+            "NOT NULL"
+          ],
+          "description": "약점 공격 배율"
+        },
+        {
+          "name": "drop_count",
+          "type": "INT",
+          "constraints": [
+            "NOT NULL"
+          ],
+          "description": "아이템 드롭 횟수"
+        }
+      ]
+    },
+    {
+      "name": "DAILY_CAP_RESERVATION",
+      "label": "일일 상한 예약",
+      "columns": [
+        {
+          "name": "submission_id",
+          "type": "UUID",
+          "constraints": [
+            "PK",
+            "FK"
+          ],
+          "description": "운동 제출 ID"
+        },
+        {
+          "name": "amount",
+          "type": "INT",
+          "constraints": [
+            "NOT NULL"
+          ],
+          "description": "보상 대상 인정 횟수"
+        },
+        {
+          "name": "released_at",
+          "type": "TIMESTAMP",
+          "constraints": [
+            "NULL"
+          ],
+          "description": "예약 해제 시각 (취소 및 반려 시 해제)"
+        }
+      ]
+    },
+    {
+      "name": "REVIEW_REQUEST",
+      "label": "검토 요청",
+      "columns": [
+        {
+          "name": "submission_id",
+          "type": "UUID",
+          "constraints": [
+            "PK",
+            "FK"
+          ],
+          "description": "운동 제출 ID"
+        },
+        {
+          "name": "reviewer_user_id",
+          "type": "UUID",
+          "constraints": [
+            "FK",
+            "NOT NULL"
+          ],
+          "description": "검토자 사용자 ID (신청자 본인 불가)"
+        },
+        {
+          "name": "requested_at",
+          "type": "TIMESTAMP",
+          "constraints": [
+            "NOT NULL"
+          ],
+          "description": "확인 요청 시각"
+        },
+        {
+          "name": "reason_code",
+          "type": "VARCHAR",
+          "constraints": [
+            "FK",
+            "NULL"
+          ],
+          "description": "반려 사유 코드 (반려 시 필수)"
+        },
+        {
+          "name": "reason_text",
+          "type": "TEXT",
+          "constraints": [
+            "NULL"
+          ],
+          "description": "반려 상세 내용 (반려 시 필수)"
+        }
+      ]
+    },
+    {
+      "name": "REWARD_LEDGER",
+      "label": "보상 지급 기록",
+      "columns": [
+        {
+          "name": "submission_id",
+          "type": "UUID",
+          "constraints": [
+            "PK",
+            "FK"
+          ],
+          "description": "운동 제출 ID (멱등성 보장 키)"
+        },
+        {
+          "name": "rewarded_at",
+          "type": "TIMESTAMP",
+          "constraints": [
+            "NOT NULL"
+          ],
+          "description": "실제 보상 지급 시각 (보호 기간 24시간)"
+        }
+      ]
+    },
+    {
+      "name": "ITEM",
+      "label": "아이템",
+      "columns": [
+        {
+          "name": "id",
+          "type": "UUID",
+          "constraints": [
+            "PK"
+          ],
+          "description": "아이템 고유 식별자"
+        },
+        {
+          "name": "user_id",
+          "type": "UUID",
+          "constraints": [
+            "FK",
+            "NOT NULL"
+          ],
+          "description": "아이템 보유 사용자 ID"
+        },
+        {
+          "name": "submission_id",
+          "type": "UUID",
+          "constraints": [
+            "FK",
+            "NOT NULL"
+          ],
+          "description": "아이템 획득과 연결된 운동 제출 ID"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR",
+          "constraints": [
+            "NOT NULL"
+          ],
+          "description": "아이템 상태 (LOCKED / 해제 상태명 미정)"
+        }
+      ]
+    },
+    {
+      "name": "WORKOUT_SESSION",
+      "label": "운동 세션",
+      "columns": [
+        {
+          "name": "id",
+          "type": "UUID",
+          "constraints": [
+            "PK"
+          ],
+          "description": "운동 세션 고유 식별자"
+        },
+        {
+          "name": "user_id",
+          "type": "UUID",
+          "constraints": [
+            "FK",
+            "NOT NULL"
+          ],
+          "description": "세션을 시작한 사용자 ID"
+        },
+        {
+          "name": "exercise_code",
+          "type": "VARCHAR",
+          "constraints": [
+            "FK",
+            "NOT NULL"
+          ],
+          "description": "운동 종류 코드"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR",
+          "constraints": [
+            "NOT NULL"
+          ],
+          "description": "세션 상태 (ACTIVE / PAUSED / SUBMITTED / DISCARDED)"
+        },
+        {
+          "name": "goal_reps",
+          "type": "INT",
+          "constraints": [
+            "NULL"
+          ],
+          "description": "목표 횟수"
+        },
+        {
+          "name": "goal_sets",
+          "type": "INT",
+          "constraints": [
+            "NULL"
+          ],
+          "description": "목표 세트"
+        },
+        {
+          "name": "target_type",
+          "type": "VARCHAR",
+          "constraints": [
+            "NULL"
+          ],
+          "description": "공략 대상 종류 (던전 / 보스, 데모 대상 미정)"
+        },
+        {
+          "name": "target_id",
+          "type": "UUID",
+          "constraints": [
+            "NULL"
+          ],
+          "description": "공략 대상 ID"
+        },
+        {
+          "name": "liveness_passed",
+          "type": "BOOLEAN",
+          "constraints": [
+            "NULL"
+          ],
+          "description": "무작위 동작 확인 통과 여부 (확인 전 NULL)"
+        },
+        {
+          "name": "started_at",
+          "type": "TIMESTAMP",
+          "constraints": [
+            "NOT NULL"
+          ],
+          "description": "세션 시작 시각"
+        }
+      ]
+    },
+    {
+      "name": "POSE_CHUNK",
+      "label": "관절 좌표 청크",
+      "columns": [
+        {
+          "name": "session_id",
+          "type": "UUID",
+          "constraints": [
+            "PK",
+            "FK"
+          ],
+          "description": "운동 세션 ID"
+        },
+        {
+          "name": "seq",
+          "type": "INT",
+          "constraints": [
+            "PK"
+          ],
+          "description": "청크 순번 (재전송 시 같은 seq는 덮어씀)"
+        },
+        {
+          "name": "frames",
+          "type": "JSONB",
+          "constraints": [
+            "NOT NULL"
+          ],
+          "description": "프레임별 관절 좌표 (얼굴 정보 제외)"
+        },
+        {
+          "name": "received_at",
+          "type": "TIMESTAMP",
+          "constraints": [
+            "NOT NULL"
+          ],
+          "description": "서버 수신 시각"
+        }
+      ]
+    },
+    {
+      "name": "GUILD_INVITATION",
+      "label": "길드 초대 코드",
+      "columns": [
+        {
+          "name": "code",
+          "type": "VARCHAR",
+          "constraints": [
+            "PK"
+          ],
+          "description": "초대 코드"
+        },
+        {
+          "name": "guild_id",
+          "type": "UUID",
+          "constraints": [
+            "FK",
+            "NOT NULL"
+          ],
+          "description": "초대할 길드 ID"
+        },
+        {
+          "name": "created_by",
+          "type": "UUID",
+          "constraints": [
+            "FK",
+            "NOT NULL"
+          ],
+          "description": "발급한 길드장 사용자 ID"
+        },
+        {
+          "name": "expires_at",
+          "type": "TIMESTAMP",
+          "constraints": [
+            "NOT NULL"
+          ],
+          "description": "만료 시각"
+        }
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "from": "GUILD",
+      "cardinality": "||--o{",
+      "to": "USER",
+      "label": "소속 (0~1)"
+    },
+    {
+      "from": "USER",
+      "cardinality": "||--o{",
+      "to": "GUILD",
+      "label": "길드장"
+    },
+    {
+      "from": "USER",
+      "cardinality": "||--||",
+      "to": "CHARACTER",
+      "label": "캐릭터 1개"
+    },
+    {
+      "from": "USER",
+      "cardinality": "||--o{",
+      "to": "WORKOUT_SUBMISSION",
+      "label": "신청"
+    },
+    {
+      "from": "USER",
+      "cardinality": "||--o{",
+      "to": "WORKOUT_SESSION",
+      "label": "운동 세션"
+    },
+    {
+      "from": "WORKOUT_SESSION",
+      "cardinality": "||--o|",
+      "to": "WORKOUT_SUBMISSION",
+      "label": "제출 (최대 1)"
+    },
+    {
+      "from": "WORKOUT_SESSION",
+      "cardinality": "||--o{",
+      "to": "POSE_CHUNK",
+      "label": "좌표 청크"
+    },
+    {
+      "from": "GUILD",
+      "cardinality": "||--o{",
+      "to": "GUILD_INVITATION",
+      "label": "초대 코드"
+    },
+    {
+      "from": "EXERCISE_TYPE",
+      "cardinality": "||--o{",
+      "to": "WORKOUT_SUBMISSION",
+      "label": "운동 종류"
+    },
+    {
+      "from": "WORKOUT_SUBMISSION",
+      "cardinality": "||--o{",
+      "to": "REP_EVENT",
+      "label": "렍 기록"
+    },
+    {
+      "from": "WORKOUT_SUBMISSION",
+      "cardinality": "||--o|",
+      "to": "SUBMISSION_SNAPSHOT",
+      "label": "보상 스냅샷 (PREPARED부터)"
+    },
+    {
+      "from": "WORKOUT_SUBMISSION",
+      "cardinality": "||--o|",
+      "to": "DAILY_CAP_RESERVATION",
+      "label": "상한 예약"
+    },
+    {
+      "from": "WORKOUT_SUBMISSION",
+      "cardinality": "||--o|",
+      "to": "REVIEW_REQUEST",
+      "label": "확인 요청 (최대 1)"
+    },
+    {
+      "from": "USER",
+      "cardinality": "||--o{",
+      "to": "REVIEW_REQUEST",
+      "label": "확인자"
+    },
+    {
+      "from": "REJECT_REASON",
+      "cardinality": "||--o{",
+      "to": "REVIEW_REQUEST",
+      "label": "반려 사유"
+    },
+    {
+      "from": "WORKOUT_SUBMISSION",
+      "cardinality": "||--o|",
+      "to": "REWARD_LEDGER",
+      "label": "지급 (한 번만)"
+    },
+    {
+      "from": "WORKOUT_SUBMISSION",
+      "cardinality": "||--o{",
+      "to": "ITEM",
+      "label": "획득"
+    },
+    {
+      "from": "USER",
+      "cardinality": "||--o{",
+      "to": "ITEM",
+      "label": "보유"
+    }
+  ],
+  "changes_from_DATA_MODEL_md": [
+    {
+      "바꾼 곳": "운동 종류·일일 상한",
+      "DATA-MODEL.md": "각 테이블에 exercise_type 문자열, 상한 200은 설명에만 있음",
+      "3NF 안": "EXERCISE_TYPE(code, name, daily_cap)으로 분리, 다른 테이블은 exercise_code로 참조",
+      "이유": "상한은 운동 종류에 딸린 값. 테이블마다 적으면 같은 값이 여러 곳에 생김"
+    },
+    {
+      "바꾼 곳": "일일 상한 예약의 날짜·운동 종류",
+      "DATA-MODEL.md": "예약 테이블에 date, exercise_type 보관",
+      "3NF 안": "뺀. 제출건의 started_at(KST)·exercise_code에서 구함",
+      "이유": "제출건에 이미 있는 값을 한 번 더 저장하는 중복"
+    },
+    {
+      "바꾼 곳": "보상 대상 인정량",
+      "DATA-MODEL.md": "제출건 rewardable_reps와 예약 amount 둘 다",
+      "3NF 안": "예약 amount 하나로 둠 [가정]",
+      "이유": "둘이 같은 값이면 한쪽만 바뀌는 이상이 생김. 둘이 다를 수 있는지(부분 예약)는 팀 확인"
+    },
+    {
+      "바꾼 곳": "보상 스냅샷",
+      "DATA-MODEL.md": "제출건의 snapshot JSON 한 칸",
+      "3NF 안": "SUBMISSION_SNAPSHOT 테이블, 값마다 칼럼",
+      "이유": "JSON 한 칸에 여러 값을 넣으면 1NF(원자값)부터 어긋남. 확정 능력치는 축이 미정이라 칼럼에서 뺀"
+    },
+    {
+      "바꾼 곳": "스냅샷의 확신도",
+      "DATA-MODEL.md": "스냅샷에도 확신도",
+      "3NF 안": "제출건 confidence 하나만",
+      "이유": "같은 사실을 두 번 저장하는 중복"
+    },
+    {
+      "바꾼 곳": "관절 좌표·렍 타임스탬프",
+      "DATA-MODEL.md": "제출건 pose_data JSON 한 칸",
+      "3NF 안": "REP_EVENT(제출건, 렍 번호)로 분리",
+      "이유": "렍마다 반복되는 값이라 행으로 나눔. 렍 하나의 관절 좌표 묶음(keypoints)은 한 값으로 취급"
+    },
+    {
+      "바꾼 곳": "지급 내역 수치",
+      "DATA-MODEL.md": "exp, stat_exp, damage를 스냅샷과 따로 보관",
+      "3NF 안": "수치는 스냅샷에만, 지급 내역은 rewarded_at만",
+      "이유": "US-04는 \"스냅샷에 저장된 값만큼\" 지급하므로 같은 값의 중복. stat_exp는 능력치 모델이 미정이라 뺀"
+    },
+    {
+      "바꾼 곳": "보호 기간 끝",
+      "DATA-MODEL.md": "protection_ends_at 보관",
+      "3NF 안": "뺀. rewarded_at + 24시간으로 계산",
+      "이유": "다른 칼럼에서 계산되는 값(이행 종속)"
+    },
+    {
+      "바꾼 곳": "캐릭터 레벨",
+      "DATA-MODEL.md": "level, exp 둘 다",
+      "3NF 안": "exp만, 레벨은 계산 [가정]",
+      "이유": "레벨이 경험치로 정해지면 user_id → exp → level 이행 종속. 레벨이 따로 오르는 규칙이면 다시 넣음"
+    },
+    {
+      "바꾼 곳": "반려 사유",
+      "DATA-MODEL.md": "문자열 3종",
+      "3NF 안": "REJECT_REASON 코드 테이블",
+      "이유": "값 목록을 한 곳에서 관리"
+    },
+    {
+      "바꾼 곳": "아이템 기본 키",
+      "DATA-MODEL.md": "없음",
+      "3NF 안": "ITEM.id 추가",
+      "이유": "같은 제출건으로 아이템 여러 개를 얻을 수 있어 식별자가 필요"
+    },
+    {
+      "바꾼 곳": "운동 세션 (API 명세 반영)",
+      "DATA-MODEL.md": "없음",
+      "3NF 안": "WORKOUT_SESSION·POSE_CHUNK 추가, 제출건 session_id를 FK로",
+      "이유": "세션 시작·좌표 청크 업로드·일시중지·재개·폐기(API-020~027)를 저장할 곳이 필요"
+    },
+    {
+      "바꾼 곳": "무작위 동작 확인 결과 (API 명세 반영)",
+      "DATA-MODEL.md": "제출건 liveness_passed",
+      "3NF 안": "세션 liveness_passed로 옮김",
+      "이유": "제출 전 세션 중에 정해지는 값. 제출건은 session_id로 참조해 중복 저장을 피함"
+    },
+    {
+      "바꾼 곳": "제출건 버전 (API 명세 반영)",
+      "DATA-MODEL.md": "없음",
+      "3NF 안": "WORKOUT_SUBMISSION.version 추가",
+      "이유": "취소·확인 요청·승인·반려 API의 If-Match 동시 수정 검사"
+    },
+    {
+      "바꾼 곳": "길드 초대 (API 명세 반영)",
+      "DATA-MODEL.md": "없음",
+      "3NF 안": "GUILD_INVITATION 추가",
+      "이유": "초대 코드 발급·가입(API-012·013)"
+    },
+    {
+      "바꾼 곳": "확인 요청 시각 (API 명세 반영)",
+      "DATA-MODEL.md": "없음",
+      "3NF 안": "REVIEW_REQUEST.requested_at 추가",
+      "이유": "받은 확인 요청 목록(API-036) 정렬·표시"
+    },
+    {
+      "바꾼 곳": "캐릭터 아바타 (API 명세 반영)",
+      "DATA-MODEL.md": "없음",
+      "3NF 안": "CHARACTER.avatar_id(NULL 허용) 추가 [가정]",
+      "이유": "캐릭터 생성·수정(API-006·008) 입력. 선택 범위는 미정"
+    }
+  ],
+  "undecided": [
+    "보상 대상 인정량을 부분만 예약할 수 있는지 (예: 180회 상태에서 30회 → 20만 인정?) → 된다면 예약 amount와 인정량을 따로 둠",
+    "캐릭터 레벨이 경험치로만 정해지는지",
+    "확정 능력치의 축(오각형 5축 미정) → 정해지면 SNAPSHOT_STAT(submission_id, axis, value) 테이블 추가",
+    "아이템 카탈로그·LOCKED 해제 뒤 상태 이름, 공략 대상(던전 적 / 주간 보스) 모델",
+    "로그인 방식 → 사용자 인증 필드(리프레시 토큰 등 테이블), \"지인\" 정의 → 친구 목록 모델",
+    "길드장은 그 길드의 소속원이어야 한다는 제약을 DB에서 걸지 서버 코드에서 검사할지",
+    "운영자 역할 저장 방식, 문의(INQUIRY)·카탈로그 버전(CATALOG) 테이블은 범위 확인 기능이라 MVP 포함이 확정되면 추가",
+    "POSE_CHUNK 원본 좌표의 보관·삭제 기간 (제출 후 REP_EVENT로 옮기고 지울지)"
+  ],
+  "table_summary": [
+    {
+      "번호": "1",
+      "테이블명": "EXERCISE_TYPE",
+      "역할": "운동 종류 관리",
+      "PK": "code"
+    },
+    {
+      "번호": "2",
+      "테이블명": "REJECT_REASON",
+      "역할": "반려 사유 관리",
+      "PK": "code"
+    },
+    {
+      "번호": "3",
+      "테이블명": "USER",
+      "역할": "사용자 관리",
+      "PK": "id"
+    },
+    {
+      "번호": "4",
+      "테이블명": "GUILD",
+      "역할": "길드 관리",
+      "PK": "id"
+    },
+    {
+      "번호": "5",
+      "테이블명": "CHARACTER",
+      "역할": "캐릭터 및 경험치 관리",
+      "PK": "user_id"
+    },
+    {
+      "번호": "6",
+      "테이블명": "WORKOUT_SUBMISSION",
+      "역할": "운동 제출 및 승인 관리",
+      "PK": "id"
+    },
+    {
+      "번호": "7",
+      "테이블명": "REP_EVENT",
+      "역할": "반복 운동별 기록",
+      "PK": "submission_id, rep_no"
+    },
+    {
+      "번호": "8",
+      "테이블명": "SUBMISSION_SNAPSHOT",
+      "역할": "제출 시점 보상 정보 보관",
+      "PK": "submission_id"
+    },
+    {
+      "번호": "9",
+      "테이블명": "DAILY_CAP_RESERVATION",
+      "역할": "일일 운동 상한 예약",
+      "PK": "submission_id"
+    },
+    {
+      "번호": "10",
+      "테이블명": "REVIEW_REQUEST",
+      "역할": "운동 검토 요청 관리",
+      "PK": "submission_id"
+    },
+    {
+      "번호": "11",
+      "테이블명": "REWARD_LEDGER",
+      "역할": "보상 지급 이력 및 중복 지급 방지",
+      "PK": "submission_id"
+    },
+    {
+      "번호": "12",
+      "테이블명": "ITEM",
+      "역할": "획득 아이템 관리",
+      "PK": "id"
+    },
+    {
+      "번호": "13",
+      "테이블명": "WORKOUT_SESSION",
+      "역할": "운동 세션 진행 상태 관리",
+      "PK": "id"
+    },
+    {
+      "번호": "14",
+      "테이블명": "POSE_CHUNK",
+      "역할": "세션 중 관절 좌표 청크 수신",
+      "PK": "session_id, seq"
+    },
+    {
+      "번호": "15",
+      "테이블명": "GUILD_INVITATION",
+      "역할": "길드 초대 코드 관리",
+      "PK": "code"
+    }
+  ],
+  "erd_mermaid": "erDiagram\n    GUILD ||--o{ USER : \"소속 (0~1)\"\n    USER ||--o{ GUILD : \"길드장\"\n    USER ||--|| CHARACTER : \"캐릭터 1개\"\n    USER ||--o{ WORKOUT_SUBMISSION : \"신청\"\n    USER ||--o{ WORKOUT_SESSION : \"운동 세션\"\n    WORKOUT_SESSION ||--o| WORKOUT_SUBMISSION : \"제출 (최대 1)\"\n    WORKOUT_SESSION ||--o{ POSE_CHUNK : \"좌표 청크\"\n    GUILD ||--o{ GUILD_INVITATION : \"초대 코드\"\n    EXERCISE_TYPE ||--o{ WORKOUT_SUBMISSION : \"운동 종류\"\n    WORKOUT_SUBMISSION ||--o{ REP_EVENT : \"렍 기록\"\n    WORKOUT_SUBMISSION ||--o| SUBMISSION_SNAPSHOT : \"보상 스냅샷 (PREPARED부터)\"\n    WORKOUT_SUBMISSION ||--o| DAILY_CAP_RESERVATION : \"상한 예약\"\n    WORKOUT_SUBMISSION ||--o| REVIEW_REQUEST : \"확인 요청 (최대 1)\"\n    USER ||--o{ REVIEW_REQUEST : \"확인자\"\n    REJECT_REASON ||--o{ REVIEW_REQUEST : \"반려 사유\"\n    WORKOUT_SUBMISSION ||--o| REWARD_LEDGER : \"지급 (한 번만)\"\n    WORKOUT_SUBMISSION ||--o{ ITEM : \"획득\"\n    USER ||--o{ ITEM : \"보유\"\n\n    EXERCISE_TYPE {\n        string code PK \"SQUAT 등\"\n        string name \"스쿼트\"\n        int daily_cap \"스쿼트 200\"\n    }\n    REJECT_REASON {\n        string code PK\n        string label \"기록이상/본인확인실패/도용의심\"\n    }\n    USER {\n        uuid id PK\n        string nickname \"LLM에 보내지 않음\"\n        date birth_date \"14세 미만 가입 불가\"\n        uuid guild_id FK \"nullable\"\n    }\n    GUILD {\n        uuid id PK\n        string name \"LLM·확인자 화면에 보내지 않음\"\n        uuid leader_user_id FK\n    }\n    CHARACTER {\n        uuid user_id PK, FK\n        int exp \"level은 exp로 계산\"\n        string avatar_id \"nullable, 선택 범위 미정\"\n    }\n    WORKOUT_SESSION {\n        uuid id PK\n        uuid user_id FK\n        string exercise_code FK\n        string status \"ACTIVE/PAUSED/SUBMITTED/DISCARDED\"\n        int goal_reps\n        int goal_sets\n        string target_type \"DUNGEON / BOSS, 미정\"\n        uuid target_id\n        bool liveness_passed \"무작위 동작 확인, 확인 전 NULL\"\n        timestamp started_at\n    }\n    POSE_CHUNK {\n        uuid session_id PK, FK\n        int seq PK\n        jsonb frames \"얼굴 제외 관절 좌표\"\n        timestamp received_at\n    }\n    WORKOUT_SUBMISSION {\n        uuid id PK\n        uuid user_id FK\n        uuid session_id FK \"UNIQUE\"\n        string exercise_code FK\n        string status \"SUBMITTED~REVOKED 9개\"\n        timestamp started_at\n        timestamp ended_at\n        int counted_reps \"서버 재계산 인정량\"\n        int version \"If-Match 동시 수정 검사\"\n        float confidence \"0~1, 기준 미확정\"\n        string approval_path \"AI_AUTO / REVIEWER\"\n        text ai_story \"L3\"\n        text ai_form_tip \"L4\"\n        text ai_summary \"L1\"\n        text ai_flags \"L2\"\n    }\n    REP_EVENT {\n        uuid submission_id PK, FK\n        int rep_no PK\n        timestamp ts\n        bool counted \"인정 여부\"\n        jsonb keypoints \"얼굴 제외 관절 좌표 묶음\"\n    }\n    SUBMISSION_SNAPSHOT {\n        uuid submission_id PK, FK\n        string catalog_version\n        int hit_count\n        int exp\n        int total_damage\n        float weakness_multiplier\n        int drop_count\n    }\n    DAILY_CAP_RESERVATION {\n        uuid submission_id PK, FK\n        int amount \"보상 대상 인정량\"\n        timestamp released_at \"취소·반려 시 해제\"\n    }\n    REVIEW_REQUEST {\n        uuid submission_id PK, FK\n        uuid reviewer_user_id FK \"신청자 본인 불가\"\n        timestamp requested_at\n        string reason_code FK \"반려 때 필수\"\n        text reason_text \"반려 때 필수\"\n    }\n    REWARD_LEDGER {\n        uuid submission_id PK, FK \"멱등 키\"\n        timestamp rewarded_at \"보호 기간 = +24시간\"\n    }\n    ITEM {\n        uuid id PK\n        uuid user_id FK\n        uuid submission_id FK\n        string status \"LOCKED / 해제 이름 미정\"\n    }\n    GUILD_INVITATION {\n        string code PK\n        uuid guild_id FK\n        uuid created_by FK \"길드장\"\n        timestamp expires_at\n    }"
+}
