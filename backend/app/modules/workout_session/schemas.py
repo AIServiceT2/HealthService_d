@@ -1,5 +1,7 @@
 """session API 입출력. JSON 키는 노션 API 명세서대로 camelCase, 파이썬 안에서는 snake_case."""
 
+from datetime import date
+
 from pydantic import BaseModel, ConfigDict
 from pydantic.alias_generators import to_camel
 
@@ -28,3 +30,18 @@ class ExerciseItem(_CamelModel):
 class ExercisesResponse(_CamelModel):
     catalog_version: str
     items: list[ExerciseItem]
+
+
+# ---- API-019 내 일일 상한 ----
+
+
+class DailyCapItem(_CamelModel):
+    exercise_code: str
+    cap: int
+    reserved: int
+    remaining: int
+
+
+class DailyCapsResponse(_CamelModel):
+    date: date
+    items: list[DailyCapItem]

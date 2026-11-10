@@ -11,8 +11,11 @@ from fastapi import APIRouter, Depends
 from app.core.stub import not_implemented
 from app.modules.auth.dependencies import get_current_user
 from app.modules.auth.models import User
+from app.modules.workout_session import service
 from app.modules.workout_session.catalog import CATALOG_VERSION, EXERCISES
 from app.modules.workout_session.schemas import (
+    DailyCapItem,
+    DailyCapsResponse,
     ExerciseCriteria,
     ExerciseItem,
     ExercisesResponse,
@@ -42,11 +45,25 @@ def api_018(_: User = Depends(get_current_user)) -> ExercisesResponse:
 @router.get(
     "/me/daily-caps",
     summary="[API-019] 내 일일 상한 조회",
-    description="권한: PLAYER",
-    status_code=501,
+    description=(
+        "권한: PLAYER. date는 KST. 임시: reserved는 제출(API-026)이 아직 없어 항상 0"
+    ),
+    response_model=DailyCapsResponse,
 )
-def api_019() -> None:
-    not_implemented()
+def api_019(user: User = Depends(get_current_user)) -> DailyCapsResponse:
+    day = service.today_kst()
+    return DailyCapsResponse(
+        date=day,
+        items=[
+            DailyCapItem(
+                exercise_code=c.exercise.code,
+                cap=c.exercise.daily_cap,
+                reserved=c.reserved,
+                remaining=c.remaining,
+            )
+            for c in service.daily_caps(user.id, day)
+        ],
+    )
 
 
 @router.post(
