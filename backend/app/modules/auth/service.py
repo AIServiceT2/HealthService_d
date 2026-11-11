@@ -72,6 +72,7 @@ def signup(db: Session, req: SignupRequest, today: date | None = None) -> User:
         password_hash=hash_password(req.password),
         nickname=req.nickname,
         birth_date=req.birth_date,
+        gender=req.gender,
     )
     db.add(user)
     try:

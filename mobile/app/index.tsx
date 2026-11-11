@@ -1,35 +1,70 @@
-import { useState } from 'react';
+// 시작 화면 (시안 '시작 화면'). 저장된 로그인이 살아 있으면 바로 홈(또는 캐릭터 만들기)으로 보낸다.
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ScrollView, Text, TextInput, StyleSheet } from 'react-native';
-import { ActionButton } from '../src/components/ActionButton';
-import { COLORS, FONT, RADIUS, SPACE, TOUCH_MIN } from '../src/theme/tokens';
-import { IS_MOCK_MODE, isSubmissionId } from '../src/api/submissions';
-export default function Home() {
-  const [id, setId] = useState(''); const router = useRouter();
-  const valid = isSubmissionId(id.trim());
-  const open = () => router.push({ pathname: '/workout/[id]', params: { id: id.trim() } });
-  return <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
-    <Text style={styles.eyebrow}>운동이 전투가 되는 순간</Text>
-    <Text style={styles.title}>오늘의 운동,{'\n'}얼마나 강해졌을까?</Text>
-    <Text style={styles.body}>운동 기록의 인정 횟수와 계산된 타격 수를 확인하세요.</Text>
-    <Text style={styles.label}>제출건 ID</Text>
-    <TextInput accessibilityLabel="제출건 ID" value={id} onChangeText={setId} autoCapitalize="none" autoCorrect={false}
-      placeholder="시드로 생성한 제출건 UUID" placeholderTextColor={COLORS.textMuted} style={styles.input}
-      onSubmitEditing={() => valid && open()} />
-    {id.length === 0 && <Text style={styles.hint}>제출건 ID를 입력하면 버튼을 누를 수 있어요.</Text>}
-    {id.length > 0 && !valid && <Text style={styles.error}>UUID 형식의 제출건 ID를 입력해 주세요.</Text>}
-    <ActionButton title="보상 미리보기" disabled={!valid} onPress={open} />
-    <Text style={styles.note}>첫 기능 시연 · US-02{'\n'}{IS_MOCK_MODE ? '목데이터 모드입니다. UUID로 예시 기록을 조회하며 서버에는 저장되지 않아요.' : '서버 시드로 만든 기록을 조회합니다. 아직 전투 결과가 지급된 상태는 아닙니다.'}</Text>
-  </ScrollView>;
+import Svg, { G, Path } from 'react-native-svg';
+import { api, tokenStore } from '../src/auth/session';
+import { HttpError } from '../src/api/http';
+import { BodyHero, FadeToBlack, OB, PillButton, ProgressDots, Screen } from '../src/onboarding/ui';
+
+export default function Start() {
+  const router = useRouter();
+  const [checking, setChecking] = useState(true);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        if (await tokenStore.get()) {
+          const me = await api.me();
+          if (!alive) return;
+          router.replace(me.hasCharacter ? '/home' : { pathname: '/onboarding/avatar', params: { existing: '1' } });
+          return;
+        }
+      } catch (error) {
+        // 토큰이 만료·폐기됐으면 지우고 시작 화면을 보여 준다. 네트워크 오류면 토큰은 둔다
+        if (error instanceof HttpError && error.status === 401) await tokenStore.clear();
+      }
+      if (alive) setChecking(false);
+    })();
+    return () => { alive = false; };
+  }, [router]);
+
+  return <Screen>
+    <Svg width={390} height={420} style={styles.lines} pointerEvents="none">
+      <G stroke="#2E2E2E" strokeWidth={1} fill="none">
+        <Path d="M-20 40 C 80 120, 140 20, 220 110 S 360 60, 420 150" />
+        <Path d="M-10 160 C 60 90, 150 200, 240 130 S 330 230, 410 180" />
+        <Path d="M40 -10 C 70 80, 20 160, 90 240" />
+        <Path d="M330 -10 C 300 90, 370 170, 310 260" />
+      </G>
+    </Svg>
+    <View style={styles.top}><ProgressDots count={3} active={0} /></View>
+    <View style={styles.heading}>
+      <Text style={styles.kicker}>전지적 운동 시점</Text>
+      <Text accessibilityRole="header" style={styles.h1}>운동한 만큼{'\n'}<Text style={{ color: OB.accent }}>캐릭터가 싸운다</Text></Text>
+    </View>
+    <View style={styles.hero}>
+      <BodyHero width={300} height={481} feet label="카메라가 관절 위치를 인식해 몸 위에 관절선을 그린 모습. 얼굴은 인식하지 않음" />
+      <FadeToBlack top={360} height={160} />
+    </View>
+    <View style={styles.bottom}>
+      {checking
+        ? <ActivityIndicator color={OB.accent} accessibilityLabel="로그인 상태 확인 중" />
+        : <>
+          <PillButton title="시작하기" arrow onPress={() => router.push('/onboarding/birth')} />
+          <PillButton title="이미 계정이 있습니다" variant="text" onPress={() => router.push('/login')} />
+        </>}
+    </View>
+  </Screen>;
 }
+
 const styles = StyleSheet.create({
-  page: { padding: SPACE.medium, gap: SPACE.medium, paddingBottom: SPACE.section },
-  eyebrow: { ...FONT.caption, color: COLORS.primary, marginTop: SPACE.large },
-  title: { ...FONT.title, color: COLORS.text },
-  body: { ...FONT.body, color: COLORS.textMuted, marginBottom: SPACE.large },
-  label: { ...FONT.body, color: COLORS.text },
-  input: { ...FONT.body, color: COLORS.text, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.control, minHeight: TOUCH_MIN, paddingHorizontal: SPACE.medium },
-  hint: { ...FONT.caption, color: COLORS.textMuted },
-  error: { ...FONT.caption, color: COLORS.danger },
-  note: { ...FONT.caption, color: COLORS.textMuted, marginTop: SPACE.large },
+  lines: { position: 'absolute', left: 0, top: 0 },
+  top: { paddingHorizontal: 28, paddingTop: 12 },
+  heading: { alignItems: 'center', marginTop: 20, gap: 2 },
+  kicker: { fontSize: 14, fontWeight: '600', letterSpacing: 2, color: OB.mutedStrong },
+  h1: { marginTop: 6, fontSize: 32, fontWeight: '600', lineHeight: 40, letterSpacing: -0.5, color: '#F7F7F7', textAlign: 'center' },
+  hero: { flex: 1, alignItems: 'center', justifyContent: 'flex-start', marginTop: 8 },
+  bottom: { paddingHorizontal: 24, paddingBottom: 24, gap: 4 },
 });

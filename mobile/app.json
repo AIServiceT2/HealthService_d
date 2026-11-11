@@ -1,1 +1,15 @@
-{ "expo": { "name": "전운시", "slug": "jeonunsi", "scheme": "jeonunsi", "userInterfaceStyle": "dark", "plugins": ["expo-router"], "android": { "package": "com.jeonunsi.mobile" } } }
+{
+  "expo": {
+    "name": "전운시",
+    "slug": "jeonunsi",
+    "scheme": "jeonunsi",
+    "userInterfaceStyle": "dark",
+    "plugins": [
+      "expo-router",
+      "expo-secure-store"
+    ],
+    "android": {
+      "package": "com.jeonunsi.mobile"
+    }
+  }
+}

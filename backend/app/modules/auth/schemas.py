@@ -22,6 +22,8 @@ class SignupRequest(CamelModel):
     # 앞뒤 공백을 지운 뒤 2~12자 (캐릭터·길드 이름과 같은 방식). 공백만 있으면 400
     nickname: Annotated[str, StringConstraints(strip_whitespace=True, min_length=2, max_length=12)]
     birth_date: date
+    # [추가] 선택 항목. 보내지 않거나 null이면 '선택하지 않음' (노션 API-001에 없음, 2026-11-11 팀 요청)
+    gender: Literal["MALE", "FEMALE"] | None = None
 
 
 class SignupResponse(CamelModel):

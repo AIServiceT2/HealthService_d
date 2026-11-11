@@ -29,7 +29,10 @@ router = APIRouter(tags=["auth"])
 @router.post(
     "/auth/signup",
     summary="[API-001] 회원 가입",
-    description="권한: NONE. 14세 미만·이메일 중복·형식 오류는 400 VALIDATION_FAILED",
+    description=(
+        "권한: NONE. 14세 미만·이메일 중복·형식 오류는 400 VALIDATION_FAILED. "
+        "gender(MALE|FEMALE|null, 선택)는 명세에 없는 추가 필드"
+    ),
     status_code=201,
     response_model=SignupResponse,
 )

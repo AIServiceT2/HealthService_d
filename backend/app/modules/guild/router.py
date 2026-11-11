@@ -31,6 +31,8 @@ from app.modules.guild.schemas import (
     InvitationCreated,
     LeaderDelegate,
     LeaderDelegated,
+    RecommendedGuildList,
+    RecommendedGuildRead,
 )
 
 # 입력 오류는 전역 처리기가 400 VALIDATION_FAILED로 돌려주므로, Swagger에 실제와 다른 422가
@@ -66,6 +68,57 @@ def create_guild(
     except service.AlreadyInGuild:
         raise AppError(409, "INVALID_STATE", "이미 다른 길드에 소속되어 있습니다.")
     return GuildCreated(guild_id=guild.id, name=guild.name, leader_user_id=guild.leader_user_id)
+
+
+# /guilds/{guild_id}보다 먼저 둔다 ('recommended'가 guild_id로 읽히지 않게)
+@router.get(
+    "/guilds/recommended",
+    summary="[추가] 추천 길드 목록",
+    description=(
+        "권한: PLAYER. 노션 명세에 없는 API (시안 'F-01 길드 가입'의 추천 길드, 2026-11-11 팀 요청). "
+        "길드원이 많은 순으로 최대 3개 [제안: 추천 기준 미정]. 길드장 닉네임은 보내지 않는다."
+    ),
+    response_model=RecommendedGuildList,
+    response_model_by_alias=True,
+    responses={401: _UNAUTHENTICATED},
+)
+def recommended_guilds(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    guilds = service.list_recommended_guilds(db)
+    return RecommendedGuildList(
+        items=[RecommendedGuildRead(guild_id=g.guild_id, name=g.name, member_count=g.member_count) for g in guilds]
+    )
+
+
+@router.post(
+    "/guilds/{guild_id}/members/me",
+    summary="[추가] 추천 길드에 가입",
+    description=(
+        "권한: PLAYER. 노션 명세에 없는 API (추천 길드를 골라 초대 코드 없이 가입, 2026-11-11 팀 요청). "
+        "응답은 API-013과 같은 { guildId }."
+    ),
+    response_model=GuildJoined,
+    response_model_by_alias=True,
+    responses={
+        401: _UNAUTHENTICATED,
+        404: {"model": ErrorResponse, "description": "NOT_FOUND 길드를 찾을 수 없습니다."},
+        409: {"model": ErrorResponse, "description": "INVALID_STATE 이미 길드에 소속되어 있습니다."},
+    },
+)
+def join_recommended_guild(
+    guild_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        joined = service.join_guild(db, user.id, guild_id)
+    except service.GuildNotFound:
+        raise AppError(404, "NOT_FOUND", "길드를 찾을 수 없습니다.")
+    except service.AlreadyInGuild:
+        raise AppError(409, "INVALID_STATE", "이미 길드에 소속되어 있습니다.")
+    return GuildJoined(guild_id=joined)
 
 
 @router.get(

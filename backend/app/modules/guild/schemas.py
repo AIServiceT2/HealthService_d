@@ -107,6 +107,18 @@ class GuildJoin(_CamelModel):
     invite_code: InviteCode
 
 
+class RecommendedGuildRead(_CamelModel):
+    guild_id: uuid.UUID
+    name: str
+    member_count: int
+
+
+class RecommendedGuildList(_CamelModel):
+    """추천 길드 응답 200: { items: [{ guildId, name, memberCount }] } [제안: 노션 명세에 없음]."""
+
+    items: list[RecommendedGuildRead]
+
+
 class GuildJoined(_CamelModel):
     """API-013 응답 200: { guildId }."""
 
