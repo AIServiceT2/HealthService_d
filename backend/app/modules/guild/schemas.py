@@ -119,6 +119,19 @@ class RecommendedGuildList(_CamelModel):
     items: list[RecommendedGuildRead]
 
 
+class AcquaintanceRead(_CamelModel):
+    user_id: uuid.UUID
+    nickname: str
+    # GUILD_LEADER | GUILD_MEMBER
+    relation: str
+
+
+class AcquaintanceList(_CamelModel):
+    """API-017 응답 200: { items: [{ userId, nickname, relation }] }."""
+
+    items: list[AcquaintanceRead]
+
+
 class GuildJoined(_CamelModel):
     """API-013 응답 200: { guildId }."""
 

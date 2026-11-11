@@ -1,7 +1,7 @@
 """guild API. 노션 '전운시 API 명세서' API-009~017.
 
 구현: API-009~016 (길드 생성·정보 조회·길드원 목록·초대 코드 발급·가입·탈퇴·내보내기·길드장 위임).
-API-017 지인 목록은 경로만 있고 501을 돌려준다.
+API-017 지인 목록은 노션 가안(같은 길드원)으로 구현.
 로그인 확인은 auth 모듈의 get_current_user (Bearer access token, JWT).
 에러 본문 { code, message, details }은 전역 처리기(app/core/errors.py)가 만든다.
 """
@@ -13,11 +13,12 @@ from sqlalchemy.orm import Session
 
 from app.core.db import get_db
 from app.core.errors import AppError
-from app.core.stub import not_implemented
 from app.modules.auth.dependencies import get_current_user
 from app.modules.auth.models import User
 from app.modules.guild import service
 from app.modules.guild.schemas import (
+    AcquaintanceList,
+    AcquaintanceRead,
     ErrorResponse,
     GuildCreate,
     GuildCreated,
@@ -343,8 +344,19 @@ def delegate_leader(
 @router.get(
     "/me/acquaintances",
     summary="[API-017] 확인 요청 가능한 지인 목록",
-    description="권한: PLAYER",
-    status_code=501,
+    description=(
+        "권한: PLAYER. 지인 = 같은 길드원(본인 제외), 노션 명세 가안. 길드장 먼저. 길드가 없으면 빈 목록. "
+        "확인 요청(API-035)은 이 목록에 있는 사람에게만 보낼 수 있다. '지인' 정의는 미정 [가안·팀 확인 필요]."
+    ),
+    response_model=AcquaintanceList,
+    response_model_by_alias=True,
+    responses={401: _UNAUTHENTICATED},
 )
-def api_017() -> None:
-    not_implemented()
+def list_acquaintances(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    items = service.list_acquaintances(db, user.id)
+    return AcquaintanceList(
+        items=[AcquaintanceRead(user_id=a.user_id, nickname=a.nickname, relation=a.relation) for a in items]
+    )

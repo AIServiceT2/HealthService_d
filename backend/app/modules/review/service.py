@@ -181,16 +181,12 @@ class NotAllowedReviewer(Exception):
 
 
 def allowed_reviewers(db: Session, user_id: uuid.UUID) -> set[uuid.UUID]:
-    """확인자로 고를 수 있는 사람. 지금은 '내 길드의 길드장'뿐이다 [가정·팀 확인 필요].
+    """확인자로 고를 수 있는 사람 = API-017 지인 목록 (같은 길드원, 본인 제외) [가안·팀 확인 필요].
 
-    "지인"을 어떻게 정할지(친구 목록 등)는 미정이라 아직 넣지 않았다 (PRD 미정 표, backlog US-07 미확정).
-    길드가 없거나 본인이 길드장이면 고를 사람이 없다.
+    "지인" 정의는 미정이라 노션 API-017 가안(같은 길드원)을 따른다 (PRD 미정 표, backlog US-07 미확정).
+    2026-11-11 팀 요청으로 '내 길드의 길드장만'에서 넓혔다. 길드가 없으면 고를 사람이 없다.
     """
-    user = db.get(User, user_id)
-    if user is None or user.guild_id is None:
-        return set()
-    leader = guild_service.get_guild_info(db, user_id, user.guild_id).leader_user_id
-    return {leader} - {user_id}
+    return {a.user_id for a in guild_service.list_acquaintances(db, user_id)}
 
 
 @dataclass(frozen=True)

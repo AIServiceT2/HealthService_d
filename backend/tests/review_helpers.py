@@ -52,7 +52,7 @@ def version_of(client, submission_id: str, headers) -> int:
 def leader_and_member(client) -> tuple[uuid.UUID, dict[str, str], dict[str, str]]:
     """길드장 1명과 같은 길드 소속원 1명. (길드장 user_id, 길드장 헤더, 소속원 헤더).
 
-    확인자는 지금 '내 길드의 길드장'만 고를 수 있다 (review/service.py allowed_reviewers).
+    확인자는 같은 길드원(API-017 지인 목록)만 고를 수 있다 (review/service.py allowed_reviewers).
     """
     guild_id, leader_id, leader_headers = new_guild(client)
     _, member_headers = join_with_code(client, guild_id, leader_headers)
