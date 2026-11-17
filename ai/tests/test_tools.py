@@ -172,3 +172,103 @@ def test_bottom_snapshot_rules() -> None:
     assert b.take(make_rep(start=0, dur=400)) is None  # bottom_t 200 ≠ 166 → 저장 안 함
     b.observe(False, 400, 170.0, np.array([400]), fr)  # 렙 밖 → 후보 버림
     assert b.image is None and b.take(make_rep(start=0, dur=332)) is None
+
+
+# --- webcam_demo 운동 선택 버튼·목표 횟수 (카메라·cv2 없이) -------------------------
+
+
+def test_demo_button_layout_and_hit() -> None:
+    from tools.webcam_demo import BUTTON_BAR_H, EXERCISE_BUTTONS, button_rects, hit_button
+
+    rects = button_rects(1280)
+    assert len(rects) == len(EXERCISE_BUTTONS) == 7
+    for (x0, y0, x1, y1), (nx0, _, _, _) in zip(rects, rects[1:], strict=False):
+        assert x0 < x1 <= nx0 and 0 <= y0 < y1 <= BUTTON_BAR_H  # 겹치지 않음
+    for i, (x0, y0, x1, y1) in enumerate(rects):
+        assert hit_button(rects, (x0 + x1) // 2, (y0 + y1) // 2) == i
+    assert hit_button(rects, 640, BUTTON_BAR_H + 50) is None  # 버튼 줄 아래
+
+
+@pytest.mark.parametrize(
+    "exercise",
+    [
+        "SQUAT",
+        "PUSHUP",
+        "SITUP",
+        "LUNGE",
+        "INVERTED_SHOULDER_PRESS",
+        "GLUTE_BRIDGE",
+        "SIDE_LEG_LIFT",
+    ],
+)
+def test_demo_select_exercise_and_reach_goal_of_5(exercise: str) -> None:
+    """버튼으로 운동을 고르면 그 운동으로 판정하고, 인정 5회에서 목표 달성이 된다."""
+    from tools import synth_floor, synth_more
+    from tools.webcam_demo import DEFAULT_TARGET_REPS, DEMO_CATALOG, Demo
+
+    if exercise == "SQUAT":
+        frames = synth_frames(SynthConfig(reps=varied_squats(6, seed=1)))
+    elif exercise in ("PUSHUP", "SITUP"):
+        angle = 75.0 if exercise == "PUSHUP" else 110.0
+        frames = synth_floor.synth_frames(
+            synth_floor.FloorSynthConfig(exercise, synth_floor.reps(6, angle))  # type: ignore[arg-type]
+        )
+    else:
+        angle = {
+            "LUNGE": 88.0,
+            "INVERTED_SHOULDER_PRESS": 80.0,
+            "GLUTE_BRIDGE": 8.0,
+            "SIDE_LEG_LIFT": 140.0,
+        }[exercise]
+        frames = synth_more.synth_frames(
+            synth_more.MoreSynthConfig(exercise, synth_floor.reps(6, angle))  # type: ignore[arg-type]
+        )
+    demo = Demo(720, 1280, "lite", "test", False, DEMO_CATALOG)
+    assert DEFAULT_TARGET_REPS == 5 and demo.target_reps == 5 and demo.exercise == "SQUAT"
+    assert demo.set_exercise(exercise, start_t=0)  # type: ignore[arg-type]
+    assert demo.meta.exercise_type == exercise
+    goal_seen_at: int | None = None
+    for f in frames:
+        demo.push(f)
+        if demo.goal_reached and goal_seen_at is None:
+            goal_seen_at = demo.runner.counter.accepted_count
+    assert goal_seen_at == 5  # 5번째 인정 렙에서 목표 달성
+    lines = demo.status_lines(15.0)
+    assert f"exercise {exercise}" in lines and any("DONE" in line for line in lines)
+    assert len(demo.graph_lines()) == 3
+
+
+def test_demo_unsupported_exercise_keeps_previous() -> None:
+    """옛 카탈로그(스쿼트만)에서 런지를 고르면 바꾸지 않고 스쿼트로 남는다."""
+    from tools.webcam_demo import Demo
+
+    demo = Demo(720, 1280, "lite", "test", False, "cat_2026-11-01")
+    assert not demo.set_exercise("LUNGE", start_t=0)
+    assert demo.exercise == "SQUAT" and demo.meta.exercise_type == "SQUAT"
+
+
+def test_demo_custom_target_reps() -> None:
+    from tools.webcam_demo import Demo
+
+    demo = Demo(720, 1280, "lite", "test", False, "cat_2026-11-17", target_reps=3)
+    for f in synth_frames(SynthConfig(reps=varied_squats(4, seed=2))):
+        demo.push(f)
+    assert demo.target_reps == 3 and demo.goal_reached
+
+
+def test_demo_leg_visibility_readout() -> None:
+    """데모 화면의 다리 가시도 표시: 엉덩이·무릎·발목 중 가장 낮은 값, 기준 미만이면 '!'."""
+    from rep_engine.schemas import Landmark
+    from tools.webcam_demo import Demo, leg_visibility
+
+    lms: list[Landmark | None] = [None] * 33
+    for i in range(11, 33):
+        lms[i] = Landmark(x=0.5, y=0.5, z=0.0, visibility=0.9)
+    lms[25] = Landmark(x=0.5, y=0.5, z=0.0, visibility=0.25)  # 왼무릎만 낮음
+    frame = Frame(t=0, landmarks=lms)
+    assert leg_visibility(frame) == (0.25, 0.9)
+    assert leg_visibility(Frame(t=0, landmarks=None)) == (None, None)
+    demo = Demo(720, 1280, "lite", "test", False, "cat_2026-11-17")
+    demo.push(frame)
+    line = next(x for x in demo.status_lines(15.0) if x.startswith("leg vis"))
+    assert line == "leg vis L 0.25! R 0.90 (need 0.30)"

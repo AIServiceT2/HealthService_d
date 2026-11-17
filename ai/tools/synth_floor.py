@@ -6,10 +6,15 @@
 
 - 푸시업: 손목은 바닥, 어깨는 손목 바로 위. 팔꿈치 내각 θ로 어깨 높이가 정해지고
   몸(어깨–엉덩이–무릎–발목)은 발목을 바닥에 둔 직선이다. `hip_sag`만큼 엉덩이를 내린다.
+  `knees="flat"`이면 무릎을 바닥에 대고(어깨–엉덩이–무릎 직선, 정강이는 바닥에 눕힘),
+  `knees="raised"`면 무릎을 대고 발을 60° 들어 올린다 (무릎 대고 하는 푸시업, D-78).
 - 윗몸 일으키기: 엉덩이·발목은 바닥, 허벅지는 `thigh_tilt_deg`(기본 45°, 무릎 90°)로 세움.
   판정 각도 = 상체 각도(어깨–엉덩이–발목 내각) a면 상체가 바닥에서 (180 − a)° 들린다.
   엉덩이 각도 = 180 − 허벅지 기울기 − 상체가 들린 각도. `thigh_raise_deg`를 주면 렙마다 허벅지를
-  그만큼 더 들어 올린다 (무릎을 가슴 쪽으로 당기는 동작 흉내).
+  그만큼 더 들어 올린다 (무릎을 가슴 쪽으로 당기는 동작 흉내). `legs_lift_deg`를 주면 렙마다
+  다리 전체(무릎 각도 그대로)를 엉덩이 중심으로 그만큼 배 쪽으로 돌려 **발이 바닥에서 뜬다**
+  (배와 다리를 맞부딪치는 동작 흉내, D-82). 이때 판정 각도(어깨–엉덩이–발목)는 상체가 실제로
+  들린 각도와 달라진다.
 
 출력은 모델 원본 형식(MediaPipe 33 / MoveNet 17)이며 얼굴 인덱스는 null이다.
 """
@@ -69,10 +74,14 @@ class FloorSynthConfig:
     visibility: float = 0.9
     #: 푸시업: 엉덩이를 몸통 직선에서 아래로 내리는 양 (몸 길이 단위)
     hip_sag: float = 0.0
+    #: 푸시업: 무릎 자세. "off" = 다리를 편 보통 푸시업 (기본)
+    knees: Literal["off", "flat", "raised"] = "off"
     #: 윗몸 일으키기: 허벅지 기울기(도, 바닥 기준). 작을수록 다리를 편 것
     thigh_tilt_deg: float = 45.0
     #: 윗몸 일으키기: 렙 최저점에서 허벅지를 더 들어 올리는 양(도)
     thigh_raise_deg: float = 0.0
+    #: 윗몸 일으키기: 렙 최저점에서 다리 전체를 배 쪽으로 돌리는 양(도). 발이 뜬다 (D-82)
+    legs_lift_deg: float = 0.0
     #: [start, end) ms 동안 사람 미검출 (landmarks=null)
     invalid_ranges: list[tuple[int, int]] = field(default_factory=list)
     session_id: str = "synth-floor-1"
@@ -120,6 +129,22 @@ def _lerp(a: Vec2, b: Vec2, s: float) -> Vec2:
     return (a[0] + (b[0] - a[0]) * s, a[1] + (b[1] - a[1]) * s)
 
 
+KNEE_PUSHUP_FEET_DEG = 60.0  # knees="raised": 정강이가 바닥에서 들린 각도
+
+
+def knee_pushup_pose(elbow_angle: float, knees: Literal["flat", "raised"]) -> dict[str, Vec2]:
+    """무릎 대고 하는 푸시업: 무릎은 바닥, 어깨–엉덩이–무릎 직선, 정강이는 눕히거나 든다."""
+    arm = pushup_pose(elbow_angle, 0.0)
+    shoulder = arm["sh"]
+    h = shoulder[1]
+    body = TORSO + THIGH
+    knee = (math.sqrt(body**2 - h**2), 0.0)
+    hip = _lerp(shoulder, knee, TORSO / body)
+    lift = 0.0 if knees == "flat" else math.radians(KNEE_PUSHUP_FEET_DEG)
+    ankle = (knee[0] + SHIN * math.cos(lift), SHIN * math.sin(lift))
+    return {**arm, "hip": hip, "knee": knee, "ank": ankle}
+
+
 def pushup_pose(elbow_angle: float, hip_sag: float) -> dict[str, Vec2]:
     """팔꿈치 내각 → 한쪽 관절 (어깨, 팔꿈치, 손목, 엉덩이, 무릎, 발목)."""
     th = math.radians(elbow_angle)
@@ -137,12 +162,25 @@ def pushup_pose(elbow_angle: float, hip_sag: float) -> dict[str, Vec2]:
     return {"sh": shoulder, "el": elbow, "wr": wrist, "hip": hip, "knee": knee, "ank": ankle}
 
 
-def situp_pose(torso_angle: float, thigh_tilt_deg: float) -> dict[str, Vec2]:
-    """상체 각도(어깨–엉덩이–발목 내각) → 한쪽 관절. 팔은 가슴 앞에 모은다."""
+def _rotate(p: Vec2, deg: float) -> Vec2:
+    """원점(엉덩이) 중심 반시계 회전."""
+    a = math.radians(deg)
+    return (p[0] * math.cos(a) - p[1] * math.sin(a), p[0] * math.sin(a) + p[1] * math.cos(a))
+
+
+def situp_pose(
+    torso_angle: float, thigh_tilt_deg: float, legs_lift_deg: float = 0.0
+) -> dict[str, Vec2]:
+    """상체가 바닥에서 (180 − torso_angle)° 들린 자세 → 한쪽 관절. 팔은 가슴 앞에 모은다.
+
+    `legs_lift_deg` > 0이면 다리(무릎·발목)를 엉덩이 중심으로 그만큼 배 쪽으로 돌린다 (발이 뜸).
+    """
     tilt = math.radians(thigh_tilt_deg)
     hip = (0.0, 0.0)
     knee = (THIGH * math.cos(tilt), THIGH * math.sin(tilt))
     ankle = (knee[0] + math.sqrt(SHIN**2 - knee[1] ** 2), 0.0)
+    if legs_lift_deg:
+        knee, ankle = _rotate(knee, legs_lift_deg), _rotate(ankle, legs_lift_deg)
     phi = math.radians(180.0 - torso_angle)  # 상체가 바닥(엉덩이–발목 선)에서 들린 각도
     shoulder = (-TORSO * math.cos(phi), TORSO * math.sin(phi))
     elbow = _lerp(shoulder, hip, UPPER_ARM / TORSO)
@@ -163,11 +201,15 @@ _SIDE_JOINTS: dict[str, tuple[Joint, Joint]] = {
 def _common(cfg: FloorSynthConfig, t: int) -> dict[Joint, Vec2]:
     """시각 t → 공통 골격 정규화 좌표 (얼굴 제외)."""
     angle = angle_at(cfg, t)
-    if cfg.exercise == "PUSHUP":
+    if cfg.exercise == "PUSHUP" and cfg.knees != "off":
+        pose = knee_pushup_pose(angle, cfg.knees)
+    elif cfg.exercise == "PUSHUP":
         pose = pushup_pose(angle, cfg.hip_sag)
     else:
         e, _ = progress_at(cfg, t)
-        pose = situp_pose(angle, cfg.thigh_tilt_deg + cfg.thigh_raise_deg * e)
+        pose = situp_pose(
+            angle, cfg.thigh_tilt_deg + cfg.thigh_raise_deg * e, cfg.legs_lift_deg * e
+        )
     scale = cfg.person_scale * cfg.image_height
     x0 = (0.2 if cfg.exercise == "PUSHUP" else 0.45) * cfg.image_width
     ground = 0.7 * cfg.image_height

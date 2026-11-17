@@ -18,9 +18,10 @@ from dataclasses import dataclass
 from statistics import median
 
 from rep_engine.adapters import Point, SkeletonFrame
-from rep_engine.config import FeaturesCfg
+from rep_engine.config import FeaturesCfg, TorsoRangeCfg
 from rep_engine.features.filters import OneEuroFilter
 from rep_engine.features.geometry import Vec, angle_deg, distance, midpoint, tilt_from_vertical_deg
+from rep_engine.features.posture import posture_ok
 from rep_engine.landmarks import LEFT_LEG, RIGHT_LEG, Joint
 
 
@@ -95,9 +96,13 @@ def frame_quality(frame: SkeletonFrame, min_visibility: float) -> tuple[bool, fl
 class FeatureExtractor:
     """스트리밍 특징 추출기. 프레임을 시각 순서대로 `update`에 넣는다."""
 
-    def __init__(self, cfg: FeaturesCfg, stand_angle: float) -> None:
+    def __init__(
+        self, cfg: FeaturesCfg, stand_angle: float, posture: TorsoRangeCfg | None = None
+    ) -> None:
         self._cfg = cfg
         self._stand_angle = stand_angle
+        #: 자세 확인 범위 (D-75). 벗어난 프레임은 무효. None이면 확인하지 않음
+        self._posture = posture
         self._filter = OneEuroFilter(
             cfg.one_euro.min_cutoff, cfg.one_euro.beta, cfg.one_euro.d_cutoff
         )
@@ -112,7 +117,11 @@ class FeatureExtractor:
         """프레임 1개를 처리한다."""
         joints = frame.joints
         legs = [] if joints is None else visible_legs(joints, self._cfg.min_visibility)
-        if joints is None or not legs:
+        if (
+            joints is None
+            or not legs
+            or not posture_ok(joints, self._cfg.min_visibility, self._posture)
+        ):
             # 무효 프레임: 기준 자세 연속 구간도 끊는다
             if self.baseline is None:
                 self._calib.clear()

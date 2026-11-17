@@ -2,6 +2,8 @@
 
 판정 각도 = 상체 각도(어깨–엉덩이–발목), 둘째 판정 각도 = 엉덩이 각도(어깨–엉덩이–무릎).
 둘 다 기준을 넘어야 인정한다 (D-70).
+카탈로그에 `situp.feet_down`이 있으면 렙 동안 발이 바닥에 붙어 있어야 인정한다 (D-82). 다리를 들어
+배 쪽으로 당기면 발목이 올라가 상체 각도(어깨–엉덩이–발목)가 상체를 들지 않아도 작아지기 때문이다.
 """
 
 from __future__ import annotations
@@ -10,7 +12,7 @@ from rep_engine.config import EngineConfig, SitupCfg
 from rep_engine.counters.base import register_counter
 from rep_engine.counters.flexion import FlexionCounter, RepDraft
 from rep_engine.errors import UnsupportedExerciseError
-from rep_engine.rounding import r_angle, r_opt_angle, r_ratio
+from rep_engine.rounding import r_angle, r_opt_angle, r_opt_ratio, r_ratio
 from rep_engine.schemas import AnyRepEvent, SitupRepEvent
 
 
@@ -18,7 +20,7 @@ class SitupCounter(FlexionCounter):
     """윗몸 일으키기 판정기."""
 
     def __init__(self, cfg: SitupCfg) -> None:
-        super().__init__(cfg)
+        super().__init__(cfg, cfg.feet_down)
         self._hip_accept = cfg.hip_accept_angle
 
     @property
@@ -45,6 +47,7 @@ class SitupCounter(FlexionCounter):
             min_torso_angle=r_angle(d.min_angle),
             min_hip_angle=r_opt_angle(d.min_aux),
             knee_angle_at_bottom=r_opt_angle(d.form_at_bottom),
+            max_foot_lift=r_opt_ratio(d.max_foot_lift),
             invalid_ratio=r_ratio(d.invalid_ratio),
         )
 

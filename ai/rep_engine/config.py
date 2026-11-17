@@ -97,11 +97,27 @@ class FlexionCfg(_Cfg):
         return self
 
 
+class FeetDownCfg(_Cfg):
+    """발이 바닥에 붙어 있어야 하는 종목의 '발 뜸' 판정 (D-79, D-82).
+
+    바닥 높이 = 최근 `floor_window_ms` 동안 바닥 쪽 발목(화면 y가 가장 큰 발목)의 가장 낮은 위치.
+    바닥 쪽 발목이 그보다 다리 길이 × `max_foot_lift_ratio` 넘게 올라가면 '떴다'.
+    렙 시작 `airborne_lookback_ms` 전부터 렙 끝까지 한 번이라도 떴으면 인정하지 않는다.
+    """
+
+    max_foot_lift_ratio: float = Field(gt=0)
+    floor_window_ms: int = Field(gt=0)
+    airborne_lookback_ms: int = Field(ge=0)
+
+
 class PushupCfg(FlexionCfg):
     """푸시업. 판정 각도 = 팔꿈치 내각(어깨–팔꿈치–손목)."""
 
     #: 인정 렙 평균 몸통 이탈(180 − 어깨–엉덩이–발목 내각)이 이 값을 넘으면 BODY_LINE_BROKEN
     body_line_dev_deg: float = Field(ge=0)
+    #: 렙 내내 무릎 내각(엉덩이–무릎–발목)이 이 값 이상이어야 인정 (무릎 대고 하기 제외, D-78).
+    #: 없으면 확인하지 않음 (cat_2026-11-17 전 카탈로그)
+    min_knee_angle: float | None = Field(default=None, gt=0, le=180)
 
 
 class SitupCfg(FlexionCfg):
@@ -113,6 +129,77 @@ class SitupCfg(FlexionCfg):
 
     #: 렙 동안 엉덩이 내각(어깨–엉덩이–무릎) 최저값이 이 값 이하여야 인정
     hip_accept_angle: float = Field(gt=0, lt=180)
+    #: 발이 바닥에 붙어 있어야 인정 (다리를 들어 배에 붙이기 제외, D-82). 없으면 확인하지 않음
+    feet_down: FeetDownCfg | None = None
+
+
+class LungeCfg(FlexionCfg):
+    """런지. 판정 각도 = 무릎 내각(엉덩이–무릎–발목, 보이는 다리 평균) (D-71).
+
+    스쿼트와 구별하려고 최저점의 좌우 엉덩이 각도 차가 `min_hip_spread_deg` 이상이어야
+    인정한다.
+    """
+
+    #: 최저점에서 |왼쪽 − 오른쪽 엉덩이 내각(어깨–엉덩이–무릎)|이 이 값 이상이어야 인정
+    min_hip_spread_deg: float = Field(gt=0, lt=180)
+    #: 점프 판정 (D-79). 점프 착지 뒤 렙도 잡도록 렙 시작 전부터 본다
+    feet_down: FeetDownCfg
+
+
+class InvertedShoulderPressCfg(FlexionCfg):
+    """인버티드 숄더 프레스(파이크 자세). 판정 각도 = 팔꿈치 내각(어깨–팔꿈치–손목) (D-72).
+
+    파이크 자세 확인: 렙 동안 엉덩이 각도(어깨–엉덩이–발목) 최저값이 `pike_hip_accept_angle` 이하.
+    """
+
+    pike_hip_accept_angle: float = Field(gt=0, lt=180)
+
+
+class GluteBridgeCfg(FlexionCfg):
+    """글루트 브릿지. 판정 각도 = 엉덩이 굽힘 = 180 − 엉덩이 내각(어깨–엉덩이–무릎) (D-73).
+
+    누우면 약 45°, 엉덩이를 들어 몸이 일직선에 가까워질수록 0°에 가까워진다. 그래서 다른
+    종목처럼 '쉬는 자세에서 크고 동작할수록 작아지는' 각도가 되어 같은 상태 머신을 쓴다.
+    """
+
+
+class SideLegLiftCfg(FlexionCfg):
+    """사이드 레그 리프트. 판정 각도 = 180 − 다리 벌림 (D-77).
+
+    다리 벌림 = 왼쪽·오른쪽 엉덩이→발목 선 사이 각도. 다리를 모으면 약 0°(판정 각도 약 180°),
+    위쪽 다리를 들수록 커진다(판정 각도는 작아짐). 옆으로 누운 몸의 앞쪽을 카메라가 보게 찍는다.
+    """
+
+
+class TorsoRangeCfg(_Cfg):
+    """상체 방향 허용 범위 (D-75). 상체 방향 = 엉덩이→어깨 선이 화면 위쪽에서 기운 각도.
+
+    0° = 똑바로 섬, 90° = 수평(누움·엎드림), 180° = 거꾸로. 폰을 세로로 세워 둔다고 가정한다.
+    """
+
+    min_deg: float = Field(ge=0, le=180)
+    max_deg: float = Field(ge=0, le=180)
+
+    @model_validator(mode="after")
+    def _order(self) -> TorsoRangeCfg:
+        if not self.min_deg < self.max_deg:
+            raise ValueError("min_deg < max_deg 이어야 함")
+        return self
+
+
+class PostureCfg(_Cfg):
+    """종목별 자세(서기·엎드리기·눕기) 확인 (D-75). 범위를 벗어난 프레임은 무효 프레임이 된다.
+
+    종목 키가 없으면 그 종목은 자세를 확인하지 않는다. 옛 카탈로그에는 이 섹션이 없다.
+    """
+
+    squat: TorsoRangeCfg | None = None
+    pushup: TorsoRangeCfg | None = None
+    situp: TorsoRangeCfg | None = None
+    lunge: TorsoRangeCfg | None = None
+    inverted_shoulder_press: TorsoRangeCfg | None = None
+    glute_bridge: TorsoRangeCfg | None = None
+    side_leg_lift: TorsoRangeCfg | None = None
 
 
 class LivenessCfg(_Cfg):
@@ -215,6 +302,12 @@ class EngineConfig(_Cfg):
     #: 없으면 그 카탈로그 버전으로는 해당 종목을 판정할 수 없다 (ConfigError)
     pushup: PushupCfg | None = None
     situp: SitupCfg | None = None
+    lunge: LungeCfg | None = None
+    inverted_shoulder_press: InvertedShoulderPressCfg | None = None
+    glute_bridge: GluteBridgeCfg | None = None
+    side_leg_lift: SideLegLiftCfg | None = None
+    #: 없으면 어느 종목도 자세를 확인하지 않는다 (cat_2026-11-17 전 카탈로그)
+    posture: PostureCfg | None = None
     liveness: LivenessCfg
     confidence: ConfidenceCfg
     form_tags: FormTagsCfg

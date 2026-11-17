@@ -20,7 +20,9 @@
 
 모든 판정 기준값(`config/catalog/cat_2026-11-01.yaml`)은 **가안**입니다. 근거와 한계는 DECISIONS.md를 보세요. 특히 확신도가 촬영 각도 때문에 생긴 판정 오류를 반영하지 못하는 문제(D-54)가 있습니다.
 
-푸시업(`PUSHUP`)·윗몸 일으키기(`SITUP`)는 `cat_2026-11-10`에서만 판정할 수 있습니다. MVP 범위 밖이고, 기준값은 모두 실측 근거 없는 가정입니다 (D-66~D-69).
+푸시업(`PUSHUP`)·윗몸 일으키기(`SITUP`)는 `cat_2026-11-10`부터 판정할 수 있습니다. MVP 범위 밖이고, 기준값은 모두 실측 근거 없는 가정입니다 (D-66~D-69).
+
+런지(`LUNGE`)·인버티드 숄더 프레스(`INVERTED_SHOULDER_PRESS`)·글루트 브릿지(`GLUTE_BRIDGE`)·사이드 레그 리프트(`SIDE_LEG_LIFT`)는 `cat_2026-11-17`에서만 판정할 수 있습니다. 역시 MVP 범위 밖이고 기준값은 가정이며, 합성 데이터로만 확인했습니다 (D-71~D-74, D-77). 이 카탈로그는 고른 종목과 다른 자세(서기·엎드리기·눕기)의 프레임을 무효로 처리합니다 (D-75). 운동 종류를 자동으로 알아내지는 않습니다.
 
 ## 설치 (macOS·Linux, Python 3.11)
 
@@ -235,7 +237,7 @@ curl -X POST http://localhost:8001/internal/recount \
 | --- | --- | --- |
 | `download_models` | MediaPipe lite/full/heavy `.task`를 `models/`로 받기 | 실행 확인 |
 | `extract_keypoints` | 영상 → 세션 JSON (15fps, 얼굴 null, 청크 분할) | 사람 없는 테스트 영상으로만 확인 |
-| `webcam_demo` | 실시간 렙 판정 화면, `--snapshots`로 인정 렙 최저점 사진 저장 | 리더가 카메라로 실행 확인. 사진 저장은 합성 입력으로 확인 |
+| `webcam_demo` | 실시간 렙 판정 화면. 위쪽 버튼(또는 1~7 키)으로 운동 7종 선택, 목표 횟수(기본 5회) 달성 표시. `--snapshots`로 인정 렙 최저점 사진 저장 | 스쿼트는 리더가 카메라로 실행 확인. 운동 선택·목표는 합성 입력과 화면 그리기로만 확인(2026-11-17, 카메라 미확인) |
 | `plot_session` | 세션 → kneeAngle 그래프 PNG | 합성 세션으로 확인 |
 | `evaluate` | 라벨 CSV 전체 평가 | 합성 샘플로 확인 |
 | `compare_models` | lite/full/heavy 정확도·추론 시간 | 사람 없는 영상으로만 확인 (시간 비교 무의미, D-60) |
@@ -261,6 +263,8 @@ cd ai
 ```bash
 # 웹캠 데모 (키: L 무작위 동작 · R 리셋 · S 저장 · Q 종료). 처음엔 macOS가 카메라 권한을 묻는다
 .venv/bin/python -m tools.webcam_demo --model lite
+# 운동을 골라 시작 (화면 위 버튼이나 1~7 키로 바꿈), 목표 5회
+.venv/bin/python -m tools.webcam_demo --exercise LUNGE --target-reps 5   # 기본 heavy 모델 (D-81)
 # 인정 렙마다 최저점 사진 1장 → ~/Downloads/jeonunsi_snapshots/<세션ID>/rep03_86.2deg.jpg
 # 흐림 없음(얼굴이 나옴). 이 PC에만 두고 저장소·공유 폴더에 올리지 않는다 (D-65)
 .venv/bin/python -m tools.webcam_demo --model lite --snapshots
