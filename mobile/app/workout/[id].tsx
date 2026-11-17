@@ -1,9 +1,9 @@
+// 개발용 보상 미리보기 (첫 기능 US-02 화면, src/api/submissions 목데이터 지원). 디자인 키트로 모양만 맞춤.
 import { useEffect, useRef, useState } from 'react';
 import { useLocalSearchParams } from 'expo-router';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { IS_MOCK_MODE, getSubmission, isSubmissionId, prepareSubmission, Submission } from '../../src/api/submissions';
-import { ActionButton } from '../../src/components/ActionButton';
-import { COLORS, FONT, RADIUS, SPACE } from '../../src/theme/tokens';
+import { Cta, DS, Divider, Header, Page, T, Tag } from '../../src/design/kit';
 
 export default function Preview() {
   const params = useLocalSearchParams<{ id: string }>(); const id = params.id;
@@ -34,31 +34,34 @@ export default function Preview() {
     return () => { active.current?.abort(); active.current = null; };
   }, [id]);
   const prepared = record?.status === 'PREPARED';
-  return <ScrollView contentContainerStyle={styles.page}>
-    <Text style={styles.kicker}>{IS_MOCK_MODE ? '목데이터 · 실제 기록이 아니에요' : '운동 기록 · 보상 미리보기'}</Text>
-    <Text style={styles.heading}>운동이 쌓인 만큼,{'\n'}공격도 강해져요.</Text>
-    {busy && <View accessibilityLiveRegion="polite" style={styles.row}><ActivityIndicator color={COLORS.primary} /><Text style={styles.muted}>기록을 확인하고 있어요…</Text></View>}
-    {!!error && <View accessibilityRole="alert" style={styles.card}><Text style={styles.error}>{error}</Text><Text style={styles.muted}>처리 결과가 불확실하면 다시 조회해 주세요.</Text></View>}
-    {record && <>
-      <View style={styles.row}><Text style={[styles.badge, prepared && styles.badgeActive]}>{STATUS_TEXT[record.status] ?? record.status}</Text><Text style={styles.muted}>{record.exercise_type === 'SQUAT' ? '스쿼트' : record.exercise_type}</Text></View>
-      <View style={styles.card}>
-        <Text style={styles.muted}>인정된 운동</Text>
-        <Text style={styles.count}>{record.counted_reps}<Text style={styles.unit}> 회</Text></Text>
-        <View style={styles.divider} />
-        <Text style={styles.muted}>예상 타격 수</Text>
-        <Text style={[styles.count, { color: COLORS.primary }]}>{prepared ? record.snapshot?.hit_count : '—'}<Text style={styles.unit}>{prepared ? ' 타' : ''}</Text></Text>
-        <Text style={styles.body}>{prepared ? (IS_MOCK_MODE ? '목데이터 계산 예시예요. 실제 보상은 지급되지 않아요.' : '서버에서 계산한 미리보기예요. 승인과 보상 지급은 아직이에요.') : record.status === 'SUBMITTED' ? '계산이 끝나면 타격 수를 보여드려요.' : '이 기록은 미리보기 단계를 벗어났어요. 현재 상태만 표시합니다.'}</Text>
-      </View>
-      {record.status === 'SUBMITTED' && <>
-        <Text style={styles.muted}>{IS_MOCK_MODE ? '목데이터의 보상 계산을 실행합니다.' : '개발 시연용 · 서버의 보상 계산을 수동 실행합니다.'}</Text>
-        <ActionButton title="보상 계산 실행" disabled={busy || needsRefresh} onPress={() => void load(true)} />
-        {needsRefresh && <Text style={styles.muted}>다시 조회한 뒤 계산을 재시도할 수 있어요.</Text>}
+  return <Page>
+    <Header title="보상 미리보기" />
+    <ScrollView contentContainerStyle={styles.page}>
+      <Text style={styles.kicker}>{IS_MOCK_MODE ? '목데이터 · 실제 기록이 아니에요' : '운동 기록 · 보상 미리보기'}</Text>
+      <Text accessibilityRole="header" style={styles.heading}>운동이 쌓인 만큼,{'\n'}공격도 강해져요.</Text>
+      {busy && <View accessibilityLiveRegion="polite" style={styles.row}><ActivityIndicator color={DS.accent} /><Text style={T.foot}>기록을 확인하고 있어요…</Text></View>}
+      {!!error && <View accessibilityRole="alert" style={styles.card}><Text style={styles.error}>{error}</Text><Text style={T.foot}>처리 결과가 불확실하면 다시 조회해 주세요.</Text></View>}
+      {record && <>
+        <View style={styles.row}><Tag label={STATUS_TEXT[record.status] ?? record.status} tone={prepared ? 'solid' : 'muted'} /><Text style={T.foot}>{record.exercise_type === 'SQUAT' ? '스쿼트' : record.exercise_type}</Text></View>
+        <View style={styles.card}>
+          <Text style={T.foot}>인정된 운동</Text>
+          <Text style={styles.count}>{record.counted_reps}<Text style={styles.unit}> 회</Text></Text>
+          <Divider />
+          <Text style={T.foot}>예상 타격 수</Text>
+          <Text style={[styles.count, { color: DS.accent }]}>{prepared ? record.snapshot?.hit_count : '—'}<Text style={styles.unit}>{prepared ? ' 타' : ''}</Text></Text>
+          <Text style={T.sub}>{prepared ? (IS_MOCK_MODE ? '목데이터 계산 예시예요. 실제 보상은 지급되지 않아요.' : '서버에서 계산한 미리보기예요. 승인과 보상 지급은 아직이에요.') : record.status === 'SUBMITTED' ? '계산이 끝나면 타격 수를 보여드려요.' : '이 기록은 미리보기 단계를 벗어났어요. 현재 상태만 표시합니다.'}</Text>
+        </View>
+        {record.status === 'SUBMITTED' && <>
+          <Text style={T.foot}>{IS_MOCK_MODE ? '목데이터의 보상 계산을 실행합니다.' : '개발 시연용 · 서버의 보상 계산을 수동 실행합니다.'}</Text>
+          <Cta title="보상 계산 실행" disabled={busy || needsRefresh} onPress={() => void load(true)} />
+          {needsRefresh && <Text style={T.foot}>다시 조회한 뒤 계산을 재시도할 수 있어요.</Text>}
+        </>}
       </>}
-    </>}
-    {!busy && !record && !error && <Text style={styles.muted}>표시할 운동 기록이 없어요.</Text>}
-    <ActionButton title="상태 다시 조회" secondary disabled={busy} onPress={() => void load()} />
-    <Text selectable style={styles.muted}>기록 ID{'\n'}{id}</Text>
-  </ScrollView>;
+      {!busy && !record && !error && <Text style={T.foot}>표시할 운동 기록이 없어요.</Text>}
+      <Cta title="상태 다시 조회" variant="outline" disabled={busy} onPress={() => void load()} />
+      <Text selectable style={T.cap}>기록 ID{'\n'}{id}</Text>
+    </ScrollView>
+  </Page>;
 }
 // DESIGN.md 4절 화면 문구 [제안]
 const STATUS_TEXT: Record<string, string> = {
@@ -72,15 +75,11 @@ const STATUS_TEXT: Record<string, string> = {
   CLOSED: '종료된 기록이에요',
 };
 const styles = StyleSheet.create({
-  page: { padding: SPACE.medium, gap: SPACE.large, paddingBottom: SPACE.section },
-  kicker: { ...FONT.caption, color: COLORS.primary, marginTop: SPACE.medium },
-  heading: { ...FONT.title, color: COLORS.text },
-  card: { backgroundColor: COLORS.surface, borderRadius: RADIUS.card, padding: SPACE.medium, gap: SPACE.small },
-  row: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: SPACE.small },
-  badge: { ...FONT.caption, color: COLORS.text, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.pill, paddingHorizontal: SPACE.medium, paddingVertical: SPACE.small, fontWeight: '700', overflow: 'hidden' },
-  badgeActive: { color: COLORS.onPrimary, backgroundColor: COLORS.primary, borderColor: COLORS.primary },
-  count: { ...FONT.counter, color: COLORS.text }, unit: { ...FONT.body, fontWeight: '400' },
-  divider: { height: 1, backgroundColor: COLORS.border, marginVertical: SPACE.small },
-  muted: { ...FONT.caption, color: COLORS.textMuted }, body: { ...FONT.body, color: COLORS.textMuted },
-  error: { ...FONT.body, color: COLORS.danger },
+  page: { paddingHorizontal: 20, paddingBottom: 32, gap: 18 },
+  kicker: { fontSize: 13, fontWeight: '600', color: DS.accent, marginTop: 8 },
+  heading: { fontSize: 24, lineHeight: 32, fontWeight: '800', color: DS.label },
+  card: { backgroundColor: DS.bg2, borderRadius: 16, padding: 20, gap: 8 },
+  row: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
+  count: { fontSize: 48, lineHeight: 56, fontWeight: '800', color: DS.label }, unit: { fontSize: 16, fontWeight: '400', color: DS.label2 },
+  error: { fontSize: 16, lineHeight: 24, color: DS.danger },
 });

@@ -17,7 +17,8 @@ export class HttpError extends ApiError {
   }
 }
 
-type Options = { method?: string; body?: unknown; auth?: boolean; signal?: AbortSignal };
+// headers: If-Match(제출건 version)·Idempotency-Key 같은 요청별 헤더 (API.md 공통 규칙)
+type Options = { method?: string; body?: unknown; auth?: boolean; signal?: AbortSignal; headers?: Record<string, string> };
 
 const TIMEOUT_MS = 15000;
 const NETWORK_MESSAGE = '서버에 연결할 수 없어요. 네트워크와 서버 주소를 확인해 주세요.';
@@ -26,7 +27,7 @@ const TIMEOUT_MESSAGE = '응답을 기다리는 시간이 길어졌어요. 잠�
 export function createHttp(store: TokenStore, baseUrl = () => process.env.EXPO_PUBLIC_API_URL) {
   let refreshing: Promise<boolean> | null = null;
 
-  async function send(path: string, { method = 'GET', body, auth = true, signal }: Options, token?: string) {
+  async function send(path: string, { method = 'GET', body, auth = true, signal, headers: extra }: Options, token?: string) {
     const base = baseUrl()?.trim().replace(/\/$/, '');
     if (!base) throw new HttpError('서버 주소가 설정되지 않았어요. EXPO_PUBLIC_API_URL을 확인해 주세요.', undefined);
     const controller = new AbortController();
@@ -34,7 +35,7 @@ export function createHttp(store: TokenStore, baseUrl = () => process.env.EXPO_P
     signal?.addEventListener('abort', abort);
     if (signal?.aborted) controller.abort();
     const timer = setTimeout(abort, TIMEOUT_MS);
-    const headers: Record<string, string> = { Accept: 'application/json' };
+    const headers: Record<string, string> = { Accept: 'application/json', ...extra };
     if (body !== undefined) headers['Content-Type'] = 'application/json';
     if (auth && token) headers.Authorization = `Bearer ${token}`;
     try {
