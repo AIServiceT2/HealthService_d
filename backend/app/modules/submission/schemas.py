@@ -2,6 +2,7 @@
 
 import uuid
 from datetime import datetime
+from typing import Literal
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
@@ -32,9 +33,20 @@ class RepIn(_CamelModel):
     counted: bool
 
 
-class SubmitRequest(_CamelModel):
-    """{ totalChunks, endedAt, clientRepCount, reps, aiConfidence }."""
+class PoseCaptureIn(_CamelModel):
+    """관절 좌표의 원본 영상과 자세 추정 모델 정보."""
 
+    model_config = ConfigDict(extra="forbid")
+
+    fps: int = Field(gt=0, le=1000)
+    image_width: int = Field(gt=0, le=16384)
+    image_height: int = Field(gt=0, le=16384)
+    mirrored: bool
+    platform: Literal["IOS", "ANDROID"]
+    model_version: str = Field(min_length=1, max_length=128)
+
+
+class SubmitRequest(_CamelModel):
     model_config = ConfigDict(extra="forbid")
 
     total_chunks: int = Field(ge=1)
@@ -42,6 +54,9 @@ class SubmitRequest(_CamelModel):
     client_rep_count: int = Field(ge=0)
     reps: list[RepIn] = Field(max_length=MAX_REPS_PER_SUBMISSION)
     ai_confidence: float = Field(ge=0, le=1)
+    pose_capture: PoseCaptureIn | None = Field(
+        default=None, description="신규 제출에 필요. 이미 접수된 제출의 재전송에서는 생략 가능."
+    )
 
 
 class SubmitResponse(_CamelModel):

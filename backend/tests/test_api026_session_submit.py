@@ -1,6 +1,6 @@
 """API-026 세션 종료·운동 제출 — 노션 '전운시 API 명세서' API-026 (US-01 운동하면 렙을 세어 자동 제출).
 
-서버 재계산은 ai/ 엔진 연결 전이라 앱이 보낸 reps 중 counted=true 수를 쓴다 (service.recount_reps, 임시).
+도메인 규칙 검증에는 AI 엔진의 판정 픽스처를 사용한다.
 """
 
 import uuid

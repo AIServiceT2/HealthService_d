@@ -222,6 +222,12 @@ def received_seqs(db: Session, session_id: uuid.UUID) -> list[int]:
     )
 
 
+def get_pose_chunks(db: Session, session_id: uuid.UUID) -> list[PoseChunk]:
+    return list(
+        db.scalars(select(PoseChunk).where(PoseChunk.session_id == session_id).order_by(PoseChunk.seq))
+    )
+
+
 def upload_chunk(
     db: Session,
     user_id: uuid.UUID,

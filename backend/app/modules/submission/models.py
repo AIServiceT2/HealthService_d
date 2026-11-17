@@ -38,7 +38,7 @@ class WorkoutSubmission(Base):
     counted_reps: Mapped[int] = mapped_column(Integer)
     # 상태가 바뀔 때마다 1 증가 (If-Match 동시 수정 검사)
     version: Mapped[int] = mapped_column(Integer, default=0)
-    # 0~1, 기준 미확정. 서버 재계산이 아직 없어 앱이 보낸 aiConfidence를 저장한다 (임시, service.py)
+    # 0~1. 신규 제출은 AI가 관절 좌표로 다시 계산한 확신도를 저장한다.
     confidence: Mapped[float] = mapped_column(Float)
     # AI_AUTO / REVIEWER. 승인 전에는 NULL (노션 API-028 예시)
     approval_path: Mapped[str | None] = mapped_column(String(16), default=None)
@@ -49,7 +49,7 @@ class WorkoutSubmission(Base):
 
 
 class RepEvent(Base):
-    """렙 기록. keypoints(렙의 관절 좌표 묶음)는 서버 재계산이 생기면 채운다 (지금은 NULL)."""
+    """AI가 다시 계산한 렙 기록. 원본 관절 좌표는 세션의 청크에 보관한다."""
 
     __tablename__ = "rep_event"
 

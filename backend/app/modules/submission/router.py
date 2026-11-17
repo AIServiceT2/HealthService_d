@@ -103,8 +103,7 @@ stub_router = APIRouter(tags=["submission"], responses=_ERRORS_4XX)
         "청크 1..totalChunks가 모두 있어야 한다. endedAt이 서버 현재 시각보다 미래면 서버 시각으로 저장, "
         "reps는 최대 500개 (둘 다 제안). "
         "그날 상한이 다 찼으면 제출건은 만들고 reservedReps는 0. "
-        "임시: 서버 재계산은 ai/ 엔진 연결 전이라 reps 중 counted=true 수를 쓰고, "
-        "confidence는 앱이 보낸 aiConfidence를 저장한다."
+        "신규 제출에는 poseCapture가 필요하다. AI가 저장된 좌표에서 렙 수·확신도를 재계산한다."
     ),
     status_code=202,
     response_model=SubmitResponse,
@@ -119,6 +118,7 @@ stub_router = APIRouter(tags=["submission"], responses=_ERRORS_4XX)
             "description": "DUPLICATE_SUBMISSION 같은 시간대에 활성 제출건이 있습니다. / INVALID_STATE 이미 제출했거나 폐기된 세션입니다.",
         },
         422: {"model": ErrorResponse, "description": "SERVER_RECOUNT_MISMATCH 인정 렙 수가 서버 재계산 값보다 큽니다."},
+        503: {"model": ErrorResponse, "description": "AI_UNAVAILABLE 운동 판정 서비스에 연결할 수 없습니다."},
     },
 )
 def submit_session(
@@ -136,8 +136,9 @@ def submit_session(
         total_chunks=body.total_chunks,
         ended_at=body.ended_at,
         client_rep_count=body.client_rep_count,
-        reps=[service.RepIn(rep_no=r.rep_no, ts=r.ts, counted=r.counted) for r in body.reps],
+        reps=body.reps,
         ai_confidence=body.ai_confidence,
+        pose_capture=body.pose_capture,
     )
     submission = result.submission
     # 다시 보낸 요청에도 '첫 결과'를 돌려준다: 접수 직후 상태(SUBMITTED, version 0)
