@@ -39,6 +39,10 @@ def submit_body(counted: int = 30, uncounted: int = 0, client_count: int | None 
         "clientRepCount": counted if client_count is None else client_count,
         "reps": reps,
         "aiConfidence": 0.94,
+        "poseCapture": {
+            "fps": 15, "imageWidth": 720, "imageHeight": 1280, "mirrored": False,
+            "platform": "ANDROID", "modelVersion": "movenet-lightning@4",
+        },
     }
 
 

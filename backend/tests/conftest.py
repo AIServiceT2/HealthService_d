@@ -21,6 +21,8 @@ from sqlalchemy import text
 
 from app.core.db import Base, SessionLocal, engine
 from app.main import app
+from app.modules.submission import service as submission_service
+from app.modules.submission.ai_recount import WorkoutRecount
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -48,5 +50,16 @@ def db():
 
 
 @pytest.fixture
-def client():
+def ai_recount(monkeypatch):
+    """도메인 테스트용 판정 픽스처. AI HTTP 계약 테스트는 실제 어댑터를 사용한다."""
+    def fake(session, _chunks, _capture, *, client_rep_count, reps, ai_confidence):
+        return WorkoutRecount(
+            sum(rep.counted for rep in reps), ai_confidence, reps, session.liveness_passed
+        )
+
+    monkeypatch.setattr(submission_service, "recount_workout", fake)
+
+
+@pytest.fixture
+def client(ai_recount):
     return TestClient(app)

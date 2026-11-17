@@ -76,12 +76,12 @@ cd ai
 AI_INTERNAL_TOKEN=<로컬용 값> .venv/bin/uvicorn service.app:app --port 8001
 
 # 도커 (저장소 루트에서). 토큰은 셸 환경변수나 루트 .env로 (저장소에 넣지 않음)
-docker compose up -d --build ai
+docker compose -p jeonunsi up -d --build ai
 curl http://localhost:8001/internal/health
 # {"status":"ok","engineVersion":"0.1.0","catalogVersions":["cat_2026-11-01"]}
 ```
 
-`AI_INTERNAL_TOKEN`이 비어 있으면 토큰이 필요한 엔드포인트는 모두 401입니다(D-45). 백엔드는 같은 compose 네트워크에서 `http://ai:8001/internal/...`로 부릅니다. 백엔드 쪽 호출 코드는 아직 없습니다.
+`AI_INTERNAL_TOKEN`이 비어 있으면 토큰이 필요한 엔드포인트는 모두 401입니다(D-45). API-026을 사용하는 백엔드 프로세스에도 같은 `AI_INTERNAL_TOKEN`을 설정합니다. `AI_SERVICE_URL`의 기본값은 호스트에서 접근하는 `http://127.0.0.1:8001`입니다. 백엔드도 같은 Compose 네트워크에서 실행할 경우 `http://ai:8001`을 사용합니다.
 
 | 엔드포인트 | 토큰 | 요청 → 응답 |
 | --- | --- | --- |
@@ -89,6 +89,25 @@ curl http://localhost:8001/internal/health
 | `POST /internal/recount` | `X-Internal-Token` | `{meta, chunks, client, userReducedCount?}` → `{result, comparison, decision}` |
 | `POST /internal/liveness/evaluate` | `X-Internal-Token` | `{meta, frames}` → `LivenessResult` (`meta.liveness` 필수) |
 | `POST /internal/liveness/issue` | `X-Internal-Token` | → `{action, instruction, challengeId}` (시각은 백엔드가 정함) |
+
+### 백엔드 운동 제출
+
+API-022의 `frames[].t`는 Unix epoch 밀리초입니다. 신규 API-026 제출에는 좌표를 추출한 원본 영상과 모델을 설명하는 `poseCapture`를 함께 보냅니다.
+
+```json
+{
+  "poseCapture": {
+    "fps": 15,
+    "imageWidth": 720,
+    "imageHeight": 1280,
+    "mirrored": false,
+    "platform": "ANDROID",
+    "modelVersion": "movenet-lightning@4"
+  }
+}
+```
+
+백엔드는 업로드한 좌표와 발급한 무작위 동작으로 AI 재계산을 요청합니다. AI가 계산한 렙·확신도·동작 확인 결과를 저장합니다. 앱 렙 수가 AI 인정량보다 크면 422, AI 서비스에 연결할 수 없으면 503을 받습니다. 이때 세션과 청크가 보존되므로 같은 세션에서 다시 제출할 수 있습니다.
 
 ### 재계산 호출 예시
 

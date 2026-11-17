@@ -11,12 +11,14 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
 from app.modules.auth.models import User
+from app.modules.submission.ai_recount import recount_workout
 from app.modules.submission.constants import (
     BLOCKING_STATUSES,
     CANCELABLE_STATUSES,
     SubmissionStatus,
 )
 from app.modules.submission.models import DailyCapReservation, RepEvent, WorkoutSubmission
+from app.modules.submission.schemas import PoseCaptureIn, RepIn
 from app.modules.workout_session import service as session_service
 from app.modules.workout_session.catalog import EXERCISES
 from app.modules.workout_session.models import SessionStatus, WorkoutSession
@@ -104,24 +106,9 @@ def reserved_amount(db: Session, user_id: uuid.UUID, exercise_code: str, day: da
 
 
 @dataclass(frozen=True)
-class RepIn:
-    rep_no: int
-    ts: datetime
-    counted: bool
-
-
-@dataclass(frozen=True)
 class SubmitResult:
     submission: WorkoutSubmission
     reserved_reps: int
-
-
-def recount_reps(reps: Sequence[RepIn]) -> int:
-    """서버 재계산 인정량. [임시] ai/ 엔진(/internal/recount) 연결 전이라 앱이 보낸 렙 중
-    counted=true인 수를 쓴다. 연결하려면 세션에 fps·화면 크기·좌우 반전·모델 버전을 저장하고
-    청크 형식(kp [x,y,v])을 엔진 형식(landmarks)으로 바꿔야 한다 (팀 확인 필요).
-    """
-    return sum(1 for rep in reps if rep.counted)
 
 
 def _validation_failed(reason: str, **details) -> AppError:
@@ -153,6 +140,7 @@ def submit_session(
     client_rep_count: int,
     reps: Sequence[RepIn],
     ai_confidence: float,
+    pose_capture: PoseCaptureIn | None,
 ) -> SubmitResult:
     """세션을 끝내고 제출건(SUBMITTED)을 만든다 (노션 API-026).
 
@@ -163,8 +151,7 @@ def submit_session(
     - 그날 남은 상한만큼 원자적으로 예약한다. 다 찼으면 제출건은 만들고 예약 0
     """
     try:
-        # 같은 사용자의 제출을 하나씩 처리해 상한 예약이 겹치지 않게 한다 (사용자 → 세션 순서로 잠금)
-        db.scalars(select(User).where(User.id == user_id).with_for_update()).one()
+        # 좌표 교체와 중복 재계산을 막기 위해 판정 중에는 이 세션만 잠근다.
         session = session_service.get_owned_session(db, user_id, session_id, lock=True)
         if session.status == SessionStatus.SUBMITTED:
             result = _replay(db, user_id, session_id, idempotency_key)
@@ -186,7 +173,8 @@ def submit_session(
         rep_nos = [rep.rep_no for rep in reps]
         if len(set(rep_nos)) != len(rep_nos):
             raise _validation_failed("DUPLICATE_REP_NO")
-        received = set(session_service.received_seqs(db, session_id))
+        chunks = session_service.get_pose_chunks(db, session_id)
+        received = {chunk.seq for chunk in chunks}
         missing = [seq for seq in range(1, total_chunks + 1) if seq not in received]
         if missing:
             raise _validation_failed("MISSING_CHUNKS", missingSeq=missing)
@@ -194,13 +182,21 @@ def submit_session(
         if extra:
             raise _validation_failed("UNEXPECTED_CHUNKS", extraSeq=extra)
 
-        counted_reps = recount_reps(reps)
+        if pose_capture is None:
+            raise _validation_failed("MISSING_POSE_CAPTURE")
+        recount = recount_workout(
+            session, chunks, pose_capture,
+            client_rep_count=client_rep_count, reps=reps, ai_confidence=ai_confidence,
+        )
+        counted_reps = recount.counted_reps
         if client_rep_count > counted_reps:
             raise AppError(
                 422, "SERVER_RECOUNT_MISMATCH", "인정 렙 수가 서버 재계산 값보다 큽니다.",
                 {"clientRepCount": client_rep_count, "serverRepCount": counted_reps},
             )
 
+        # 사용자의 세션 간 시간 중복 확인과 일일 상한 예약을 직렬화한다.
+        db.scalars(select(User.id).where(User.id == user_id).with_for_update(key_share=True)).one()
         overlapping = db.scalar(
             select(func.count())
             .select_from(WorkoutSubmission)
@@ -231,15 +227,16 @@ def submit_session(
             ended_at=ended_at,
             counted_reps=counted_reps,
             version=0,
-            confidence=ai_confidence,
+            confidence=recount.confidence,
         )
         db.add(submission)
         db.flush()
         db.add_all(
             RepEvent(submission_id=submission.id, rep_no=r.rep_no, ts=r.ts, counted=r.counted)
-            for r in reps
+            for r in recount.reps
         )
         db.add(DailyCapReservation(submission_id=submission.id, amount=reserved))
+        session.liveness_passed = recount.liveness_passed
         session.status = SessionStatus.SUBMITTED
         db.commit()
     except Exception:
