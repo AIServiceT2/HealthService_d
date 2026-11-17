@@ -1,4 +1,8 @@
-"""푸시업 렙 판정기. 판정 각도 = 팔꿈치 내각(어깨–팔꿈치–손목). 규칙은 `flexion.py`."""
+"""푸시업 렙 판정기. 판정 각도 = 팔꿈치 내각(어깨–팔꿈치–손목). 규칙은 `flexion.py`.
+
+카탈로그에 `min_knee_angle`이 있으면 렙 내내 무릎 내각이 그 이상이어야 인정한다 (D-78).
+무릎을 바닥에 대고 하면 무릎이 굽어 SHALLOW_DEPTH, 다리가 한 번도 안 보이면 OUT_OF_FRAME.
+"""
 
 from __future__ import annotations
 
@@ -15,6 +19,12 @@ class PushupCounter(FlexionCounter):
 
     def __init__(self, cfg: PushupCfg) -> None:
         super().__init__(cfg)
+        self._min_knee = cfg.min_knee_angle
+
+    @property
+    def _hold_accept_angle(self) -> float | None:
+        """무릎이 렙 내내 펴져 있어야 인정 (무릎 대고 하는 푸시업 제외, D-78)."""
+        return self._min_knee
 
     @classmethod
     def from_config(cls, cfg: EngineConfig) -> PushupCounter:
@@ -37,6 +47,7 @@ class PushupCounter(FlexionCounter):
             body_line_dev_at_bottom=r_opt_angle(d.form_at_bottom),
             elbow_asymmetry_at_bottom=r_opt_angle(d.asymmetry_at_bottom),
             invalid_ratio=r_ratio(d.invalid_ratio),
+            min_knee_angle_in_rep=r_opt_angle(d.min_hold),
         )
 
 

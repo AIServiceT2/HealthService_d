@@ -1,6 +1,6 @@
 """poseSummary와 자세 오류 태그 (SPEC 8.1·8.2, L4 입력).
 
-스쿼트는 `pose_summary`, 푸시업·윗몸 일으키기는 `pushup_pose_summary`·`situp_pose_summary`.
+스쿼트는 `pose_summary`, 그 밖의 종목은 `<종목>_pose_summary`.
 
 인정 렙의 최저점 값(RepEvent, 이미 반올림된 값)으로만 계산한다. 그래서 기기와 서버가 같은
 RepEvent 목록을 가지면 요약도 같다. 각도·시간은 소수 1자리.
@@ -13,16 +13,25 @@ from collections.abc import Sequence
 from rep_engine.config import FormTagsCfg, PushupCfg
 from rep_engine.rounding import r_angle, r_ms
 from rep_engine.schemas import (
+    AnyRepEvent,
     AvgMax,
     AvgMinMax,
     AvgOnly,
     AvgStd,
     FormTag,
+    GluteBridgePoseSummary,
+    GluteBridgeRepEvent,
+    InvertedShoulderPressPoseSummary,
+    InvertedShoulderPressRepEvent,
+    LungePoseSummary,
+    LungeRepEvent,
     PoseSummary,
     PushupPoseSummary,
     PushupRepEvent,
     RepEvent,
     RepReason,
+    SideLegLiftPoseSummary,
+    SideLegLiftRepEvent,
     SitupPoseSummary,
     SitupRepEvent,
 )
@@ -97,7 +106,7 @@ def pose_summary(reps: Sequence[RepEvent], cfg: FormTagsCfg) -> PoseSummary:
 _TAG_ORDER = {tag: i for i, tag in enumerate(FormTag)}
 
 
-def _reason_tags(reps: Sequence[PushupRepEvent | SitupRepEvent], cfg: FormTagsCfg) -> list[FormTag]:
+def _reason_tags(reps: Sequence[AnyRepEvent], cfg: FormTagsCfg) -> list[FormTag]:
     """미인정 사유 비율로 정하는 태그 (스쿼트 `form_tags`와 같은 기준값)."""
     n = len(reps)
     if not n:
@@ -121,7 +130,7 @@ def _ordered(tags: list[FormTag]) -> list[FormTag]:
     return sorted(tags, key=_TAG_ORDER.__getitem__)
 
 
-def _duration(acc: Sequence[PushupRepEvent | SitupRepEvent]) -> AvgStd:
+def _duration(acc: Sequence[AnyRepEvent]) -> AvgStd:
     dur = [float(e.end_t - e.start_t) for e in acc]
     return AvgStd(avg=r_ms(mean(dur)), std=r_ms(pstdev(dur)))
 
@@ -191,6 +200,132 @@ def situp_pose_summary(reps: Sequence[SitupRepEvent], cfg: FormTagsCfg) -> Situp
         torso_raise_deg=_flexion([e.min_torso_angle for e in acc]),
         hip_flexion_deg=_flexion(hips) if hips else None,
         knee_angle_deg=AvgOnly(avg=r_angle(mean(knee))) if knee else None,
+        rep_duration_ms=_duration(acc),
+        depth_consistency_deg=depth_std,
+        form_tags=_ordered(tags),
+    )
+
+
+# --- 런지·인버티드 숄더 프레스·글루트 브릿지 (D-71~D-73) ------------------------
+
+
+def _min_max_avg(vals: Sequence[float]) -> AvgMinMax:
+    return AvgMinMax(avg=r_angle(mean(vals)), min=r_angle(min(vals)), max=r_angle(max(vals)))
+
+
+def lunge_pose_summary(reps: Sequence[LungeRepEvent], cfg: FormTagsCfg) -> LungePoseSummary:
+    """시도 렙 전체로 사유 태그를, 인정 렙으로 수치를 만든다."""
+    tags = _reason_tags(reps, cfg)
+    acc = [e for e in reps if e.accepted]
+    if not acc:
+        return LungePoseSummary(
+            lunge_knee_flexion_deg=None,
+            hip_spread_deg=None,
+            knee_asymmetry_deg=None,
+            rep_duration_ms=None,
+            depth_consistency_deg=None,
+            form_tags=_ordered(tags),
+        )
+    depth_std = r_angle(pstdev([e.min_knee_angle for e in acc]))
+    spread = [e.hip_spread_at_bottom for e in acc if e.hip_spread_at_bottom is not None]
+    asym = [e.knee_asymmetry_at_bottom for e in acc if e.knee_asymmetry_at_bottom is not None]
+    if depth_std > cfg.depth_std_deg:
+        tags.append(FormTag.DEPTH_INCONSISTENT)
+    return LungePoseSummary(
+        lunge_knee_flexion_deg=_flexion([e.min_knee_angle for e in acc]),
+        hip_spread_deg=_min_max_avg(spread) if spread else None,
+        knee_asymmetry_deg=AvgOnly(avg=r_angle(mean(asym))) if asym else None,
+        rep_duration_ms=_duration(acc),
+        depth_consistency_deg=depth_std,
+        form_tags=_ordered(tags),
+    )
+
+
+def inverted_shoulder_press_pose_summary(
+    reps: Sequence[InvertedShoulderPressRepEvent], cfg: FormTagsCfg
+) -> InvertedShoulderPressPoseSummary:
+    """시도 렙 전체로 사유 태그를, 인정 렙으로 수치와 자세 태그를 만든다."""
+    tags = _reason_tags(reps, cfg)
+    acc = [e for e in reps if e.accepted]
+    if not acc:
+        return InvertedShoulderPressPoseSummary(
+            elbow_flexion_deg=None,
+            pike_hip_angle_deg=None,
+            knee_angle_deg=None,
+            elbow_asymmetry_deg=None,
+            rep_duration_ms=None,
+            depth_consistency_deg=None,
+            form_tags=_ordered(tags),
+        )
+    depth_std = r_angle(pstdev([e.min_elbow_angle for e in acc]))
+    pike = [e.min_pike_hip_angle for e in acc if e.min_pike_hip_angle is not None]
+    knee = [e.knee_angle_at_bottom for e in acc if e.knee_angle_at_bottom is not None]
+    asym = [e.elbow_asymmetry_at_bottom for e in acc if e.elbow_asymmetry_at_bottom is not None]
+    asym_avg = r_angle(mean(asym)) if asym else None
+    if depth_std > cfg.depth_std_deg:
+        tags.append(FormTag.DEPTH_INCONSISTENT)
+    if asym_avg is not None and asym_avg > cfg.asymmetry_deg:
+        tags.append(FormTag.ELBOW_ASYMMETRY)
+    return InvertedShoulderPressPoseSummary(
+        elbow_flexion_deg=_flexion([e.min_elbow_angle for e in acc]),
+        pike_hip_angle_deg=_min_max_avg(pike) if pike else None,
+        knee_angle_deg=AvgOnly(avg=r_angle(mean(knee))) if knee else None,
+        elbow_asymmetry_deg=AvgOnly(avg=asym_avg) if asym_avg is not None else None,
+        rep_duration_ms=_duration(acc),
+        depth_consistency_deg=depth_std,
+        form_tags=_ordered(tags),
+    )
+
+
+def glute_bridge_pose_summary(
+    reps: Sequence[GluteBridgeRepEvent], cfg: FormTagsCfg
+) -> GluteBridgePoseSummary:
+    """시도 렙 전체로 사유 태그를, 인정 렙으로 수치를 만든다."""
+    tags = _reason_tags(reps, cfg)
+    acc = [e for e in reps if e.accepted]
+    if not acc:
+        return GluteBridgePoseSummary(
+            top_hip_flexion_deg=None,
+            top_knee_angle_deg=None,
+            rep_duration_ms=None,
+            depth_consistency_deg=None,
+            form_tags=_ordered(tags),
+        )
+    depth_std = r_angle(pstdev([e.min_hip_flexion for e in acc]))
+    knee = [e.knee_angle_at_top for e in acc if e.knee_angle_at_top is not None]
+    if depth_std > cfg.depth_std_deg:
+        tags.append(FormTag.DEPTH_INCONSISTENT)
+    return GluteBridgePoseSummary(
+        top_hip_flexion_deg=_min_max_avg([e.min_hip_flexion for e in acc]),
+        top_knee_angle_deg=AvgOnly(avg=r_angle(mean(knee))) if knee else None,
+        rep_duration_ms=_duration(acc),
+        depth_consistency_deg=depth_std,
+        form_tags=_ordered(tags),
+    )
+
+
+def side_leg_lift_pose_summary(
+    reps: Sequence[SideLegLiftRepEvent], cfg: FormTagsCfg
+) -> SideLegLiftPoseSummary:
+    """시도 렙 전체로 사유 태그를, 인정 렙으로 수치를 만든다 (D-77)."""
+    tags = _reason_tags(reps, cfg)
+    acc = [e for e in reps if e.accepted]
+    if not acc:
+        return SideLegLiftPoseSummary(
+            leg_spread_deg=None,
+            top_knee_angle=None,
+            rep_duration_ms=None,
+            depth_consistency_deg=None,
+            form_tags=_ordered(tags),
+        )
+    spread = [e.max_leg_spread for e in acc]
+    depth_std = r_angle(pstdev(spread))
+    knee = [e.knee_angle_at_top for e in acc if e.knee_angle_at_top is not None]
+    if depth_std > cfg.depth_std_deg:
+        tags.append(FormTag.DEPTH_INCONSISTENT)
+    return SideLegLiftPoseSummary(
+        leg_spread_deg=_min_max_avg(spread),
+        top_knee_angle=AvgOnly(avg=r_angle(mean(knee))) if knee else None,
         rep_duration_ms=_duration(acc),
         depth_consistency_deg=depth_std,
         form_tags=_ordered(tags),

@@ -18,9 +18,10 @@
 from __future__ import annotations
 
 from abc import abstractmethod
+from collections import deque
 from dataclasses import dataclass
 
-from rep_engine.config import FlexionCfg
+from rep_engine.config import FeetDownCfg, FlexionCfg
 from rep_engine.counters.base import ExerciseCounter
 from rep_engine.features.chain import ChainFeatures
 from rep_engine.schemas import AnyRepEvent, RepReason
@@ -43,6 +44,10 @@ class RepDraft:
     min_angle: float
     #: 렙 동안 둘째 판정 각도의 최저값 (쓰지 않거나 한 번도 안 보였으면 None)
     min_aux: float | None
+    #: 렙 동안 유지 각도의 최저값 (종목에 없거나 한 번도 안 보였으면 None, D-78)
+    min_hold: float | None
+    #: 렙 시작 직전~끝 동안 발이 뜬 최대 높이 ÷ 다리 길이 (발 뜸 규칙이 없거나 못 쟀으면 None)
+    max_foot_lift: float | None
     #: 최저점에서의 좌우 차·보조 각도 (필터 전)
     asymmetry_at_bottom: float | None
     form_at_bottom: float | None
@@ -52,8 +57,12 @@ class RepDraft:
 class FlexionCounter(ExerciseCounter[ChainFeatures]):
     """굽혔다 펴는 종목 판정기의 공통 부분."""
 
-    def __init__(self, cfg: FlexionCfg) -> None:
+    def __init__(self, cfg: FlexionCfg, feet_down: FeetDownCfg | None = None) -> None:
         self._cfg = cfg
+        #: 발이 바닥에 붙어 있어야 하는 종목의 발 뜸 판정 (D-79, D-82). None이면 확인하지 않음
+        self._feet = feet_down
+        self._floor: deque[tuple[int, float]] = deque()  # (t, 바닥 쪽 발목 y)
+        self._lifts: deque[tuple[int, float]] = deque()  # (t, 뜬 높이 ÷ 다리 길이)
         self._state = REST
         self._angle: float | None = None
         self._accepted = 0
@@ -65,6 +74,7 @@ class FlexionCounter(ExerciseCounter[ChainFeatures]):
         self._asym_at_min: float | None = None
         self._form_at_min: float | None = None
         self._min_aux: float | None = None
+        self._min_hold: float | None = None
         self._n_total = 0
         self._n_invalid = 0
         self._last_valid_t = 0
@@ -78,6 +88,41 @@ class FlexionCounter(ExerciseCounter[ChainFeatures]):
     @property
     def _aux_accept_angle(self) -> float | None:
         """둘째 판정 각도의 인정 기준 (이하여야 인정). None이면 둘째 조건 없음."""
+        return None
+
+    def _track_floor(self, f: ChainFeatures) -> None:
+        """바닥 높이와 발 뜸을 기록한다 (발 뜸 규칙이 있는 종목만)."""
+        feet = self._feet
+        if feet is None or not f.valid or f.floor_y is None or not f.leg_length:
+            return
+        while self._floor and f.t - self._floor[0][0] > feet.floor_window_ms:
+            self._floor.popleft()
+        self._floor.append((f.t, f.floor_y))
+        floor = max(y for _, y in self._floor)  # 화면 y는 아래로 증가 → 가장 낮은 위치
+        self._lifts.append((f.t, (floor - f.floor_y) / f.leg_length))
+        keep = self._cfg.max_rep_ms + feet.airborne_lookback_ms
+        while self._lifts and f.t - self._lifts[0][0] > keep:
+            self._lifts.popleft()
+
+    def _rep_foot_lift(self) -> float | None:
+        """지금 렙의 발 뜸 최댓값 (렙 시작 lookback 전부터). 규칙이 없거나 못 쟀으면 None."""
+        if self._feet is None:
+            return None
+        t0 = self._start_t - self._feet.airborne_lookback_ms
+        vals = [lift for t, lift in self._lifts if t >= t0]
+        return max(vals) if vals else None
+
+    @property
+    def _hold_accept_angle(self) -> float | None:
+        """유지 각도의 인정 기준 (렙 내내 이상이어야 인정, D-78). None이면 조건 없음."""
+        return None
+
+    def _bottom_form_reason(self, form_at_bottom: float | None) -> RepReason | None:
+        """최저점 보조 각도로 거는 추가 인정 조건 (기본: 없음).
+
+        `OUT_OF_FRAME`을 돌려주면 판정 불가(관절이 안 보임), `SHALLOW_DEPTH`면 기준 미달로 처리한다.
+        런지(좌우 엉덩이 각도 차 ≥ 기준)가 쓴다 (D-71).
+        """
         return None
 
     @property
@@ -100,12 +145,15 @@ class FlexionCounter(ExerciseCounter[ChainFeatures]):
         self._n_invalid = 0
         self._last_valid_t = f.t
         self._min_aux = None
+        self._min_hold = None
         self._track_aux(f)
         self._new_min(f, angle)
 
     def _track_aux(self, f: ChainFeatures) -> None:
         if f.aux_angle is not None and (self._min_aux is None or f.aux_angle < self._min_aux):
             self._min_aux = f.aux_angle
+        if f.hold_angle is not None and (self._min_hold is None or f.hold_angle < self._min_hold):
+            self._min_hold = f.hold_angle
 
     def _new_min(self, f: ChainFeatures, angle: float) -> None:
         self._min_angle = angle
@@ -126,12 +174,36 @@ class FlexionCounter(ExerciseCounter[ChainFeatures]):
         aux_shallow = (
             aux_limit is not None and self._min_aux is not None and self._min_aux > aux_limit
         )
+        hold_limit = self._hold_accept_angle
+        hold_missing = hold_limit is not None and self._min_hold is None
+        hold_bad = (
+            hold_limit is not None and self._min_hold is not None and self._min_hold < hold_limit
+        )
+        form_reason = self._bottom_form_reason(self._form_at_min)
+        foot_lift = self._rep_foot_lift()
+        feet_up = (
+            self._feet is not None
+            and foot_lift is not None
+            and foot_lift > self._feet.max_foot_lift_ratio
+        )
         reason: RepReason | None
-        if out_of_frame or invalid_ratio > c.max_invalid_ratio_in_rep or aux_missing:
+        if (
+            out_of_frame
+            or invalid_ratio > c.max_invalid_ratio_in_rep
+            or aux_missing
+            or hold_missing
+            or form_reason is RepReason.OUT_OF_FRAME
+        ):
             reason = RepReason.OUT_OF_FRAME
         elif end_t - self._start_t < c.min_rep_ms or self._min_t - self._start_t < c.min_descent_ms:
             reason = RepReason.TOO_FAST
-        elif self._min_angle > c.depth_accept_angle or aux_shallow:
+        elif (
+            self._min_angle > c.depth_accept_angle
+            or aux_shallow
+            or hold_bad
+            or feet_up
+            or form_reason is RepReason.SHALLOW_DEPTH
+        ):
             reason = RepReason.SHALLOW_DEPTH
         else:
             reason = None
@@ -148,6 +220,8 @@ class FlexionCounter(ExerciseCounter[ChainFeatures]):
                     reason=reason,
                     min_angle=self._min_angle,
                     min_aux=self._min_aux,
+                    min_hold=self._min_hold,
+                    max_foot_lift=foot_lift,
                     asymmetry_at_bottom=self._asym_at_min,
                     form_at_bottom=self._form_at_min,
                     invalid_ratio=invalid_ratio,
@@ -158,6 +232,7 @@ class FlexionCounter(ExerciseCounter[ChainFeatures]):
     # --- 공개 ----------------------------------------------------------------
     def update(self, features: ChainFeatures) -> list[AnyRepEvent]:
         """프레임 1개 처리. 이번 프레임에서 끝난 렙(0~1개)을 돌려준다."""
+        self._track_floor(features)
         c = self._cfg
         f = features
         angle = f.angle if f.valid else None

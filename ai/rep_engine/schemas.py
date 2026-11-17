@@ -51,8 +51,10 @@ COORD_MAX = 2.0
 
 
 #: 엔진이 판정하는 종목. 영문 값 표기는 제안·팀 확인 필요 (DATA-MODEL.md '아직 정하지 못한 것',
-#: DECISIONS D-66). MVP 범위(mvp-scope.md)는 스쿼트뿐이며 PUSHUP·SITUP은 엔진에만 있다.
-ExerciseType = Literal["SQUAT", "PUSHUP", "SITUP"]
+#: DECISIONS D-66·D-71~D-73). MVP 범위(mvp-scope.md)는 스쿼트뿐이며 나머지 종목은 엔진에만 있다.
+ExerciseType = Literal[
+    "SQUAT", "PUSHUP", "SITUP", "LUNGE", "INVERTED_SHOULDER_PRESS", "GLUTE_BRIDGE", "SIDE_LEG_LIFT"
+]
 
 
 # --- 입력 --------------------------------------------------------------------
@@ -202,6 +204,8 @@ class PushupRepEvent(ApiModel):
     body_line_dev_at_bottom: float | None
     elbow_asymmetry_at_bottom: float | None
     invalid_ratio: float
+    #: 렙 동안 무릎 내각의 최저값 (D-78). 무릎을 대고 하면 작다. 다리가 안 보였으면 null
+    min_knee_angle_in_rep: float | None = None
 
     @property
     def depth_angle(self) -> float:
@@ -229,14 +233,126 @@ class SitupRepEvent(ApiModel):
     min_hip_angle: float | None
     knee_angle_at_bottom: float | None
     invalid_ratio: float
+    #: 렙 동안 발이 바닥에서 뜬 최대 높이 ÷ 다리 길이 (D-82). 발 뜸 규칙이 없는 카탈로그면 null
+    max_foot_lift: float | None = None
 
     @property
     def depth_angle(self) -> float:
         return self.min_torso_angle
 
 
+class LungeRepEvent(ApiModel):
+    """런지 렙 1개 (D-71). 판정 각도는 무릎 내각(엉덩이–무릎–발목, 보이는 다리 평균, 도).
+
+    - `hipSpreadAtBottom`: 최저점의 |왼쪽 − 오른쪽 엉덩이 내각(어깨–엉덩이–무릎)|. 런지는 앞다리
+      엉덩이가 굽고 뒷다리 엉덩이가 펴져서 크고, 스쿼트는 0에 가깝다. 양쪽이 다 보이지 않으면 null
+      (그 렙은 OUT_OF_FRAME).
+    - `kneeAsymmetryAtBottom`: 좌우 무릎 각도 차. 양다리가 모두 보일 때만.
+    """
+
+    index: int = Field(ge=1)
+    start_t: int
+    bottom_t: int
+    end_t: int
+    accepted: bool
+    reason: RepReason | None
+    min_knee_angle: float
+    hip_spread_at_bottom: float | None
+    knee_asymmetry_at_bottom: float | None
+    invalid_ratio: float
+    #: 렙 시작 직전~끝 동안 발이 바닥에서 뜬 최대 높이 ÷ 다리 길이 (D-79). 잴 수 없으면 null
+    max_foot_lift: float | None
+
+    @property
+    def depth_angle(self) -> float:
+        return self.min_knee_angle
+
+
+class InvertedShoulderPressRepEvent(ApiModel):
+    """인버티드 숄더 프레스(파이크 자세) 렙 1개 (D-72). 판정 각도는 팔꿈치 내각(도).
+
+    - `minPikeHipAngle`: 렙 동안 엉덩이 각도(어깨–엉덩이–발목 내각)의 최저값. 엉덩이를 높이 접을수록
+      작다(일반 푸시업은 약 180°). 한 번도 안 보였으면 null (그 렙은 OUT_OF_FRAME).
+    - `kneeAngleAtBottom`: 최저점의 무릎 내각. 다리를 펴면 약 180°.
+    - `elbowAsymmetryAtBottom`: 좌우 팔꿈치 각도 차. 양팔이 모두 보일 때만.
+    """
+
+    index: int = Field(ge=1)
+    start_t: int
+    bottom_t: int
+    end_t: int
+    accepted: bool
+    reason: RepReason | None
+    min_elbow_angle: float
+    min_pike_hip_angle: float | None
+    knee_angle_at_bottom: float | None
+    elbow_asymmetry_at_bottom: float | None
+    invalid_ratio: float
+
+    @property
+    def depth_angle(self) -> float:
+        return self.min_elbow_angle
+
+
+class GluteBridgeRepEvent(ApiModel):
+    """글루트 브릿지 렙 1개 (D-73).
+
+    - `minHipFlexion`: 렙 동안 엉덩이 굽힘(180 − 어깨–엉덩이–무릎 내각)의 최저값. 엉덩이를 들어
+      어깨–엉덩이–무릎이 일직선이면 0°. 누운 자세는 약 45°.
+    - `bottomT`: 판정 각도가 가장 작은 시각 = 엉덩이가 가장 높이 들린 시각 (종목 공통 이름).
+    - `kneeAngleAtTop`: 그때의 무릎 내각(엉덩이–무릎–발목). 안 보이면 null.
+    """
+
+    index: int = Field(ge=1)
+    start_t: int
+    bottom_t: int
+    end_t: int
+    accepted: bool
+    reason: RepReason | None
+    min_hip_flexion: float
+    knee_angle_at_top: float | None
+    invalid_ratio: float
+
+    @property
+    def depth_angle(self) -> float:
+        return self.min_hip_flexion
+
+
+class SideLegLiftRepEvent(ApiModel):
+    """사이드 레그 리프트 렙 1개 (D-77).
+
+    - `maxLegSpread`: 렙 동안 다리 벌림(왼·오른 엉덩이→발목 선 사이 각도)의 최댓값(도).
+      다리를 모으면 약 0°.
+    - `bottomT`: 다리를 가장 높이 든 시각 (종목 공통 이름).
+    - `kneeAngleAtTop`: 그때의 무릎 내각(보이는 다리 평균). 다리를 펴면 약 180°.
+    """
+
+    index: int = Field(ge=1)
+    start_t: int
+    bottom_t: int
+    end_t: int
+    accepted: bool
+    reason: RepReason | None
+    max_leg_spread: float
+    knee_angle_at_top: float | None
+    invalid_ratio: float
+
+    @property
+    def depth_angle(self) -> float:
+        """판정 각도(180 − 다리 벌림)의 최저값."""
+        return 180.0 - self.max_leg_spread
+
+
 #: 세션 결과의 렙 (종목별 모양). 필드 이름이 서로 달라 JSON만으로 구별된다.
-AnyRepEvent = RepEvent | PushupRepEvent | SitupRepEvent
+AnyRepEvent = (
+    RepEvent
+    | PushupRepEvent
+    | SitupRepEvent
+    | LungeRepEvent
+    | InvertedShoulderPressRepEvent
+    | GluteBridgeRepEvent
+    | SideLegLiftRepEvent
+)
 
 
 class LivenessStatus(StrEnum):
@@ -371,7 +487,75 @@ class SitupPoseSummary(ApiModel):
     form_tags: list[FormTag]
 
 
-AnyPoseSummary = PoseSummary | PushupPoseSummary | SitupPoseSummary
+class LungePoseSummary(ApiModel):
+    """런지 자세 요약 (L4 입력, D-71). 인정 렙이 0개면 수치 필드는 null.
+
+    - `lungeKneeFlexionDeg` = 180 − minKneeAngle.
+    - `hipSpreadDeg`: 최저점의 좌우 엉덩이 각도 차 (보폭이 충분했는지).
+    """
+
+    lunge_knee_flexion_deg: AvgMinMax | None
+    hip_spread_deg: AvgMinMax | None
+    knee_asymmetry_deg: AvgOnly | None
+    rep_duration_ms: AvgStd | None
+    depth_consistency_deg: float | None
+    form_tags: list[FormTag]
+
+
+class InvertedShoulderPressPoseSummary(ApiModel):
+    """인버티드 숄더 프레스 자세 요약 (L4 입력, D-72). 인정 렙이 0개면 수치 필드는 null.
+
+    - `elbowFlexionDeg` = 180 − minElbowAngle.
+    - `pikeHipAngleDeg`: 렙별 엉덩이 각도 최저값 (작을수록 엉덩이를 높이 접음).
+    - `kneeAngleDeg`: 최저점 무릎 내각 (다리를 펴면 약 180°).
+    """
+
+    elbow_flexion_deg: AvgMinMax | None
+    pike_hip_angle_deg: AvgMinMax | None
+    knee_angle_deg: AvgOnly | None
+    elbow_asymmetry_deg: AvgOnly | None
+    rep_duration_ms: AvgStd | None
+    depth_consistency_deg: float | None
+    form_tags: list[FormTag]
+
+
+class GluteBridgePoseSummary(ApiModel):
+    """글루트 브릿지 자세 요약 (L4 입력, D-73). 인정 렙이 0개면 수치 필드는 null.
+
+    - `topHipFlexionDeg`: 렙별 엉덩이 굽힘 최저값 (0° = 어깨–엉덩이–무릎 일직선).
+    - `topKneeAngleDeg`: 가장 높이 들었을 때의 무릎 내각.
+    """
+
+    top_hip_flexion_deg: AvgMinMax | None
+    top_knee_angle_deg: AvgOnly | None
+    rep_duration_ms: AvgStd | None
+    depth_consistency_deg: float | None
+    form_tags: list[FormTag]
+
+
+class SideLegLiftPoseSummary(ApiModel):
+    """사이드 레그 리프트 자세 요약 (L4 입력, D-77). 인정 렙이 0개면 수치 필드는 null.
+
+    - `legSpreadDeg`: 렙별 다리 벌림 최댓값.
+    - `topKneeAngle`: 가장 높이 들었을 때의 무릎 내각 (다리를 폈는지).
+    """
+
+    leg_spread_deg: AvgMinMax | None
+    top_knee_angle: AvgOnly | None
+    rep_duration_ms: AvgStd | None
+    depth_consistency_deg: float | None
+    form_tags: list[FormTag]
+
+
+AnyPoseSummary = (
+    PoseSummary
+    | PushupPoseSummary
+    | SitupPoseSummary
+    | LungePoseSummary
+    | InvertedShoulderPressPoseSummary
+    | GluteBridgePoseSummary
+    | SideLegLiftPoseSummary
+)
 
 
 class Severity(StrEnum):
