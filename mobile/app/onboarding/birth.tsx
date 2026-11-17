@@ -1,10 +1,12 @@
-// 생년월일 (시안 '생년월일 (가입 1단계)'). 만 14세 미만이면 저장하지 않고 안내 화면으로 보낸다.
+// 생년월일 (시안 'AgeStep'). 만 14세 미만이면 저장하지 않고 안내 화면으로 보낸다.
 import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useDraft } from '../../src/onboarding/draft';
 import { MIN_SIGNUP_AGE, ageOn, daysInMonth, kstToday, toIsoDate } from '../../src/onboarding/rules';
-import { Accent, BodyHero, FadeToBlack, OB, PillButton, ProgressDots, Screen, Sub, Title } from '../../src/onboarding/ui';
+import { Cta, DS, Page } from '../../src/design/kit';
+import { BodyHero, FadeToBlack } from '../../src/onboarding/ui';
+import { Lime, StepDots, StepHeading } from '../../src/onboarding/parts';
 import { ITEM_H, WheelColumn } from '../../src/onboarding/WheelColumn';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -36,14 +38,13 @@ export default function Birth() {
     router.push('/onboarding/gender');
   };
 
-  return <Screen>
+  return <Page>
     <View style={styles.hero} pointerEvents="none"><BodyHero width={330} height={529} /></View>
     <FadeToBlack top={250} height={300} />
-    <View style={styles.top}><ProgressDots count={4} active={1} /></View>
+    <View style={styles.top}><StepDots count={4} active={1} /></View>
     <View style={styles.body}>
       <View style={styles.text}>
-        <Title>생년월일을 입력하세요</Title>
-        <Sub><Accent>만 14세</Accent>부터 가입할 수 있습니다.</Sub>
+        <StepHeading title="생년월일을 입력하세요" sub={<><Lime>만 14세</Lime>부터 가입할 수 있습니다.</>} />
       </View>
       <View style={styles.wheel}>
         <View style={styles.band} pointerEvents="none" />
@@ -52,16 +53,16 @@ export default function Birth() {
         <WheelColumn label="연도" width={72} values={years} index={years.indexOf(String(date.year))} onChange={(i) => set({ year: +years[i] })} />
       </View>
     </View>
-    <View style={styles.bottom}><PillButton title="계속하기" onPress={next} /></View>
-  </Screen>;
+    <View style={styles.bottom}><Cta title="계속하기" onPress={next} /></View>
+  </Page>;
 }
 
 const styles = StyleSheet.create({
   hero: { position: 'absolute', left: 150, top: 24 },
-  top: { paddingHorizontal: 24, paddingTop: 12 },
-  body: { flex: 1, justifyContent: 'flex-end', paddingHorizontal: 24, gap: 12 },
-  text: { gap: 8, maxWidth: 300 },
-  wheel: { flexDirection: 'row', justifyContent: 'center', gap: 8, marginBottom: 16 },
-  band: { position: 'absolute', left: 30, right: 30, top: ITEM_H * 2, height: ITEM_H, borderRadius: 12, backgroundColor: OB.surface },
-  bottom: { paddingHorizontal: 24, paddingBottom: 24 },
+  top: { paddingHorizontal: 20, paddingTop: 12 },
+  body: { flex: 1, justifyContent: 'flex-end', paddingHorizontal: 20, gap: 20 },
+  text: { maxWidth: 290 },
+  wheel: { flexDirection: 'row', justifyContent: 'center', gap: 8, marginBottom: 8 },
+  band: { position: 'absolute', left: 34, right: 34, top: ITEM_H * 2, height: ITEM_H, borderRadius: 12, backgroundColor: DS.bg2 },
+  bottom: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16 },
 });

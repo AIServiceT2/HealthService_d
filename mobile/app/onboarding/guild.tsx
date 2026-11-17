@@ -1,4 +1,4 @@
-// 길드 가입 (시안 'F-01 길드 가입'). 초대 코드(API-013) 또는 추천 길드([추가] API) 중 하나로 가입. 건너뛸 수 있다.
+// 길드 가입 (시안 'GuildJoin'). 초대 코드(API-013) 또는 추천 길드([추가] API) 중 하나로 가입. 건너뛸 수 있다.
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -7,7 +7,8 @@ import { HttpError } from '../../src/api/http';
 import { api } from '../../src/auth/session';
 import { useDraft } from '../../src/onboarding/draft';
 import { isInviteCode, normalizeInviteCode } from '../../src/onboarding/rules';
-import { ErrorText, Field, OB, PillButton, Screen, Sub, Title } from '../../src/onboarding/ui';
+import { Cta, DS, Page } from '../../src/design/kit';
+import { ErrorLine, InputField, QuietButton, StepHeading } from '../../src/onboarding/parts';
 
 export default function Guild() {
   const router = useRouter();
@@ -43,20 +44,17 @@ export default function Guild() {
     }
   };
 
-  return <Screen>
+  return <Page>
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-        <View style={{ gap: 8 }}>
-          <Title>함께할 길드를 골라요</Title>
-          <Sub>애매한 기록은 길드장에게 확인을 요청할 수 있습니다.</Sub>
-        </View>
-        <Field variant="box" label="초대 코드" value={code} onChangeText={(v) => { setCode(v); if (v) setSelected(null); }}
+        <StepHeading title="함께할 길드를 골라요" sub="애매한 기록은 길드장에게 확인을 요청할 수 있습니다." />
+        <InputField variant="box" label="초대 코드" value={code} onChangeText={(v) => { setCode(v); if (v) setSelected(null); }}
           placeholder="길드장에게 받은 코드" autoCapitalize="characters" autoCorrect={false} maxLength={8} error={codeError} />
         <Text style={styles.section}>추천 길드</Text>
         <View style={{ gap: 10 }}>
-          {guilds === null && !loadError && <ActivityIndicator color={OB.accent} accessibilityLabel="추천 길드 불러오는 중" />}
-          {loadError && <View style={{ gap: 4 }}><ErrorText>{loadError}</ErrorText><PillButton variant="text" title="다시 불러오기" onPress={load} /></View>}
-          {guilds?.length === 0 && <Sub>아직 추천할 길드가 없어요. 초대 코드로 가입하거나 나중에 할 수 있어요.</Sub>}
+          {guilds === null && !loadError && <ActivityIndicator color={DS.accent} accessibilityLabel="추천 길드 불러오는 중" />}
+          {loadError && <View style={{ gap: 4 }}><ErrorLine>{loadError}</ErrorLine><QuietButton title="다시 불러오기" onPress={load} /></View>}
+          {guilds?.length === 0 && <Text style={styles.empty}>아직 추천할 길드가 없어요. 초대 코드로 가입하거나 나중에 할 수 있어요.</Text>}
           {guilds?.map((g) => {
             const on = selected === g.guildId;
             return <Pressable key={g.guildId} accessibilityRole="radio" accessibilityState={{ checked: on }}
@@ -71,23 +69,24 @@ export default function Guild() {
             </Pressable>;
           })}
         </View>
-        <ErrorText>{error}</ErrorText>
+        <ErrorLine>{error}</ErrorLine>
       </ScrollView>
       <View style={styles.bottom}>
-        <PillButton title="가입하고 시작" onPress={join} loading={busy} disabled={usingCode ? !!codeError : !selected} />
-        <PillButton title="나중에 하겠습니다" variant="text" onPress={finish} disabled={busy} />
+        <Cta title="가입하고 시작" onPress={join} loading={busy} disabled={usingCode ? !!codeError : !selected} />
+        <QuietButton title="나중에 하겠습니다" onPress={finish} disabled={busy} />
       </View>
     </KeyboardAvoidingView>
-  </Screen>;
+  </Page>;
 }
 
 const styles = StyleSheet.create({
-  scroll: { flexGrow: 1, paddingHorizontal: 24, paddingTop: 16, gap: 24 },
-  section: { fontSize: 13, color: OB.muted, marginBottom: -14 },
-  card: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16, borderRadius: 14, borderWidth: 1, borderColor: OB.surfaceRaised, backgroundColor: OB.surface },
-  cardOn: { borderWidth: 2, borderColor: OB.accent, padding: 15 },
-  emblem: { width: 44, height: 44, borderRadius: 12, backgroundColor: OB.surfaceRaised },
-  cardName: { fontSize: 16, fontWeight: '600', color: '#FFFFFF' },
-  cardSub: { fontSize: 13, color: OB.muted },
-  bottom: { paddingHorizontal: 24, paddingBottom: 8 },
+  scroll: { flexGrow: 1, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 16, gap: 24 },
+  section: { fontSize: 13, color: DS.label2, marginBottom: -14 },
+  empty: { color: DS.label2, fontSize: 14, lineHeight: 21 },
+  card: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16, borderRadius: 14, borderWidth: 1, borderColor: DS.bg3, backgroundColor: DS.bg2 },
+  cardOn: { borderWidth: 2, borderColor: DS.accent, padding: 15 },
+  emblem: { width: 44, height: 44, borderRadius: 12, backgroundColor: DS.bg3 },
+  cardName: { fontSize: 16, fontWeight: '600', color: DS.label },
+  cardSub: { fontSize: 13, color: DS.label2 },
+  bottom: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 4 },
 });
