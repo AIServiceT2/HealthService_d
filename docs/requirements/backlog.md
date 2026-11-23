@@ -2,7 +2,7 @@
 
 - 작성일: 2026-10-26
 - 기준 문서: user-flows.md, 03-rules-states-llm.md, mvp-assumptions-questions.md(5-2), client-meeting-1.md
-- 완료 표시 (2026-11-23, 성민규): `main` 0338917에서 `backend/`의 `.venv/bin/python -m pytest -q` → 371 passed로 확인한 **서버 동작**만 `[x]`로 표시하고 근거 테스트를 아래에 적음. 화면(폰)에서 확인해야 하는 부분이 남았거나 테스트가 없는 조건은 `[ ]`로 두고 '미완료'에 이유를 적음. 인수 조건 문장은 고치지 않음
+- 완료 표시 (2026-11-23, 성민규·손범수 PR #170 판단 반영): `main` 0338917에서 `backend/`의 `.venv/bin/python -m pytest -q` → 371 passed로 확인한 **서버 동작**만 `[x]`로 표시하고 근거 테스트를 아래에 적음. 화면(폰)에서 확인해야 하는 부분이 남았거나 테스트가 없는 조건은 `[ ]`로 두고 '미완료'에 이유를 적음. 인수 조건 문장은 고치지 않음
 
 ---
 
@@ -23,8 +23,8 @@
   - 확인: `test_us01_api026_submit_creates_submitted_with_counted_reps` (2026-11-23 pytest 통과)
 - [x] (정상) 제출 후 그날(KST) 스쿼트 상한 예약량이 인정 렙 수만큼 늘어난다 (0회 → 30회)
   - 확인: `test_us01_api026_session_and_daily_cap_are_updated` (2026-11-23 pytest 통과)
-- [x] (정상) 서버로 전송된 데이터에는 영상 파일과 얼굴 랜드마크 좌표가 없고, 얼굴을 뺀 관절 좌표와 렙 타임스탬프만 있다
-  - 확인: `test_us01_api022_rejects_face_landmarks`, `test_submit_uses_ai_reps_and_replays_without_another_call`(얼굴 0~4번 null) (2026-11-23 pytest 통과)
+- [ ] (정상) 서버로 전송된 데이터에는 영상 파일과 얼굴 랜드마크 좌표가 없고, 얼굴을 뺀 관절 좌표와 렙 타임스탬프만 있다
+  - 미완료: 얼굴 좌표 거부는 `test_us01_api022_rejects_face_landmarks`로 확인. '영상이 전송되지 않음'을 단언하는 테스트는 없음 (PR #170)
 - [x] (실패·거절) 그날 스쿼트 인정량이 이미 200회인 상태에서 30회를 하면 제출건은 기록되지만 보상 대상 인정량은 0이다
   - 확인: `test_us01_api026_daily_cap_full_reserves_zero` (2026-11-23 pytest 통과)
 - [x] (실패·거절) 같은 사용자에게 같은 시간대의 활성 스쿼트 제출건이 있으면 새 제출건이 만들어지지 않고 거부 응답이 온다
@@ -98,8 +98,8 @@
   - 확인: `test_us03_api033_without_liveness_is_not_auto_approved_regardless_of_confidence` (2026-11-23 pytest 통과)
 - [x] (실패·거절) `PREPARED`를 거치지 않고 `SUBMITTED`에서 바로 `APPROVED`로 바꾸는 요청은 거부된다
   - 확인: `test_us03_api033_rejects_submitted_skipping_prepared` (2026-11-23 pytest 통과)
-- [x] (권한) 플레이어와 확인자는 확신도 값이나 승인 상태를 직접 바꿀 수 없고, 그런 요청은 거부된다
-  - 확인: `test_us03_api033_internal_only`, `test_submit_uses_ai_reps_and_replays_without_another_call`(확신도는 AI 엔진 재계산 값 저장) (2026-11-23 pytest 통과)
+- [ ] (권한) 플레이어와 확인자는 확신도 값이나 승인 상태를 직접 바꿀 수 없고, 그런 요청은 거부된다
+  - 미완료: 자동 승인 API가 내부 전용인 것(`test_us03_api033_internal_only`)과 확신도를 AI 재계산 값으로 저장하는 것(`test_submit_uses_ai_reps_and_replays_without_another_call`)은 확인. 확인자가 확신도를 바꾸려는 요청을 거부하는 테스트는 없음 (PR #170)
 
 ### 미확정
 - 확신도 기준 90% 확정 (3주차 첫 데모 전 자세 인식 모델 테스트 후)
@@ -119,8 +119,8 @@
 - 관련 이슈: (다음 주에 채움)
 
 ### 인수 조건
-- [x] (정상) `APPROVED` 건이 지급되면 상태가 `REWARDED`가 되고, 경험치·아이템·능력치 경험치·보스(또는 던전) 피해가 스냅샷에 저장된 값만큼 한 번 늘어난다
-  - 확인: `test_us04_grant_applies_snapshot_once_and_rewards` (2026-11-23 pytest 통과)
+- [ ] (정상) `APPROVED` 건이 지급되면 상태가 `REWARDED`가 되고, 경험치·아이템·능력치 경험치·보스(또는 던전) 피해가 스냅샷에 저장된 값만큼 한 번 늘어난다
+  - 미완료: 경험치·아이템·피해 1회 반영은 `test_us04_grant_applies_snapshot_once_and_rewards`로 확인. 능력치 경험치는 아직 구현되지 않음 (PR #170)
 - [ ] (정상) 지급 직후 얻은 아이템은 `LOCKED`, 능력치 경험치는 '확정 대기'로 표시되고, 지급 후 24시간이 지나기 전에는 위력·방어 계산에 들어가지 않는다
   - 미완료: `LOCKED`·확정 대기·24시간 해제는 `test_us04_grant_applies_snapshot_once_and_rewards`, `test_us04_release_before_24h_keeps_locked`, `test_us04_release_at_24h_unlocks`로 확인. 위력·방어 계산 반영 여부는 확인 못 함
 - [x] (실패·거절) 같은 지급 요청이 두 번 오면 두 번째 요청은 첫 번째 결과를 그대로 돌려주고, 경험치·아이템·피해량은 다시 늘지 않는다
@@ -156,14 +156,14 @@
   - 미완료: 30초 이하는 `test_us05_replay_combo_equals_hit_count_and_fits_30s`로 확인. 스킵 → 결과 카드는 폰에서 확인 전
 - [x] (실패·거절) `REWARDED`가 아닌 건(`PREPARED`, `CANCELED` 등)은 리플레이를 열 수 없다
   - 확인: `test_us05_not_rewarded_cannot_open_replay` (2026-11-23 pytest 통과)
-- [x] (실패·거절) 일일 상한 초과로 타격 수가 0이면 리플레이 없이 "일일 상한 초과" 카드가 나온다
-  - 확인: `test_us05_daily_cap_exceeded_has_no_replay`, `test_us05_daily_cap_exceeded_card` (2026-11-23 pytest 통과)
-- [x] (실패·거절) 서사 후보에 숫자·다른 스킬명·아이템명이 있으면 저장하지 않고 다시 만들며, 2번 실패하면 기본 문구가 나온다
-  - 확인: `test_us05_api049_retries_output_with_number_then_succeeds`, `test_us05_api049_two_bad_outputs_fall_back` (2026-11-23 pytest 통과)
+- [ ] (실패·거절) 일일 상한 초과로 타격 수가 0이면 리플레이 없이 "일일 상한 초과" 카드가 나온다
+  - 미완료: 서버 부분만 확인: `test_us05_daily_cap_exceeded_has_no_replay`, `test_us05_daily_cap_exceeded_card`. 화면 카드는 폰에서 확인 전 (PR #170)
+- [ ] (실패·거절) 서사 후보에 숫자·다른 스킬명·아이템명이 있으면 저장하지 않고 다시 만들며, 2번 실패하면 기본 문구가 나온다
+  - 미완료: 숫자 검사·2회 실패 시 기본 문구는 `test_us05_api049_retries_output_with_number_then_succeeds`, `test_us05_api049_two_bad_outputs_fall_back`로 확인. 다른 스킬명·아이템명 검사 테스트는 없음 (PR #170)
 - [x] (권한) 리플레이·결과 카드·교정 코멘트는 본인에게만 보이고, 다른 사용자가 요청하면 거부된다
   - 확인: `test_us05_other_user_is_403`, `test_us05_replay_only_for_owner` (2026-11-23 pytest 통과)
-- [x] (LLM) 서사·코멘트를 표시하거나 다시 만드는 일은 제출건 상태와 결과 카드의 수치를 바꾸지 않는다
-  - 확인: `test_us05_result_does_not_change_state`, `test_us05_saved_llm_texts_are_shown_and_numbers_unchanged` (2026-11-23 pytest 통과)
+- [ ] (LLM) 서사·코멘트를 표시하거나 다시 만드는 일은 제출건 상태와 결과 카드의 수치를 바꾸지 않는다
+  - 미완료: 표시는 `test_us05_result_does_not_change_state`, `test_us05_saved_llm_texts_are_shown_and_numbers_unchanged`로 확인. 다시 만드는 경우의 테스트는 없음 (PR #170)
 - [ ] (LLM) 서사를 다시 만드는 요청에도 수치·메모·관절 좌표 원본·닉네임은 담기지 않는다 (제안서 Ⅳ-13)
   - 미완료: 첫 요청 입력은 `test_us02_api049_sends_only_allowed_fields`로 확인. 다시 만드는 요청의 입력만 따로 검사한 테스트는 없음
 
@@ -196,8 +196,8 @@
   - 확인: `test_us06_api038_cancel_and_approve_at_the_same_time_only_one_wins`, `test_us03_api033_canceled_first_is_412` (2026-11-23 pytest 통과)
 - [x] (실패·거절) `CANCELED` 건은 다른 상태로 바뀌지 않는다
   - 확인: `test_us06_canceled_does_not_change_again` (2026-11-23 pytest 통과)
-- [x] (권한) 신청자 본인만 취소할 수 있고, 확인자·길드장·다른 사용자의 취소 요청은 거부된다
-  - 확인: `test_us06_only_applicant_can_cancel` (2026-11-23 pytest 통과)
+- [ ] (권한) 신청자 본인만 취소할 수 있고, 확인자·길드장·다른 사용자의 취소 요청은 거부된다
+  - 미완료: 다른 사용자 거부는 `test_us06_only_applicant_can_cancel`로 확인. 확인자·길드장의 취소 시도 테스트는 없음 (PR #170)
 - [x] (취소·반려 스토리) 신청자가 승인 전(`SUBMITTED` / `PREPARED` / `PENDING_REVIEW`)에 취소하면 `CANCELED`로 가고, 그 건에는 이후 보상 지급과 리플레이가 생기지 않는다
   - 확인: `test_us04_not_approved_is_409`, `test_us05_not_rewarded_cannot_open_replay` (2026-11-23 pytest 통과)
 
@@ -220,9 +220,9 @@
 
 ### 인수 조건
 - [x] (정상) 확신도 기준 미만인 `PREPARED` 건에서 신청자가 확인자(지인 또는 길드장) 1명을 골라 보내면 상태가 `PENDING_REVIEW`가 된다
-  - 확인: `test_us07_api035_sends_to_guild_leader_and_becomes_pending_review`, `test_us07_api035_can_send_to_guild_member_in_acquaintances` (2026-11-23 pytest 통과)
-- [x] (정상) 보내기 전에 보낼 내용(관절 선 또는 실루엣, 운동 종류, 제출 간격 통계)의 미리보기가 나오고, 신청자가 확인을 누른 뒤에만 전송된다
-  - 확인: `test_us07_api034_owner_sees_share_content_for_low_confidence`, `test_us07_api035_requires_share_preview_confirmed` (2026-11-23 pytest 통과)
+  - 확인: `test_us07_api035_sends_to_guild_leader_and_becomes_pending_review`, `test_us07_api035_can_send_to_guild_member_in_acquaintances` (API-017 지인 목록은 `main`에서 구현됨, `test_us07_api017_*`) (2026-11-23 pytest 통과)
+- [ ] (정상) 보내기 전에 보낼 내용(관절 선 또는 실루엣, 운동 종류, 제출 간격 통계)의 미리보기가 나오고, 신청자가 확인을 누른 뒤에만 전송된다
+  - 미완료: 확인 후에만 전송되는 것은 `test_us07_api035_requires_share_preview_confirmed`로 확인. 미리보기에 관절 선·운동 종류가 없음 (PR #170)
 - [ ] (실패·거절) 이미 `APPROVED`된 건에는 보내기 버튼이 없고, 보내기 요청은 거부된다
   - 미완료: 서버 부분만 확인: `test_us07_api035_rejects_already_approved`. 화면 버튼은 폰에서 확인 전
 - [x] (실패·거절) 신청자 본인을 확인자로 고르면 거부된다
@@ -231,8 +231,8 @@
   - 확인: `test_us07_api037_hides_face_age_and_guild`, `test_us07_api037_only_assigned_reviewer`, `test_us07_api036_others_do_not_see_it` (2026-11-23 pytest 통과)
 - [x] (LLM) 확인 화면의 `ai_summary`·`ai_flags`는 표시만 되고, 확인자가 승인이나 반려를 누르기 전까지 상태는 `PENDING_REVIEW`에서 바뀌지 않는다
   - 확인: `test_us07_api051_shows_on_review_screens_without_changing_state` (2026-11-23 pytest 통과)
-- [ ] (LLM) L1·L2 요청에는 닉네임·길드명, 메모 속 이름·연락처·장소, 관절 좌표 원본, 건강 앱 원본 데이터가 담기지 않고, 관절 좌표는 통계로만 보낸다 (제안서 Ⅳ-13)
-  - 미완료: L1·L2 입력 필드만 따로 검사한 테스트는 없음
+- [x] (LLM) L1·L2 요청에는 닉네임·길드명, 메모 속 이름·연락처·장소, 관절 좌표 원본, 건강 앱 원본 데이터가 담기지 않고, 관절 좌표는 통계로만 보낸다 (제안서 Ⅳ-13)
+  - 확인: `test_us07_api051_summary_and_rule_anomalies` (L1·L2에 보내는 필드를 정확히 검사, PR #170) (2026-11-23 pytest 통과)
 
 ### 미확정
 - 신청자가 아무에게도 보내지 않거나 확인자가 응답하지 않을 때의 처리
@@ -256,18 +256,18 @@
 ### 인수 조건
 - [x] (정상) 확인자가 사유 코드(`기록이상` / `본인확인실패` / `도용의심`)와 설명을 입력해 반려하면, 카메라 세션 건은 `REJECTED`를 거쳐 `CLOSED`가 된다
   - 확인: `test_us08_api039_reject_closes_and_releases_cap` (2026-11-23 pytest 통과)
-- [x] (정상) 반려되면 그 건이 예약한 일일 상한 인정량이 해제되고 보상은 지급되지 않는다
-  - 확인: `test_us08_api039_reject_closes_and_releases_cap`, `test_us04_not_approved_is_409` (2026-11-23 pytest 통과)
+- [ ] (정상) 반려되면 그 건이 예약한 일일 상한 인정량이 해제되고 보상은 지급되지 않는다
+  - 미완료: 상한 해제는 `test_us08_api039_reject_closes_and_releases_cap`로 확인. `CLOSED` 건 지급 거부 테스트는 없음 (PR #170)
 - [x] (실패·거절) 사유 코드나 설명 없이 반려를 요청하면 거부되고 상태는 `PENDING_REVIEW`에 남는다
   - 확인: `test_us08_api039_requires_reason_code_and_text` (2026-11-23 pytest 통과)
 - [x] (실패·거절) AI 판정이나 `ai_flags`만으로는 반려되지 않고, 확인자의 반려 요청이 있어야 `REJECTED`가 된다
   - 확인: `test_us07_api051_shows_on_review_screens_without_changing_state` (2026-11-23 pytest 통과)
-- [x] (실패·거절) `CLOSED` 건은 재제출되거나 다른 상태로 바뀌지 않는다
-  - 확인: `test_us08_api039_closed_cannot_change_again` (2026-11-23 pytest 통과)
+- [ ] (실패·거절) `CLOSED` 건은 재제출되거나 다른 상태로 바뀌지 않는다
+  - 미완료: 다른 상태로 안 바뀌는 것은 `test_us08_api039_closed_cannot_change_again`로 확인. 재제출 거부 테스트는 없음 (PR #170)
 - [x] (권한) 그 건을 요청받은 확인자만 반려할 수 있고, 신청자 본인과 요청받지 않은 사용자의 반려 요청은 거부된다
   - 확인: `test_us08_api039_only_assigned_reviewer` (2026-11-23 pytest 통과)
-- [x] (취소·반려 스토리) 확인자가 `PENDING_REVIEW` 건을 사유와 함께 반려하면 `REJECTED` → `CLOSED`로 가고, 신청자는 새 세션으로 다시 운동해야 한다
-  - 확인: `test_us08_api039_reject_closes_and_releases_cap` (2026-11-23 pytest 통과)
+- [ ] (취소·반려 스토리) 확인자가 `PENDING_REVIEW` 건을 사유와 함께 반려하면 `REJECTED` → `CLOSED`로 가고, 신청자는 새 세션으로 다시 운동해야 한다
+  - 미완료: `REJECTED → CLOSED`는 `test_us08_api039_reject_closes_and_releases_cap`로 확인. '새 세션으로 다시 운동해야 한다'를 확인하는 테스트는 없음 (PR #170)
 
 ### 미확정
 - 운영자의 도용 확정 절차
