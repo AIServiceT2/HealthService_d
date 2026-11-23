@@ -13,16 +13,32 @@ from typing import Any, Protocol
 from rep_engine.adapters import SkeletonFrame
 from rep_engine.anomaly import squat_rest
 from rep_engine.confidence import QualityFn
-from rep_engine.config import EngineConfig, FlexionCfg, PushupCfg, TorsoRangeCfg
+from rep_engine.config import (
+    AnomalyCfg,
+    EngineConfig,
+    FlexionCfg,
+    PushupCfg,
+    TorsoRangeCfg,
+    merge_anomaly,
+)
 from rep_engine.counters import base as counters
 from rep_engine.errors import UnsupportedExerciseError
 from rep_engine.features.chain import (
+    BOTH_LEGS_QUALITY_SPEC,
+    DONKEY_KICK_SPEC,
     GLUTE_BRIDGE_SPEC,
+    HIGH_KNEE_LEFT_SPEC,
+    HIGH_KNEE_RIGHT_SPEC,
     INVERTED_SHOULDER_PRESS_SPEC,
     LUNGE_SPEC,
+    MOUNTAIN_CLIMBER_LEFT_SPEC,
+    MOUNTAIN_CLIMBER_RIGHT_SPEC,
     PUSHUP_SPEC,
     SIDE_LEG_LIFT_SPEC,
     SITUP_SPEC,
+    SUPERMAN_SPEC,
+    AlternatingFeatureExtractor,
+    AlternatingFeatures,
     ChainFeatureExtractor,
     ChainFeatures,
     ChainSpec,
@@ -33,23 +49,31 @@ from rep_engine.features.posture import posture_ok
 from rep_engine.schemas import (
     AnyPoseSummary,
     AnyRepEvent,
+    DonkeyKickRepEvent,
     ExerciseType,
     GluteBridgeRepEvent,
+    HighKneeRepEvent,
     InvertedShoulderPressRepEvent,
     LungeRepEvent,
+    MountainClimberRepEvent,
     PushupRepEvent,
     RepEvent,
     SideLegLiftRepEvent,
     SitupRepEvent,
+    SupermanRepEvent,
 )
 from rep_engine.summary import (
+    donkey_kick_pose_summary,
     glute_bridge_pose_summary,
+    high_knee_pose_summary,
     inverted_shoulder_press_pose_summary,
     lunge_pose_summary,
+    mountain_climber_pose_summary,
     pose_summary,
     pushup_pose_summary,
     side_leg_lift_pose_summary,
     situp_pose_summary,
+    superman_pose_summary,
 )
 
 
@@ -66,6 +90,8 @@ class ExerciseKit:
     quality: QualityFn
     is_rest: Callable[[Any], bool]
     summarize: Callable[[Sequence[AnyRepEvent]], AnyPoseSummary]
+    #: 종목별 이상 징후 기준 (D-87). None이면 카탈로그 공통 `anomaly`를 쓴다
+    anomaly: AnomalyCfg | None = None
 
 
 def _flexion_rest(cfg: FlexionCfg) -> Callable[[ChainFeatures], bool]:
@@ -73,6 +99,14 @@ def _flexion_rest(cfg: FlexionCfg) -> Callable[[ChainFeatures], bool]:
         return f.angle_raw is not None and f.angle_raw >= cfg.rest_angle
 
     return is_rest
+
+
+def _anomaly(cfg: EngineConfig, key: str) -> AnomalyCfg | None:
+    """종목별 이상 징후 기준 (D-87). 덮어쓰기가 없으면 None(공통 기준 그대로)."""
+    if cfg.anomaly_by_exercise is None:
+        return None
+    override = getattr(cfg.anomaly_by_exercise, key)
+    return None if override is None else merge_anomaly(cfg.anomaly, override)
 
 
 def _posture_range(cfg: EngineConfig, key: str) -> TorsoRangeCfg | None:
@@ -112,6 +146,34 @@ def _chain_kit(
         quality=_with_posture(chain_quality(spec), rng),
         is_rest=_flexion_rest(section),
         summarize=summarize,
+        anomaly=_anomaly(cfg, key),
+    )
+
+
+def _alternating_kit(
+    exercise: ExerciseType,
+    cfg: EngineConfig,
+    key: str,
+    specs: tuple[ChainSpec, ChainSpec],
+    summarize: Callable[[Sequence[AnyRepEvent]], AnyPoseSummary],
+) -> ExerciseKit:
+    """다리를 번갈아 하는 종목(D-83): 다리마다 특징을 따로 뽑아 판정기에 함께 넘긴다."""
+    section = _section(cfg, exercise, key)
+    rng = _posture_range(cfg, key)
+
+    def is_rest(f: AlternatingFeatures) -> bool:
+        return all(
+            leg.angle_raw is not None and leg.angle_raw >= section.rest_angle
+            for leg in (f.left, f.right)
+        )
+
+    return ExerciseKit(
+        extractor=AlternatingFeatureExtractor(cfg.features, specs[0], specs[1], rng),
+        counter=counters.make_counter(exercise, cfg),
+        quality=_with_posture(chain_quality(BOTH_LEGS_QUALITY_SPEC), rng),
+        is_rest=is_rest,
+        summarize=summarize,
+        anomaly=_anomaly(cfg, key),
     )
 
 
@@ -187,12 +249,52 @@ def make_kit(exercise: ExerciseType, cfg: EngineConfig) -> ExerciseKit:
                 [e for e in reps if isinstance(e, GluteBridgeRepEvent)], ft
             ),
         )
+    if exercise == "SIDE_LEG_LIFT":
+        return _chain_kit(
+            exercise,
+            cfg,
+            "side_leg_lift",
+            SIDE_LEG_LIFT_SPEC,
+            lambda reps: side_leg_lift_pose_summary(
+                [e for e in reps if isinstance(e, SideLegLiftRepEvent)], ft
+            ),
+        )
+    if exercise == "HIGH_KNEE":
+        return _alternating_kit(
+            exercise,
+            cfg,
+            "high_knee",
+            (HIGH_KNEE_LEFT_SPEC, HIGH_KNEE_RIGHT_SPEC),
+            lambda reps: high_knee_pose_summary(
+                [e for e in reps if isinstance(e, HighKneeRepEvent)], ft
+            ),
+        )
+    if exercise == "MOUNTAIN_CLIMBER":
+        return _alternating_kit(
+            exercise,
+            cfg,
+            "mountain_climber",
+            (MOUNTAIN_CLIMBER_LEFT_SPEC, MOUNTAIN_CLIMBER_RIGHT_SPEC),
+            lambda reps: mountain_climber_pose_summary(
+                [e for e in reps if isinstance(e, MountainClimberRepEvent)], ft
+            ),
+        )
+    if exercise == "SUPERMAN":
+        return _chain_kit(
+            exercise,
+            cfg,
+            "superman",
+            SUPERMAN_SPEC,
+            lambda reps: superman_pose_summary(
+                [e for e in reps if isinstance(e, SupermanRepEvent)], ft
+            ),
+        )
     return _chain_kit(
         exercise,
         cfg,
-        "side_leg_lift",
-        SIDE_LEG_LIFT_SPEC,
-        lambda reps: side_leg_lift_pose_summary(
-            [e for e in reps if isinstance(e, SideLegLiftRepEvent)], ft
+        "donkey_kick",
+        DONKEY_KICK_SPEC,
+        lambda reps: donkey_kick_pose_summary(
+            [e for e in reps if isinstance(e, DonkeyKickRepEvent)], ft
         ),
     )

@@ -3,11 +3,14 @@
 화면: 위쪽 운동 선택 버튼, 스켈레톤, 현재 판정 각도, 상태, 목표(기본 5회)·인정/시도 수,
 마지막 미인정 사유, 최근 5초 각도 그래프, FPS. 목표 횟수를 채우면 'GOAL DONE'을 띄운다.
 마우스: 위쪽 버튼을 눌러 운동 선택 (누르면 그 운동으로 새 세션 시작)
-키: 1~7 운동 선택 · L 무작위 동작 확인 시작 · R 리셋 · S 세션 JSON 저장 · Q 종료
+키: 1~7 운동 선택(버튼과 같음) · 8 하이 니 · 9 마운틴 클라이머 · 0 슈퍼맨 · - 돈키 킥
+    · L 무작위 동작 확인 시작 · R 리셋 · S 세션 JSON 저장 · Q 종료
 
-운동 7종(스쿼트·푸시업·윗몸 일으키기·런지·인버티드 숄더 프레스·글루트 브릿지·사이드 레그 리프트)을
-고를 수 있도록 기본 카탈로그는 `cat_2026-11-17`이다 (자세 확인 D-75 포함). 엔진은 운동을 자동으로
-알아내지 않으므로 고른 운동과 같은 동작을 해야 한다. 바닥 운동은 몸 옆면이 보이게 폰·노트북을 둔다
+운동 11종(스쿼트·푸시업·윗몸 일으키기·런지·인버티드 숄더 프레스·글루트 브릿지·사이드 레그 리프트·
+하이 니·마운틴 클라이머·슈퍼맨·돈키 킥)을 고를 수 있도록 기본 카탈로그는 `cat_2026-11-23`이다
+(자세 확인 D-75 포함). 뒤의 4종은 버튼 없이 키(8·9·0·-)나 `--exercise`로 고른다 (D-88).
+엔진은 운동을 자동으로 알아내지 않으므로 고른 운동과 같은 동작을 해야 한다.
+바닥 운동은 몸 옆면이 보이게 폰·노트북을 둔다
 (사이드 레그 리프트는 옆으로 누운 몸의 앞쪽, 배 쪽이 보이게).
 
     python -m tools.webcam_demo                       # 카메라 0번, heavy 모델, 스쿼트, 목표 5회
@@ -57,8 +60,8 @@ LIVENESS_WINDOW_MS = 10000
 SNAPSHOT_DIR = Path.home() / "Downloads" / "jeonunsi_snapshots"
 #: 렙이 진행 중인 상태 (이 동안 최저점 후보 프레임을 들고 있음). 스쿼트 / 그 밖의 종목
 IN_REP_STATES = frozenset({DESCENDING, ASCENDING, FLEXING, EXTENDING})
-#: 운동 7종을 모두 판정할 수 있는 카탈로그 (D-71~D-77)
-DEMO_CATALOG = "cat_2026-11-17"
+#: 운동 11종을 모두 판정할 수 있는 카탈로그 (D-71~D-77, D-83~D-87)
+DEMO_CATALOG = "cat_2026-11-23"
 DEFAULT_TARGET_REPS = 5
 #: 선택 버튼 (종목, 화면 이름). 순서 = 키 1~7. OpenCV 기본 글꼴은 한글을 못 그려 영문으로 쓴다
 EXERCISE_BUTTONS: tuple[tuple[ExerciseType, str], ...] = (
@@ -70,6 +73,16 @@ EXERCISE_BUTTONS: tuple[tuple[ExerciseType, str], ...] = (
     ("GLUTE_BRIDGE", "BRIDGE"),
     ("SIDE_LEG_LIFT", "SIDE LEG"),
 )
+#: 버튼 없이 키로만 고르는 운동 (종목, 키). 버튼 줄에 넣지 않은 이유는 D-88
+EXTRA_EXERCISE_KEYS: tuple[tuple[ExerciseType, str], ...] = (
+    ("HIGH_KNEE", "8"),
+    ("MOUNTAIN_CLIMBER", "9"),
+    ("SUPERMAN", "0"),
+    ("DONKEY_KICK", "-"),
+)
+ALL_EXERCISES: tuple[ExerciseType, ...] = tuple(ex for ex, _ in EXERCISE_BUTTONS) + tuple(
+    ex for ex, _ in EXTRA_EXERCISE_KEYS
+)
 #: 종목 → 카탈로그 섹션 이름 (그래프 기준선용)
 _SECTION: dict[str, str] = {
     "SQUAT": "squat",
@@ -79,6 +92,10 @@ _SECTION: dict[str, str] = {
     "INVERTED_SHOULDER_PRESS": "inverted_shoulder_press",
     "GLUTE_BRIDGE": "glute_bridge",
     "SIDE_LEG_LIFT": "side_leg_lift",
+    "HIGH_KNEE": "high_knee",
+    "MOUNTAIN_CLIMBER": "mountain_climber",
+    "SUPERMAN": "superman",
+    "DONKEY_KICK": "donkey_kick",
 }
 #: MediaPipe 사람 찾기·자세 신뢰도 기준. 기본값 0.5는 다리가 가늘고 긴 사람을 놓쳐 낮춤 (D-80)
 MP_CONFIDENCE = 0.3
@@ -570,8 +587,11 @@ def run(
                     demo.set_exercise(EXERCISE_BUTTONS[idx][0], t_ms)
             if key in (ord("q"), ord("Q")):
                 break
+            extra = {ord(k): ex for ex, k in EXTRA_EXERCISE_KEYS}
             if ord("1") <= key < ord("1") + len(EXERCISE_BUTTONS):
                 demo.set_exercise(EXERCISE_BUTTONS[key - ord("1")][0], t_ms)
+            elif key in extra:
+                demo.set_exercise(extra[key], t_ms)
             elif key in (ord("r"), ord("R")):
                 demo.reset(start_t=t_ms)
             elif key in (ord("l"), ord("L")):
@@ -609,12 +629,12 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="카메라 화면을 거울처럼 뒤집어 보여 주고 meta.mirrored=true로 저장",
     )
-    p.add_argument("--catalog", default=DEMO_CATALOG, help=f"기본 {DEMO_CATALOG} (운동 7종)")
+    p.add_argument("--catalog", default=DEMO_CATALOG, help=f"기본 {DEMO_CATALOG} (운동 11종)")
     p.add_argument(
         "--exercise",
-        choices=[ex for ex, _ in EXERCISE_BUTTONS],
+        choices=list(ALL_EXERCISES),
         default="SQUAT",
-        help="처음 고를 운동 (화면 위 버튼이나 1~7 키로 바꿀 수 있음)",
+        help="처음 고를 운동 (화면 위 버튼·1~7 키, 8 9 0 - 키로 바꿀 수 있음)",
     )
     p.add_argument(
         "--mp-confidence",

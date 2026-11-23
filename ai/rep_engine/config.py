@@ -171,6 +171,57 @@ class SideLegLiftCfg(FlexionCfg):
     """
 
 
+class AlternatingCfg(FlexionCfg):
+    """다리를 번갈아 하는 종목(하이 니·마운틴 클라이머)의 **다리 하나** 판정 기준 (D-83).
+
+    판정 각도 = 그 다리의 엉덩이 내각(어깨–엉덩이–무릎). 다리마다 따로 굽혔다 펴기를 판정하고,
+    왼다리 1번 + 오른다리 1번을 묶어 1렙으로 센다. 두 다리가 모두 인정이어야 그 렙이 인정이다.
+    시간 기준(`min_rep_ms` 등)은 다리 하나 기준이다.
+    """
+
+    #: 이 다리가 가장 높이 올라간 순간, 반대쪽 다리의 엉덩이 내각이 이 값 이상이어야 인정
+    #: (두 다리를 함께 굽히는 스쿼트·웅크리기 제외). 반대쪽 다리가 안 보이면 OUT_OF_FRAME
+    min_other_hip_angle: float = Field(gt=0, le=180)
+    #: 한 쌍으로 묶을 수 있는 두 다리 사이 최대 간격 (앞 다리 끝 → 뒷 다리 시작, ms).
+    #: 넘으면 앞 다리는 짝 없이 버린다
+    max_pair_gap_ms: int = Field(gt=0)
+
+
+class HighKneeCfg(AlternatingCfg):
+    """하이 니 (D-83). 선 자세에서 무릎을 번갈아 엉덩이 높이 가까이 올린다."""
+
+
+class MountainClimberCfg(AlternatingCfg):
+    """마운틴 클라이머 (D-84). 플랭크 자세에서 무릎을 번갈아 가슴 쪽으로 당긴다."""
+
+    #: 렙 내내 팔 지지 각도(180 − 어깨→손목 선이 아래 방향에서 기운 각도)가 이 값 이상이어야 인정.
+    #: 손을 바닥에 짚고 팔이 몸을 받치는지 본다 (누워서 무릎 당기기 제외)
+    min_arm_support_angle: float = Field(gt=0, le=180)
+
+
+class SupermanCfg(FlexionCfg):
+    """슈퍼맨 (D-85). 판정 각도 = 몸 활 각도(어깨–엉덩이–발목 내각).
+
+    엎드려 일직선이면 약 180°, 팔·가슴과 다리를 들수록 작아진다. 들었다 내리면 1렙.
+    """
+
+    #: 가장 높이 든 순간 팔 뻗음(엉덩이–어깨–손목 내각)이 이 값 이상이어야 인정
+    #: (팔을 머리 위로 뻗음. 팔을 옆에 둔 글루트 브릿지와 구별)
+    min_arm_reach_angle: float = Field(gt=0, le=180)
+
+
+class DonkeyKickCfg(FlexionCfg):
+    """돈키 킥 (D-86). 판정 각도 = 180 − 엉덩이 내각(어깨–엉덩이–무릎), 좌우 중 작은 쪽(찬 다리).
+
+    네발 자세에서 허벅지가 아래로 내려 있으면 약 90°, 다리를 뒤로 차 올려 허벅지가 몸통과
+    일직선에 가까워질수록 0°에 가까워진다.
+    """
+
+    #: 렙 내내 팔 지지 각도가 이 값 이상이어야 인정
+    #: (손을 바닥에 짚은 네발 자세, 마운틴 클라이머와 같음)
+    min_arm_support_angle: float = Field(gt=0, le=180)
+
+
 class TorsoRangeCfg(_Cfg):
     """상체 방향 허용 범위 (D-75). 상체 방향 = 엉덩이→어깨 선이 화면 위쪽에서 기운 각도.
 
@@ -200,6 +251,10 @@ class PostureCfg(_Cfg):
     inverted_shoulder_press: TorsoRangeCfg | None = None
     glute_bridge: TorsoRangeCfg | None = None
     side_leg_lift: TorsoRangeCfg | None = None
+    high_knee: TorsoRangeCfg | None = None
+    mountain_climber: TorsoRangeCfg | None = None
+    superman: TorsoRangeCfg | None = None
+    donkey_kick: TorsoRangeCfg | None = None
 
 
 class LivenessCfg(_Cfg):
@@ -283,6 +338,52 @@ class AnomalyCfg(_Cfg):
     min_avg_rep_ms: float = Field(gt=0)
 
 
+class AnomalyOverrideCfg(_Cfg):
+    """종목별 이상 징후 기준 덮어쓰기 (D-87). 적은 값만 `anomaly`를 덮어쓴다.
+
+    값의 범위는 `AnomalyCfg`와 같고, 카탈로그를 읽을 때 합친 결과로 검증한다.
+    """
+
+    regular_timing_min_reps: int | None = None
+    regular_timing_std_ms: float | None = None
+    frozen_ms: int | None = None
+    frozen_motion_ratio: float | None = None
+    zero_jitter_min_ms: int | None = None
+    zero_jitter_ratio: float | None = None
+    stationary_speed_ratio: float | None = None
+    proportion_shift_ratio: float | None = None
+    reset_gap_ms: int | None = None
+    reset_count: int | None = None
+    min_avg_rep_ms: float | None = None
+
+
+class AnomalyByExerciseCfg(_Cfg):
+    """종목 섹션 이름 → 이상 징후 덮어쓰기 (D-87). 없는 종목은 공통 `anomaly`를 그대로 쓴다.
+
+    빠른 종목(하이 니·마운틴 클라이머)은 공통 기준(렙 평균 1초 미만 = UNREALISTIC_PACE)으로는
+    정상 동작도 이상으로 잡혀서 둔다.
+    """
+
+    squat: AnomalyOverrideCfg | None = None
+    pushup: AnomalyOverrideCfg | None = None
+    situp: AnomalyOverrideCfg | None = None
+    lunge: AnomalyOverrideCfg | None = None
+    inverted_shoulder_press: AnomalyOverrideCfg | None = None
+    glute_bridge: AnomalyOverrideCfg | None = None
+    side_leg_lift: AnomalyOverrideCfg | None = None
+    high_knee: AnomalyOverrideCfg | None = None
+    mountain_climber: AnomalyOverrideCfg | None = None
+    superman: AnomalyOverrideCfg | None = None
+    donkey_kick: AnomalyOverrideCfg | None = None
+
+
+def merge_anomaly(base: AnomalyCfg, override: AnomalyOverrideCfg) -> AnomalyCfg:
+    """공통 이상 징후 기준에 종목별 덮어쓰기를 합친다 (값 범위도 다시 검증)."""
+    return AnomalyCfg.model_validate(
+        {**base.model_dump(), **override.model_dump(exclude_none=True)}
+    )
+
+
 class RecountCfg(_Cfg):
     recount_tolerance: float = Field(ge=0)
     confidence_diff_warn: float = Field(ge=0, le=1)
@@ -306,13 +407,31 @@ class EngineConfig(_Cfg):
     inverted_shoulder_press: InvertedShoulderPressCfg | None = None
     glute_bridge: GluteBridgeCfg | None = None
     side_leg_lift: SideLegLiftCfg | None = None
+    high_knee: HighKneeCfg | None = None
+    mountain_climber: MountainClimberCfg | None = None
+    superman: SupermanCfg | None = None
+    donkey_kick: DonkeyKickCfg | None = None
     #: 없으면 어느 종목도 자세를 확인하지 않는다 (cat_2026-11-17 전 카탈로그)
     posture: PostureCfg | None = None
     liveness: LivenessCfg
     confidence: ConfidenceCfg
     form_tags: FormTagsCfg
     anomaly: AnomalyCfg
+    #: 종목별 이상 징후 덮어쓰기 (D-87). 없으면 모든 종목이 `anomaly`를 쓴다 (cat_2026-11-23 전)
+    anomaly_by_exercise: AnomalyByExerciseCfg | None = None
     recount: RecountCfg
+
+    @model_validator(mode="after")
+    def _anomaly_overrides(self) -> EngineConfig:
+        if self.anomaly_by_exercise is not None:
+            for key in AnomalyByExerciseCfg.model_fields:
+                override = getattr(self.anomaly_by_exercise, key)
+                if override is not None:
+                    try:
+                        merge_anomaly(self.anomaly, override)
+                    except ValidationError as exc:
+                        raise ValueError(f"anomaly_by_exercise.{key} 검증 실패: {exc}") from exc
+        return self
 
 
 class Catalog:

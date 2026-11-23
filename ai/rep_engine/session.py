@@ -121,8 +121,14 @@ class SessionRunner:
             self.kit.quality,
         )
         diag = math.hypot(self.meta.image_width, self.meta.image_height)
+        # 종목별 이상 징후 기준이 있으면 그것으로 (D-87). 없으면 공통 기준 그대로
+        acfg = (
+            cfg
+            if self.kit.anomaly is None
+            else cfg.model_copy(update={"anomaly": self.kit.anomaly})
+        )
         anomalies = detect_anomalies(
-            self._count_frames, self._count_feats, self.reps, cfg, diag, self.kit.is_rest
+            self._count_frames, self._count_feats, self.reps, acfg, diag, self.kit.is_rest
         )
         return SessionResult(
             engine_version=ENGINE_VERSION,
