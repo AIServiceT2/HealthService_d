@@ -43,8 +43,11 @@
 - LLM: 제공사·모델 미정. 백엔드에서만 호출
 - 테스트 방식: 백엔드 pytest + PostgreSQL(Docker Compose), 앱 Jest + React Native Testing Library, CI는 GitHub Actions
 - 시연·배포 환경: Android APK 직접 설치, 백엔드 Render Free, DB Neon Free
-- 실행 명령: (뼈대 이후)
-- 테스트 명령: (뼈대 이후)
+- 실행 명령: `확인 필요` (2026-11-23에는 돌려 보지 않음)
+- 테스트 명령 (2026-11-23 실제로 돌려 성공한 것):
+  - 서버: `docker compose up -d db-test` → `cd backend && .venv/bin/python -m pytest -q`
+  - 앱: `cd mobile && npm test`, 타입 검사 `npm run typecheck`
+  - AI 엔진: `cd ai && .venv/bin/python -m pytest -q`
 - 린트·포맷 명령: 미정
 - 담당 폴더: 테크리더 미정 / 개발자1(서버) 미정 / 개발자2(화면) 미정 / 테스트 미정
 
