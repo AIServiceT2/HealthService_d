@@ -1,4 +1,7 @@
-"""다리를 번갈아 하는 종목(하이 니·마운틴 클라이머)의 렙 판정 (D-83, D-84).
+"""좌우를 번갈아 하는 종목의 렙 판정 (D-83, D-84, D-90, D-91).
+
+하이 니·마운틴 클라이머·사이드 런지·버드독. 아래 설명의 '다리'는 한쪽 동작을 뜻한다
+(사이드 런지: 굽힌 다리, 버드독: 왼팔+오른다리 / 오른팔+왼다리).
 
 다리마다 `FlexionCounter` 규칙(`flexion.py`)으로 굽혔다 펴기를 따로 판정한다. 판정 각도는 그 다리의
 엉덩이 내각(어깨–엉덩이–무릎)이다. 다리 하나의 판정 결과는 바로 내보내지 않고,
@@ -22,7 +25,7 @@ from __future__ import annotations
 from abc import abstractmethod
 from dataclasses import dataclass
 
-from rep_engine.config import AlternatingCfg
+from rep_engine.config import FlexionCfg
 from rep_engine.counters.base import ExerciseCounter
 from rep_engine.counters.flexion import (
     EXTENDING,
@@ -33,6 +36,7 @@ from rep_engine.counters.flexion import (
     RepDraft,
 )
 from rep_engine.features.chain import AlternatingFeatures
+from rep_engine.rounding import r_angle
 from rep_engine.schemas import AnyRepEvent, RepReason
 
 #: 사유 우선순위 (flexion.py와 같음)
@@ -45,18 +49,30 @@ RIGHT = "R"
 class LegCounter(FlexionCounter):
     """다리 하나의 판정기. 결과를 내보내지 않고 `done`에 모은다 (`AlternatingCounter`가 가져감)."""
 
-    def __init__(self, cfg: AlternatingCfg, hold_limit: float | None) -> None:
+    def __init__(
+        self,
+        cfg: FlexionCfg,
+        min_other: float,
+        hold_limit: float | None = None,
+        aux_limit: float | None = None,
+    ) -> None:
         super().__init__(cfg)
-        self._min_other = cfg.min_other_hip_angle
+        self._min_other = min_other
         self._hold_limit = hold_limit
+        self._aux_limit = aux_limit
         self.done: list[RepDraft] = []
 
     @property
     def _hold_accept_angle(self) -> float | None:
         return self._hold_limit
 
+    @property
+    def _aux_accept_angle(self) -> float | None:
+        return self._aux_limit
+
     def _bottom_form_reason(self, form_at_bottom: float | None) -> RepReason | None:
-        # form_at_bottom = 이 다리를 가장 높이 올린 순간 반대 다리의 엉덩이 내각
+        # form_at_bottom = 이 쪽 동작의 최저점에서 반대쪽 값 (하이 니: 반대 다리 엉덩이 내각,
+        # 사이드 런지: 반대 다리 무릎 내각, 버드독: 받치는 팔의 팔 지지 각도). 이 값 이상이어야 인정
         if form_at_bottom is None:
             return RepReason.OUT_OF_FRAME
         if form_at_bottom < self._min_other:
@@ -82,10 +98,12 @@ class PairDraft:
     reason: RepReason | None
     left: RepDraft
     right: RepDraft
-    #: 각 다리를 올린 순간 반대 다리 엉덩이 내각 중 작은 값 (못 쟀으면 None)
-    min_other_hip: float | None
-    #: 두 다리 렙 동안 유지 각도(팔 지지)의 최저값 (규칙이 없거나 못 쟀으면 None)
+    #: 각 쪽 최저점의 반대쪽 값(반대 다리 각도·받치는 팔) 중 작은 값 (못 쟀으면 None)
+    min_other: float | None
+    #: 두 쪽 렙 동안 유지 각도(팔 지지)의 최저값 (규칙이 없거나 못 쟀으면 None)
     min_hold: float | None
+    #: 두 쪽 렙 동안 둘째 판정 각도 최저값 중 큰 값 = 덜 된 쪽 (규칙이 없거나 못 쟀으면 None)
+    max_min_aux: float | None
     invalid_ratio: float
 
 
@@ -94,13 +112,25 @@ def _min_opt(*vals: float | None) -> float | None:
     return min(present) if present else None
 
 
+def _max_opt(*vals: float | None) -> float | None:
+    present = [v for v in vals if v is not None]
+    return max(present) if present else None
+
+
 class AlternatingCounter(ExerciseCounter[AlternatingFeatures]):
     """두 다리를 묶어 1렙으로 세는 판정기의 공통 부분."""
 
-    def __init__(self, cfg: AlternatingCfg, hold_limit: float | None = None) -> None:
-        self._left = LegCounter(cfg, hold_limit)
-        self._right = LegCounter(cfg, hold_limit)
-        self._max_gap = cfg.max_pair_gap_ms
+    def __init__(
+        self,
+        cfg: FlexionCfg,
+        min_other: float,
+        max_pair_gap_ms: int,
+        hold_limit: float | None = None,
+        aux_limit: float | None = None,
+    ) -> None:
+        self._left = LegCounter(cfg, min_other, hold_limit, aux_limit)
+        self._right = LegCounter(cfg, min_other, hold_limit, aux_limit)
+        self._max_gap = max_pair_gap_ms
         self._pending: tuple[str, RepDraft] | None = None
         self._index = 0
         self._accepted = 0
@@ -131,7 +161,13 @@ class AlternatingCounter(ExerciseCounter[AlternatingFeatures]):
         self._index += 1
         if reason is None:
             self._accepted += 1
-        deeper = left if left.min_angle <= right.min_angle else right
+        # 더 깊이 한 쪽의 최저점 시각. 반올림한 각도로 비교하고 같으면 먼저 한 쪽 — 각도가 같을 때
+        # 부동소수 오차로 쪽이 뒤바뀌어 미러링 여부에 따라 bottomT가 달라지지 않게 (D-94)
+        la, ra = r_angle(left.min_angle), r_angle(right.min_angle)
+        if la != ra:
+            deeper = left if la < ra else right
+        else:
+            deeper = left if left.bottom_t <= right.bottom_t else right
         return self._event(
             PairDraft(
                 index=self._index,
@@ -141,8 +177,9 @@ class AlternatingCounter(ExerciseCounter[AlternatingFeatures]):
                 reason=reason,
                 left=left,
                 right=right,
-                min_other_hip=_min_opt(left.form_at_bottom, right.form_at_bottom),
+                min_other=_min_opt(left.form_at_bottom, right.form_at_bottom),
                 min_hold=_min_opt(left.min_hold, right.min_hold),
+                max_min_aux=_max_opt(left.min_aux, right.min_aux),
                 invalid_ratio=max(left.invalid_ratio, right.invalid_ratio),
             )
         )
