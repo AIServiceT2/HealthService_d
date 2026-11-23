@@ -14,7 +14,7 @@
     "if_match": "If-Match에는 제출건 version(ETag)",
     "internal": "/internal은 서버 내부 호출 전용"
   },
-  "count": 70,
+  "count": 71,
   "apis": [
     {
       "id": "API-001",
@@ -4524,6 +4524,106 @@
         }
       ],
       "notion_url": "https://app.notion.com/p/41326201378781a8b6e9ee72fb50496b"
+    },
+    {
+      "id": "API-071",
+      "name": "음성 안내 멘트 목록",
+      "method": "GET",
+      "endpoint": "/voice-cues",
+      "group": "session",
+      "auth": "PLAYER",
+      "scope": "MVP 필수",
+      "status": "미착수",
+      "features": [
+        "JN-039 음성 안내 (카운트·운동 완료·자세 교정)"
+      ],
+      "request": {
+        "headers": [
+          {
+            "헤더": "Authorization",
+            "값": "Bearer <access_token>",
+            "필수": "예"
+          }
+        ],
+        "params": [
+          {
+            "파라미터": "exerciseCode",
+            "위치": "Query",
+            "설명": "운동 종류 (선택, 예: SQUAT). 없으면 모든 운동 공통 멘트만"
+          }
+        ],
+        "body": null,
+        "notes": [
+          "Body 없음. 앱은 운동 세션을 시작하기 전에 불러 녹음 파일을 미리 받아 두고, 운동 중에는 서버를 부르지 않습니다."
+        ]
+      },
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "version": "2026.11-1",
+            "cues": [
+              {
+                "code": "COUNT_1",
+                "type": "COUNT",
+                "exerciseCode": null,
+                "number": 1,
+                "reasonCode": null,
+                "text": "하나",
+                "audioUrl": null
+              },
+              {
+                "code": "SET_DONE",
+                "type": "SET_DONE",
+                "exerciseCode": null,
+                "number": null,
+                "reasonCode": null,
+                "text": "한 세트 완료!",
+                "audioUrl": null
+              },
+              {
+                "code": "WORKOUT_DONE",
+                "type": "WORKOUT_DONE",
+                "exerciseCode": null,
+                "number": null,
+                "reasonCode": null,
+                "text": "운동 완료! 수고했어요",
+                "audioUrl": null
+              },
+              {
+                "code": "FORM_SQUAT_SHALLOW_DEPTH",
+                "type": "FORM",
+                "exerciseCode": "SQUAT",
+                "number": null,
+                "reasonCode": "SHALLOW_DEPTH",
+                "text": "조금 더 앉아 주세요",
+                "audioUrl": "https://..."
+              }
+            ]
+          },
+          "notes": [
+            "type은 COUNT | SET_DONE | WORKOUT_DONE | FORM입니다. FORM의 reasonCode는 렙 판정 엔진의 미인정 사유(OUT_OF_FRAME | TOO_FAST | SHALLOW_DEPTH)와 같습니다.",
+            "audioUrl은 녹음 전이면 null입니다. 녹음 파일은 팀이 나중에 추가하며, 올리는 방법은 미정입니다.",
+            "version이 바뀌었을 때만 다시 받으면 됩니다. 멘트 문구와 카운트 최대 횟수는 미정이며 위 문구는 예시입니다."
+          ]
+        }
+      ],
+      "errors": [
+        {
+          "code": "VALIDATION_FAILED",
+          "status": 400,
+          "message": "모르는 운동 종류입니다."
+        },
+        {
+          "code": "UNAUTHENTICATED",
+          "status": 401,
+          "message": "Bearer 토큰이 필요하거나 유효하지 않습니다."
+        }
+      ],
+      "other_sections": [
+        "2026-11-23 저장소에서 추가 (노션 원본에는 아직 없음)"
+      ],
+      "notion_url": null
     }
   ]
 }

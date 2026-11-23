@@ -181,8 +181,8 @@ def test_demo_button_layout_and_hit() -> None:
     from tools.webcam_demo import BUTTON_BAR_H, EXERCISE_BUTTONS, button_rects, hit_button
 
     rects = button_rects(1280)
-    # 7 → 11: 운동 4종 추가 (D-88, 테스트 담당 승인)
-    assert len(rects) == len(EXERCISE_BUTTONS) == 11
+    # 7 → 11 → 15: 운동 4종씩 추가 (D-88·D-93, 두 번 모두 테스트 담당 승인)
+    assert len(rects) == len(EXERCISE_BUTTONS) == 15
     for (x0, y0, x1, y1), (nx0, _, _, _) in zip(rects, rects[1:], strict=False):
         assert x0 < x1 <= nx0 and 0 <= y0 < y1 <= BUTTON_BAR_H  # 겹치지 않음
     for i, (x0, y0, x1, y1) in enumerate(rects):

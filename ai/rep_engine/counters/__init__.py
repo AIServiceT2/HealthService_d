@@ -1,9 +1,12 @@
 """종목 판정기. import 시 기본 종목이 등록된다.
 
 SQUAT·PUSHUP·SITUP·LUNGE·INVERTED_SHOULDER_PRESS·GLUTE_BRIDGE·SIDE_LEG_LIFT·
-HIGH_KNEE·MOUNTAIN_CLIMBER·SUPERMAN·DONKEY_KICK.
+HIGH_KNEE·MOUNTAIN_CLIMBER·SUPERMAN·DONKEY_KICK·
+REVERSE_CRUNCH·SIDE_LUNGE·BIRD_DOG·CALF_RAISE.
 """
 
+from rep_engine.counters import bird_dog as _bird_dog  # noqa: F401  (등록 부수효과)
+from rep_engine.counters import calf_raise as _calf_raise  # noqa: F401  (등록 부수효과)
 from rep_engine.counters import donkey_kick as _donkey_kick  # noqa: F401  (등록 부수효과)
 from rep_engine.counters import glute_bridge as _glute_bridge  # noqa: F401  (등록 부수효과)
 from rep_engine.counters import high_knee as _high_knee  # noqa: F401  (등록 부수효과)
@@ -15,7 +18,9 @@ from rep_engine.counters import (  # noqa: F401  (등록 부수효과)
     mountain_climber as _mountain_climber,
 )
 from rep_engine.counters import pushup as _pushup  # noqa: F401  (등록 부수효과)
+from rep_engine.counters import reverse_crunch as _reverse_crunch  # noqa: F401  (등록 부수효과)
 from rep_engine.counters import side_leg_lift as _side_leg_lift  # noqa: F401  (등록 부수효과)
+from rep_engine.counters import side_lunge as _side_lunge  # noqa: F401  (등록 부수효과)
 from rep_engine.counters import situp as _situp  # noqa: F401  (등록 부수효과)
 from rep_engine.counters import squat as _squat  # noqa: F401  (등록 부수효과)
 from rep_engine.counters import superman as _superman  # noqa: F401  (등록 부수효과)

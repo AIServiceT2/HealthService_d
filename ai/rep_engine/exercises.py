@@ -15,6 +15,7 @@ from rep_engine.anomaly import squat_rest
 from rep_engine.confidence import QualityFn
 from rep_engine.config import (
     AnomalyCfg,
+    CalfRaiseCfg,
     EngineConfig,
     FlexionCfg,
     PushupCfg,
@@ -23,7 +24,10 @@ from rep_engine.config import (
 )
 from rep_engine.counters import base as counters
 from rep_engine.errors import UnsupportedExerciseError
+from rep_engine.features.calf import CalfFeatureExtractor, calf_quality
 from rep_engine.features.chain import (
+    BIRD_DOG_LEFT_SPEC,
+    BIRD_DOG_RIGHT_SPEC,
     BOTH_LEGS_QUALITY_SPEC,
     DONKEY_KICK_SPEC,
     GLUTE_BRIDGE_SPEC,
@@ -34,7 +38,10 @@ from rep_engine.features.chain import (
     MOUNTAIN_CLIMBER_LEFT_SPEC,
     MOUNTAIN_CLIMBER_RIGHT_SPEC,
     PUSHUP_SPEC,
+    REVERSE_CRUNCH_SPEC,
     SIDE_LEG_LIFT_SPEC,
+    SIDE_LUNGE_LEFT_SPEC,
+    SIDE_LUNGE_RIGHT_SPEC,
     SITUP_SPEC,
     SUPERMAN_SPEC,
     AlternatingFeatureExtractor,
@@ -49,6 +56,8 @@ from rep_engine.features.posture import posture_ok
 from rep_engine.schemas import (
     AnyPoseSummary,
     AnyRepEvent,
+    BirdDogRepEvent,
+    CalfRaiseRepEvent,
     DonkeyKickRepEvent,
     ExerciseType,
     GluteBridgeRepEvent,
@@ -58,11 +67,15 @@ from rep_engine.schemas import (
     MountainClimberRepEvent,
     PushupRepEvent,
     RepEvent,
+    ReverseCrunchRepEvent,
     SideLegLiftRepEvent,
+    SideLungeRepEvent,
     SitupRepEvent,
     SupermanRepEvent,
 )
 from rep_engine.summary import (
+    bird_dog_pose_summary,
+    calf_raise_pose_summary,
     donkey_kick_pose_summary,
     glute_bridge_pose_summary,
     high_knee_pose_summary,
@@ -71,7 +84,9 @@ from rep_engine.summary import (
     mountain_climber_pose_summary,
     pose_summary,
     pushup_pose_summary,
+    reverse_crunch_pose_summary,
     side_leg_lift_pose_summary,
+    side_lunge_pose_summary,
     situp_pose_summary,
     superman_pose_summary,
 )
@@ -156,8 +171,12 @@ def _alternating_kit(
     key: str,
     specs: tuple[ChainSpec, ChainSpec],
     summarize: Callable[[Sequence[AnyRepEvent]], AnyPoseSummary],
+    quality: QualityFn | None = None,
 ) -> ExerciseKit:
-    """다리를 번갈아 하는 종목(D-83): 다리마다 특징을 따로 뽑아 판정기에 함께 넘긴다."""
+    """좌우를 번갈아 하는 종목(D-83): 쪽마다 특징을 따로 뽑아 판정기에 함께 넘긴다.
+
+    `quality`를 주지 않으면 두 쪽 판정 값이 모두 계산되어야 유효 프레임이다 (`_both_sides_quality`).
+    """
     section = _section(cfg, exercise, key)
     rng = _posture_range(cfg, key)
 
@@ -170,11 +189,25 @@ def _alternating_kit(
     return ExerciseKit(
         extractor=AlternatingFeatureExtractor(cfg.features, specs[0], specs[1], rng),
         counter=counters.make_counter(exercise, cfg),
-        quality=_with_posture(chain_quality(BOTH_LEGS_QUALITY_SPEC), rng),
+        quality=_with_posture(quality or _both_sides_quality(specs), rng),
         is_rest=is_rest,
         summarize=summarize,
         anomaly=_anomaly(cfg, key),
     )
+
+
+def _both_sides_quality(specs: tuple[ChainSpec, ChainSpec]) -> QualityFn:
+    """확신도용 프레임 품질: 두 쪽 판정 값이 모두 계산되어야 유효, 가시도는 두 쪽 평균."""
+    left, right = chain_quality(specs[0]), chain_quality(specs[1])
+
+    def quality(frame: SkeletonFrame, min_visibility: float) -> tuple[bool, float | None]:
+        ok_l, vis_l = left(frame, min_visibility)
+        ok_r, vis_r = right(frame, min_visibility)
+        if not (ok_l and ok_r) or vis_l is None or vis_r is None:
+            return False, None
+        return True, (vis_l + vis_r) / 2.0
+
+    return quality
 
 
 def _section(cfg: EngineConfig, exercise: ExerciseType, key: str) -> FlexionCfg:
@@ -268,6 +301,7 @@ def make_kit(exercise: ExerciseType, cfg: EngineConfig) -> ExerciseKit:
             lambda reps: high_knee_pose_summary(
                 [e for e in reps if isinstance(e, HighKneeRepEvent)], ft
             ),
+            chain_quality(BOTH_LEGS_QUALITY_SPEC),
         )
     if exercise == "MOUNTAIN_CLIMBER":
         return _alternating_kit(
@@ -278,6 +312,7 @@ def make_kit(exercise: ExerciseType, cfg: EngineConfig) -> ExerciseKit:
             lambda reps: mountain_climber_pose_summary(
                 [e for e in reps if isinstance(e, MountainClimberRepEvent)], ft
             ),
+            chain_quality(BOTH_LEGS_QUALITY_SPEC),
         )
     if exercise == "SUPERMAN":
         return _chain_kit(
@@ -289,12 +324,62 @@ def make_kit(exercise: ExerciseType, cfg: EngineConfig) -> ExerciseKit:
                 [e for e in reps if isinstance(e, SupermanRepEvent)], ft
             ),
         )
-    return _chain_kit(
-        exercise,
-        cfg,
-        "donkey_kick",
-        DONKEY_KICK_SPEC,
-        lambda reps: donkey_kick_pose_summary(
-            [e for e in reps if isinstance(e, DonkeyKickRepEvent)], ft
+    if exercise == "DONKEY_KICK":
+        return _chain_kit(
+            exercise,
+            cfg,
+            "donkey_kick",
+            DONKEY_KICK_SPEC,
+            lambda reps: donkey_kick_pose_summary(
+                [e for e in reps if isinstance(e, DonkeyKickRepEvent)], ft
+            ),
+        )
+    if exercise == "REVERSE_CRUNCH":
+        return _chain_kit(
+            exercise,
+            cfg,
+            "reverse_crunch",
+            REVERSE_CRUNCH_SPEC,
+            lambda reps: reverse_crunch_pose_summary(
+                [e for e in reps if isinstance(e, ReverseCrunchRepEvent)], ft
+            ),
+        )
+    if exercise == "SIDE_LUNGE":
+        return _alternating_kit(
+            exercise,
+            cfg,
+            "side_lunge",
+            (SIDE_LUNGE_LEFT_SPEC, SIDE_LUNGE_RIGHT_SPEC),
+            lambda reps: side_lunge_pose_summary(
+                [e for e in reps if isinstance(e, SideLungeRepEvent)], ft
+            ),
+        )
+    if exercise == "BIRD_DOG":
+        return _alternating_kit(
+            exercise,
+            cfg,
+            "bird_dog",
+            (BIRD_DOG_LEFT_SPEC, BIRD_DOG_RIGHT_SPEC),
+            lambda reps: bird_dog_pose_summary(
+                [e for e in reps if isinstance(e, BirdDogRepEvent)], ft
+            ),
+        )
+    return _calf_kit(cfg)
+
+
+def _calf_kit(cfg: EngineConfig) -> ExerciseKit:
+    """카프 레이즈 (D-92): 바닥 위치를 기억하는 전용 특징 추출기를 쓴다."""
+    section = _section(cfg, "CALF_RAISE", "calf_raise")
+    assert isinstance(section, CalfRaiseCfg)
+    rng = _posture_range(cfg, "calf_raise")
+    ft = cfg.form_tags
+    return ExerciseKit(
+        extractor=CalfFeatureExtractor(cfg.features, section.floor_window_ms, rng),
+        counter=counters.make_counter("CALF_RAISE", cfg),
+        quality=_with_posture(calf_quality, rng),
+        is_rest=_flexion_rest(section),
+        summarize=lambda reps: calf_raise_pose_summary(
+            [e for e in reps if isinstance(e, CalfRaiseRepEvent)], ft
         ),
+        anomaly=_anomaly(cfg, "calf_raise"),
     )

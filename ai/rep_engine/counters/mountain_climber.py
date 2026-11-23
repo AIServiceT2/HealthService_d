@@ -20,7 +20,9 @@ class MountainClimberCounter(AlternatingCounter):
     """마운틴 클라이머 판정기."""
 
     def __init__(self, cfg: MountainClimberCfg) -> None:
-        super().__init__(cfg, cfg.min_arm_support_angle)
+        super().__init__(
+            cfg, cfg.min_other_hip_angle, cfg.max_pair_gap_ms, cfg.min_arm_support_angle
+        )
 
     @classmethod
     def from_config(cls, cfg: EngineConfig) -> MountainClimberCounter:
@@ -43,7 +45,7 @@ class MountainClimberCounter(AlternatingCounter):
             right_min_tuck_angle=r_angle(p.right.min_angle),
             left_reason=p.left.reason,
             right_reason=p.right.reason,
-            min_back_leg_hip_angle=r_opt_angle(p.min_other_hip),
+            min_back_leg_hip_angle=r_opt_angle(p.min_other),
             min_arm_support_angle=r_opt_angle(p.min_hold),
             invalid_ratio=r_ratio(p.invalid_ratio),
         )

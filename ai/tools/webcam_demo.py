@@ -1,14 +1,17 @@
-"""웹캠 실시간 데모. 판정은 rep_engine의 SessionRunner를 그대로 호출한다 (데모 전용 판정 로직 없음).
+r"""웹캠 실시간 데모. 판정은 rep_engine의 SessionRunner를 그대로 호출한다
+(데모 전용 판정 로직 없음).
 
 화면: 위쪽 운동 선택 버튼, 스켈레톤, 현재 판정 각도, 상태, 목표(기본 5회)·인정/시도 수,
 마지막 미인정 사유, 최근 5초 각도 그래프, FPS. 목표 횟수를 채우면 'GOAL DONE'을 띄운다.
 마우스: 위쪽 버튼을 눌러 운동 선택 (누르면 그 운동으로 새 세션 시작)
-키: 1~9·0·- 운동 선택(버튼 순서와 같음) · L 무작위 동작 확인 시작 · R 리셋
+키: 1~9·0·-·=·[·]·\ 운동 선택(버튼 순서와 같음) · L 무작위 동작 확인 시작 · R 리셋
     · S 세션 JSON 저장 · Q 종료
 
-운동 11종(스쿼트·푸시업·윗몸 일으키기·런지·인버티드 숄더 프레스·글루트 브릿지·사이드 레그 리프트·
-하이 니·마운틴 클라이머·슈퍼맨·돈키 킥)을 고를 수 있도록 기본 카탈로그는 `cat_2026-11-23`이다
-(자세 확인 D-75 포함). 버튼 11개를 한 줄에 두고, 글자가 버튼보다 길면 글자 크기를 줄인다 (D-88).
+운동 15종(스쿼트·푸시업·윗몸 일으키기·런지·인버티드 숄더 프레스·글루트 브릿지·
+사이드 레그 리프트·하이 니·마운틴 클라이머·슈퍼맨·돈키 킥·리버스 크런치·사이드 런지·버드독·
+카프 레이즈)을 고를 수 있도록 기본 카탈로그는 `cat_2026-11-24`이다 (자세 확인 D-75 포함).
+버튼 15개를 한 줄에 두고, 글자가 버튼보다 길면 글자 크기를 줄인다 (D-88, D-93).
+사이드 런지는 **정면**에서 찍는다.
 엔진은 운동을 자동으로 알아내지 않으므로 고른 운동과 같은 동작을 해야 한다.
 바닥 운동은 몸 옆면이 보이게 폰·노트북을 둔다
 (사이드 레그 리프트는 옆으로 누운 몸의 앞쪽, 배 쪽이 보이게).
@@ -61,7 +64,7 @@ SNAPSHOT_DIR = Path.home() / "Downloads" / "jeonunsi_snapshots"
 #: 렙이 진행 중인 상태 (이 동안 최저점 후보 프레임을 들고 있음). 스쿼트 / 그 밖의 종목
 IN_REP_STATES = frozenset({DESCENDING, ASCENDING, FLEXING, EXTENDING})
 #: 운동 11종을 모두 판정할 수 있는 카탈로그 (D-71~D-77, D-83~D-87)
-DEMO_CATALOG = "cat_2026-11-23"
+DEMO_CATALOG = "cat_2026-11-24"
 DEFAULT_TARGET_REPS = 5
 #: 선택 버튼 (종목, 화면 이름). 순서 = `BUTTON_KEYS`.
 #: OpenCV 기본 글꼴은 한글을 못 그려 영문으로 쓴다
@@ -77,11 +80,15 @@ EXERCISE_BUTTONS: tuple[tuple[ExerciseType, str], ...] = (
     ("MOUNTAIN_CLIMBER", "CLIMBER"),
     ("SUPERMAN", "SUPERMAN"),
     ("DONKEY_KICK", "DONKEY"),
+    ("REVERSE_CRUNCH", "CRUNCH"),
+    ("SIDE_LUNGE", "SIDE LUNGE"),
+    ("BIRD_DOG", "BIRD DOG"),
+    ("CALF_RAISE", "CALF"),
 )
-#: 버튼별 선택 키 (버튼 순서와 같음). 키보드 숫자 줄 순서: 1~9, 0, -
-BUTTON_KEYS = "1234567890-"
+#: 버튼별 선택 키 (버튼 순서와 같음). 키보드 숫자 줄 순서 1~9, 0, -, = 다음 윗줄 [, ], \\
+BUTTON_KEYS = "1234567890-=[]\\"
 ALL_EXERCISES: tuple[ExerciseType, ...] = tuple(ex for ex, _ in EXERCISE_BUTTONS)
-#: 버튼 글자 기본 크기. 글자가 버튼보다 길면 들어갈 만큼 줄인다 (버튼 11개라 좁음, D-88)
+#: 버튼 글자 기본 크기. 글자가 버튼보다 길면 들어갈 만큼 줄인다 (버튼 15개라 좁음, D-88·D-93)
 BUTTON_FONT_SCALE = 0.55
 BUTTON_TEXT_PAD = 4  # 버튼 안쪽 좌우 여백 (px)
 #: 종목 → 카탈로그 섹션 이름 (그래프 기준선용)
@@ -97,6 +104,10 @@ _SECTION: dict[str, str] = {
     "MOUNTAIN_CLIMBER": "mountain_climber",
     "SUPERMAN": "superman",
     "DONKEY_KICK": "donkey_kick",
+    "REVERSE_CRUNCH": "reverse_crunch",
+    "SIDE_LUNGE": "side_lunge",
+    "BIRD_DOG": "bird_dog",
+    "CALF_RAISE": "calf_raise",
 }
 #: MediaPipe 사람 찾기·자세 신뢰도 기준. 기본값 0.5는 다리가 가늘고 긴 사람을 놓쳐 낮춤 (D-80)
 MP_CONFIDENCE = 0.3
@@ -648,12 +659,12 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="카메라 화면을 거울처럼 뒤집어 보여 주고 meta.mirrored=true로 저장",
     )
-    p.add_argument("--catalog", default=DEMO_CATALOG, help=f"기본 {DEMO_CATALOG} (운동 11종)")
+    p.add_argument("--catalog", default=DEMO_CATALOG, help=f"기본 {DEMO_CATALOG} (운동 15종)")
     p.add_argument(
         "--exercise",
         choices=list(ALL_EXERCISES),
         default="SQUAT",
-        help="처음 고를 운동 (화면 위 버튼이나 1~9·0·- 키로 바꿀 수 있음)",
+        help="처음 고를 운동 (화면 위 버튼이나 1~9·0·-·=·[·]·\\ 키로 바꿀 수 있음)",
     )
     p.add_argument(
         "--mp-confidence",

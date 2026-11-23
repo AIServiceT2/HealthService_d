@@ -4,9 +4,21 @@
 
 | 파일 | 노션 원본 | 내용 |
 | --- | --- | --- |
-| `jeonunsi_api_spec.json` | 전운시 API 명세서 (DB) | 공통 규칙(인증·시간·목록·에러 본문·If-Match) + API 70개(요청·응답·Error Code) |
-| `jeonunsi_db.json` | DB (ERD) | 테이블 15개·관계 18개, `DATA-MODEL.md`에서 바꾼 곳, 아직 정하지 못한 것, Mermaid ERD |
-| `jeonunsi_feature_spec.json` | 전운시 기능명세서 | 기능 38개(범위·사용자·스토리·상태 전이·LLM) |
+| `jeonunsi_api_spec.json` | 전운시 API 명세서 (DB) | 공통 규칙(인증·시간·목록·에러 본문·If-Match) + API 71개(요청·응답·Error Code) |
+| `jeonunsi_db.json` | DB (ERD) | 테이블 16개·관계 19개, `DATA-MODEL.md`에서 바꾼 곳, 아직 정하지 못한 것, Mermaid ERD |
+| `jeonunsi_feature_spec.json` | 전운시 기능명세서 | 기능 39개(범위·사용자·스토리·상태 전이·LLM) |
+
+### 노션 원본에 없는 항목 (저장소에서 추가)
+
+노션에서 내보낸 뒤 저장소에서 직접 추가한 항목이다. 노션에는 아직 없으므로 노션에도 같은 번호로 옮겨 적어야 한다. 그 전에 노션에서 다시 내보내 파일을 통째로 바꾸면 이 항목이 사라진다.
+
+| 추가일 | 파일 | 항목 | 내용 |
+| --- | --- | --- | --- |
+| 2026-11-23 | `jeonunsi_feature_spec.json` | `JN-039` 음성 안내 (카운트·운동 완료·자세 교정) | 운동 중 인정 렙 카운트·세트/운동 완료·미인정 사유별 자세 교정 멘트. 녹음은 팀이 나중에 추가. JN-014·JN-033 설명에 관계 메모 추가 |
+| 2026-11-23 | `jeonunsi_api_spec.json` | `API-071` `GET /voice-cues` | 운동 시작 전에 멘트 목록·녹음 파일 주소(녹음 전 `null`)를 받음 |
+| 2026-11-23 | `jeonunsi_db.json` | `VOICE_CUE` 테이블 | 멘트 코드·종류·운동·횟수·미인정 사유·문구·녹음 파일 주소. 관계·요약·바꾼 것·아직 정하지 못한 것·Mermaid ERD 함께 수정 |
+
+추가한 항목에는 `notion_url`이 `null`이고, 출처에 "노션 원본에는 아직 없음"이라고 적혀 있다.
 
 - 노션 내용은 **참고 자료**다. 저장소 문서(`backlog.md`·`API.md`·`DATA-MODEL.md` 등)와 다르면 한쪽에 맞추지 않고 알린다 (CLAUDE.md 팀 규칙).
 - 노션이 바뀌어도 이 파일은 자동으로 바뀌지 않는다. 다시 내보내면 파일을 통째로 바꾸고 `exported_at`을 확인한다.

@@ -18,6 +18,10 @@ from rep_engine.schemas import (
     AvgMinMax,
     AvgOnly,
     AvgStd,
+    BirdDogPoseSummary,
+    BirdDogRepEvent,
+    CalfRaisePoseSummary,
+    CalfRaiseRepEvent,
     DonkeyKickPoseSummary,
     DonkeyKickRepEvent,
     FormTag,
@@ -36,8 +40,12 @@ from rep_engine.schemas import (
     PushupRepEvent,
     RepEvent,
     RepReason,
+    ReverseCrunchPoseSummary,
+    ReverseCrunchRepEvent,
     SideLegLiftPoseSummary,
     SideLegLiftRepEvent,
+    SideLungePoseSummary,
+    SideLungeRepEvent,
     SitupPoseSummary,
     SitupRepEvent,
     SupermanPoseSummary,
@@ -469,5 +477,127 @@ def donkey_kick_pose_summary(
         kick_knee_angle_deg=_avg_only(knee),
         rep_duration_ms=_duration(acc),
         depth_consistency_deg=depth_std,
+        form_tags=_ordered(tags),
+    )
+
+
+# --- 리버스 크런치·사이드 런지·버드독·카프 레이즈 (D-89~D-92) -------------------
+
+
+def reverse_crunch_pose_summary(
+    reps: Sequence[ReverseCrunchRepEvent], cfg: FormTagsCfg
+) -> ReverseCrunchPoseSummary:
+    """시도 렙 전체로 사유 태그를, 인정 렙으로 수치를 만든다 (D-89)."""
+    tags = _reason_tags(reps, cfg)
+    acc = [e for e in reps if e.accepted]
+    if not acc:
+        return ReverseCrunchPoseSummary(
+            hip_curl_deg=None,
+            torso_tilt_deg=None,
+            rep_duration_ms=None,
+            depth_consistency_deg=None,
+            form_tags=_ordered(tags),
+        )
+    mins = [e.min_crunch_hip_angle for e in acc]
+    depth_std = r_angle(pstdev(mins))
+    tilt = [e.min_torso_tilt for e in acc if e.min_torso_tilt is not None]
+    if depth_std > cfg.depth_std_deg:
+        tags.append(FormTag.DEPTH_INCONSISTENT)
+    return ReverseCrunchPoseSummary(
+        hip_curl_deg=_flexion(mins),
+        torso_tilt_deg=_avg_only(tilt),
+        rep_duration_ms=_duration(acc),
+        depth_consistency_deg=depth_std,
+        form_tags=_ordered(tags),
+    )
+
+
+def side_lunge_pose_summary(
+    reps: Sequence[SideLungeRepEvent], cfg: FormTagsCfg
+) -> SideLungePoseSummary:
+    """시도 렙 전체로 사유 태그를, 인정 렙(두 쪽 모두)으로 수치를 만든다 (D-90)."""
+    tags = _reason_tags(reps, cfg)
+    acc = [e for e in reps if e.accepted]
+    if not acc:
+        return SideLungePoseSummary(
+            lunge_knee_bend_deg=None,
+            side_asymmetry_deg=None,
+            lateral_spread_deg=None,
+            rep_duration_ms=None,
+            depth_consistency_deg=None,
+            form_tags=_ordered(tags),
+        )
+    sides = [a for e in acc for a in (e.left_min_knee_angle, e.right_min_knee_angle)]
+    depth_std = r_angle(pstdev(sides))
+    asym_avg = r_angle(mean([abs(e.left_min_knee_angle - e.right_min_knee_angle) for e in acc]))
+    spread = [e.min_lateral_spread for e in acc if e.min_lateral_spread is not None]
+    if depth_std > cfg.depth_std_deg:
+        tags.append(FormTag.DEPTH_INCONSISTENT)
+    if asym_avg > cfg.asymmetry_deg:
+        tags.append(FormTag.KNEE_ASYMMETRY)
+    return SideLungePoseSummary(
+        lunge_knee_bend_deg=_flexion(sides),
+        side_asymmetry_deg=AvgOnly(avg=asym_avg),
+        lateral_spread_deg=_avg_only(spread),
+        rep_duration_ms=_duration(acc),
+        depth_consistency_deg=depth_std,
+        form_tags=_ordered(tags),
+    )
+
+
+def bird_dog_pose_summary(reps: Sequence[BirdDogRepEvent], cfg: FormTagsCfg) -> BirdDogPoseSummary:
+    """시도 렙 전체로 사유 태그를, 인정 렙(두 쪽 모두)으로 수치를 만든다 (D-91)."""
+    tags = _reason_tags(reps, cfg)
+    acc = [e for e in reps if e.accepted]
+    if not acc:
+        return BirdDogPoseSummary(
+            extension_deg=None,
+            side_asymmetry_deg=None,
+            support_arm_deg=None,
+            rep_duration_ms=None,
+            depth_consistency_deg=None,
+            form_tags=_ordered(tags),
+        )
+    ext = [a for e in acc for a in (e.left_side_extension, e.right_side_extension)]
+    depth_std = r_angle(pstdev(ext))
+    asym = r_angle(mean([abs(e.left_side_extension - e.right_side_extension) for e in acc]))
+    support = [e.min_support_arm_angle for e in acc if e.min_support_arm_angle is not None]
+    if depth_std > cfg.depth_std_deg:
+        tags.append(FormTag.DEPTH_INCONSISTENT)
+    return BirdDogPoseSummary(
+        extension_deg=_min_max_avg(ext),
+        side_asymmetry_deg=AvgOnly(avg=asym),
+        support_arm_deg=_avg_only(support),
+        rep_duration_ms=_duration(acc),
+        depth_consistency_deg=depth_std,
+        form_tags=_ordered(tags),
+    )
+
+
+def calf_raise_pose_summary(
+    reps: Sequence[CalfRaiseRepEvent], cfg: FormTagsCfg
+) -> CalfRaisePoseSummary:
+    """시도 렙 전체로 사유 태그를, 인정 렙으로 수치를 만든다 (D-92).
+
+    `depthConsistencyDeg`는 이 종목만 발목 높이(%)의 표준편차라서, 각도용 기준(`depth_std_deg`)으로
+    DEPTH_INCONSISTENT 태그를 붙이지 않는다.
+    """
+    tags = _reason_tags(reps, cfg)
+    acc = [e for e in reps if e.accepted]
+    if not acc:
+        return CalfRaisePoseSummary(
+            ankle_lift_pct=None,
+            knee_angle_deg=None,
+            rep_duration_ms=None,
+            depth_consistency_deg=None,
+            form_tags=_ordered(tags),
+        )
+    lift = [e.max_ankle_lift_pct for e in acc]
+    knee = [e.min_knee_angle_in_rep for e in acc if e.min_knee_angle_in_rep is not None]
+    return CalfRaisePoseSummary(
+        ankle_lift_pct=_min_max_avg(lift),
+        knee_angle_deg=_avg_only(knee),
+        rep_duration_ms=_duration(acc),
+        depth_consistency_deg=r_angle(pstdev(lift)),
         form_tags=_ordered(tags),
     )
