@@ -210,24 +210,30 @@ class FlexionCounter(ExerciseCounter[ChainFeatures]):
         self._index += 1
         if reason is None:
             self._accepted += 1
-        return [
-            self._event(
-                RepDraft(
-                    index=self._index,
-                    start_t=self._start_t,
-                    bottom_t=self._min_t,
-                    end_t=end_t,
-                    reason=reason,
-                    min_angle=self._min_angle,
-                    min_aux=self._min_aux,
-                    min_hold=self._min_hold,
-                    max_foot_lift=foot_lift,
-                    asymmetry_at_bottom=self._asym_at_min,
-                    form_at_bottom=self._form_at_min,
-                    invalid_ratio=invalid_ratio,
-                )
+        return self._emit(
+            RepDraft(
+                index=self._index,
+                start_t=self._start_t,
+                bottom_t=self._min_t,
+                end_t=end_t,
+                reason=reason,
+                min_angle=self._min_angle,
+                min_aux=self._min_aux,
+                min_hold=self._min_hold,
+                max_foot_lift=foot_lift,
+                asymmetry_at_bottom=self._asym_at_min,
+                form_at_bottom=self._form_at_min,
+                invalid_ratio=invalid_ratio,
             )
-        ]
+        )
+
+    def _emit(self, d: RepDraft) -> list[AnyRepEvent]:
+        """확정된 렙을 내보낸다. 기본은 종목별 렙 결과 1개.
+
+        다리를 번갈아 하는 종목은 다리 하나의 판정 결과를 바로 내보내지 않고 모아 두었다가
+        두 다리를 묶어 1렙으로 만든다 (`alternating.py`, D-83).
+        """
+        return [self._event(d)]
 
     # --- 공개 ----------------------------------------------------------------
     def update(self, features: ChainFeatures) -> list[AnyRepEvent]:

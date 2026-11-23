@@ -51,9 +51,20 @@ COORD_MAX = 2.0
 
 
 #: 엔진이 판정하는 종목. 영문 값 표기는 제안·팀 확인 필요 (DATA-MODEL.md '아직 정하지 못한 것',
-#: DECISIONS D-66·D-71~D-73). MVP 범위(mvp-scope.md)는 스쿼트뿐이며 나머지 종목은 엔진에만 있다.
+#: DECISIONS D-66·D-71~D-73·D-83~D-86).
+#: MVP 범위(mvp-scope.md)는 스쿼트뿐이며 나머지 종목은 엔진에만 있다.
 ExerciseType = Literal[
-    "SQUAT", "PUSHUP", "SITUP", "LUNGE", "INVERTED_SHOULDER_PRESS", "GLUTE_BRIDGE", "SIDE_LEG_LIFT"
+    "SQUAT",
+    "PUSHUP",
+    "SITUP",
+    "LUNGE",
+    "INVERTED_SHOULDER_PRESS",
+    "GLUTE_BRIDGE",
+    "SIDE_LEG_LIFT",
+    "HIGH_KNEE",
+    "MOUNTAIN_CLIMBER",
+    "SUPERMAN",
+    "DONKEY_KICK",
 ]
 
 
@@ -343,6 +354,116 @@ class SideLegLiftRepEvent(ApiModel):
         return 180.0 - self.max_leg_spread
 
 
+class HighKneeRepEvent(ApiModel):
+    """하이 니 렙 1개 = 왼다리 1번 + 오른다리 1번 (D-83). 두 다리가 모두 인정이어야 인정.
+
+    - `leftMinHipAngle`·`rightMinHipAngle`: 다리별 엉덩이 내각(어깨–엉덩이–무릎) 최저값. 서 있으면
+      약 180°, 무릎을 엉덩이 높이까지 올리면 약 90°.
+    - `leftReason`·`rightReason`: 다리별 미인정 사유 (인정이면 null).
+      `reason`은 둘 중 우선순위가 높은 것.
+    - `minStandingHipAngle`: 각 다리를 올린 순간 반대(서 있는) 다리 엉덩이 내각 중 작은 값.
+      못 쟀으면 null.
+    - `startT` = 앞 다리 시작, `endT` = 뒷 다리 끝, `bottomT` = 더 높이 올린 다리의 최고점 시각.
+    """
+
+    index: int = Field(ge=1)
+    start_t: int
+    bottom_t: int
+    end_t: int
+    accepted: bool
+    reason: RepReason | None
+    left_min_hip_angle: float
+    right_min_hip_angle: float
+    left_reason: RepReason | None
+    right_reason: RepReason | None
+    min_standing_hip_angle: float | None
+    invalid_ratio: float
+
+    @property
+    def depth_angle(self) -> float:
+        """덜 올린 다리의 엉덩이 내각 (가동범위 판정은 두 다리 모두 넘어야 하므로)."""
+        return max(self.left_min_hip_angle, self.right_min_hip_angle)
+
+
+class MountainClimberRepEvent(ApiModel):
+    """마운틴 클라이머 렙 1개 = 왼다리 1번 + 오른다리 1번 (D-84). 두 다리가 모두 인정이어야 인정.
+
+    - `leftMinTuckAngle`·`rightMinTuckAngle`: 다리별 엉덩이 내각(어깨–엉덩이–무릎) 최저값.
+      플랭크에서 약 180°, 무릎을 가슴 쪽으로 당길수록 작다.
+    - `minBackLegHipAngle`: 각 다리를 당긴 순간 반대(뒤로 뻗은) 다리 엉덩이 내각 중 작은 값.
+    - `minArmSupportAngle`: 렙 동안 팔 지지 각도 최저값 (손을 어깨 아래 바닥에 짚으면 약 180°).
+      팔이 안 보였으면 null.
+    """
+
+    index: int = Field(ge=1)
+    start_t: int
+    bottom_t: int
+    end_t: int
+    accepted: bool
+    reason: RepReason | None
+    left_min_tuck_angle: float
+    right_min_tuck_angle: float
+    left_reason: RepReason | None
+    right_reason: RepReason | None
+    min_back_leg_hip_angle: float | None
+    min_arm_support_angle: float | None
+    invalid_ratio: float
+
+    @property
+    def depth_angle(self) -> float:
+        return max(self.left_min_tuck_angle, self.right_min_tuck_angle)
+
+
+class SupermanRepEvent(ApiModel):
+    """슈퍼맨 렙 1개 (D-85). 들었다 내리면 1렙.
+
+    - `minBodyArchAngle`: 몸 활 각도(어깨–엉덩이–발목 내각) 최저값. 엎드려 일직선이면 약 180°.
+    - `bottomT`: 가장 높이 든 시각 (종목 공통 이름).
+    - `armReachAtTop`: 그때의 팔 뻗음(엉덩이–어깨–손목 내각). 팔을 머리 위로 뻗으면 약 180°.
+      안 보이면 null (그 렙은 OUT_OF_FRAME).
+    """
+
+    index: int = Field(ge=1)
+    start_t: int
+    bottom_t: int
+    end_t: int
+    accepted: bool
+    reason: RepReason | None
+    min_body_arch_angle: float
+    arm_reach_at_top: float | None
+    invalid_ratio: float
+
+    @property
+    def depth_angle(self) -> float:
+        return self.min_body_arch_angle
+
+
+class DonkeyKickRepEvent(ApiModel):
+    """돈키 킥 렙 1개 (D-86). 한쪽 다리를 뒤로 차 올렸다 내리면 1렙.
+
+    - `maxKickHipAngle`: 렙 동안 찬 다리의 엉덩이 내각(어깨–엉덩이–무릎) 최댓값. 네발 자세 약 90°,
+      허벅지가 몸통과 일직선이면 약 180°.
+    - `kneeAngleAtTop`: 가장 높이 찬 순간의 무릎 내각(보이는 다리 평균). 안 보이면 null.
+    - `minArmSupportAngle`: 렙 동안 팔 지지 각도 최저값. 팔이 안 보였으면 null.
+    """
+
+    index: int = Field(ge=1)
+    start_t: int
+    bottom_t: int
+    end_t: int
+    accepted: bool
+    reason: RepReason | None
+    max_kick_hip_angle: float
+    knee_angle_at_top: float | None
+    min_arm_support_angle: float | None
+    invalid_ratio: float
+
+    @property
+    def depth_angle(self) -> float:
+        """판정 각도(180 − 엉덩이 내각)의 최저값."""
+        return 180.0 - self.max_kick_hip_angle
+
+
 #: 세션 결과의 렙 (종목별 모양). 필드 이름이 서로 달라 JSON만으로 구별된다.
 AnyRepEvent = (
     RepEvent
@@ -352,6 +473,10 @@ AnyRepEvent = (
     | InvertedShoulderPressRepEvent
     | GluteBridgeRepEvent
     | SideLegLiftRepEvent
+    | HighKneeRepEvent
+    | MountainClimberRepEvent
+    | SupermanRepEvent
+    | DonkeyKickRepEvent
 )
 
 
@@ -547,6 +672,68 @@ class SideLegLiftPoseSummary(ApiModel):
     form_tags: list[FormTag]
 
 
+class HighKneePoseSummary(ApiModel):
+    """하이 니 자세 요약 (L4 입력, D-83). 인정 렙이 0개면 수치 필드는 null.
+
+    - `kneeDriveDeg` = 180 − 다리별 엉덩이 내각 최저값 (인정 렙의 왼·오른 다리 모두).
+    - `legAsymmetryDeg`: 렙마다 |왼 − 오른 엉덩이 내각 최저값|의 평균.
+    - `standingHipAngleDeg`: 올린 순간 서 있는 다리의 엉덩이 내각 (렙별 작은 값).
+    """
+
+    knee_drive_deg: AvgMinMax | None
+    leg_asymmetry_deg: AvgOnly | None
+    standing_hip_angle_deg: AvgOnly | None
+    rep_duration_ms: AvgStd | None
+    depth_consistency_deg: float | None
+    form_tags: list[FormTag]
+
+
+class MountainClimberPoseSummary(ApiModel):
+    """마운틴 클라이머 자세 요약 (L4 입력, D-84). 인정 렙이 0개면 수치 필드는 null.
+
+    - `kneeTuckDeg` = 180 − 다리별 엉덩이 내각 최저값.
+    - `legAsymmetryDeg`: 렙마다 |왼 − 오른|의 평균.
+    - `backLegHipAngleDeg`: 당긴 순간 뒤로 뻗은 다리의 엉덩이 내각.
+    - `armSupportDeg`: 렙별 팔 지지 각도 최저값의 평균.
+    """
+
+    knee_tuck_deg: AvgMinMax | None
+    leg_asymmetry_deg: AvgOnly | None
+    back_leg_hip_angle_deg: AvgOnly | None
+    arm_support_deg: AvgOnly | None
+    rep_duration_ms: AvgStd | None
+    depth_consistency_deg: float | None
+    form_tags: list[FormTag]
+
+
+class SupermanPoseSummary(ApiModel):
+    """슈퍼맨 자세 요약 (L4 입력, D-85). 인정 렙이 0개면 수치 필드는 null.
+
+    - `bodyArchDeg` = 180 − 몸 활 각도 최저값 (얼마나 휘었는지).
+    - `armReachDeg`: 가장 높이 든 순간 팔 뻗음.
+    """
+
+    body_arch_deg: AvgMinMax | None
+    arm_reach_deg: AvgOnly | None
+    rep_duration_ms: AvgStd | None
+    depth_consistency_deg: float | None
+    form_tags: list[FormTag]
+
+
+class DonkeyKickPoseSummary(ApiModel):
+    """돈키 킥 자세 요약 (L4 입력, D-86). 인정 렙이 0개면 수치 필드는 null.
+
+    - `kickHipAngleDeg`: 렙별 찬 다리 엉덩이 내각 최댓값 (180° = 허벅지가 몸통과 일직선).
+    - `kickKneeAngleDeg`: 가장 높이 찬 순간 무릎 내각.
+    """
+
+    kick_hip_angle_deg: AvgMinMax | None
+    kick_knee_angle_deg: AvgOnly | None
+    rep_duration_ms: AvgStd | None
+    depth_consistency_deg: float | None
+    form_tags: list[FormTag]
+
+
 AnyPoseSummary = (
     PoseSummary
     | PushupPoseSummary
@@ -555,6 +742,10 @@ AnyPoseSummary = (
     | InvertedShoulderPressPoseSummary
     | GluteBridgePoseSummary
     | SideLegLiftPoseSummary
+    | HighKneePoseSummary
+    | MountainClimberPoseSummary
+    | SupermanPoseSummary
+    | DonkeyKickPoseSummary
 )
 
 

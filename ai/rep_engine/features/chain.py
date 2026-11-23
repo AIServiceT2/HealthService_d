@@ -24,11 +24,12 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Literal
 
 from rep_engine.adapters import Point, SkeletonFrame
 from rep_engine.config import FeaturesCfg, TorsoRangeCfg
 from rep_engine.features.filters import OneEuroFilter
-from rep_engine.features.geometry import angle_deg, distance
+from rep_engine.features.geometry import angle_deg, distance, tilt_from_vertical_deg
 from rep_engine.features.posture import posture_ok
 from rep_engine.landmarks import Joint
 
@@ -92,7 +93,15 @@ class ChainSpec:
     사이드 레그 리프트의 다리 벌림 각도가 쓴다 (D-77).
 
     `hold`는 렙 내내 일정 각도 이상이어야 하는 사슬(유지 각도, 보이는 쪽 평균)이다. 푸시업의
-    무릎(무릎을 대고 하면 무릎이 굽음)이 쓴다 (D-78).
+    무릎(무릎을 대고 하면 무릎이 굽음)이 쓴다 (D-78). 관절 3개 내각이 아닌 유지 값은 `hold_fn`으로
+    준다 (마운틴 클라이머·돈키 킥의 팔 지지 각도, D-84·D-86). 둘 다 있으면 `hold`를 쓴다.
+
+    `single=True`면 `left` 사슬 하나만 쓴다 (`right`는 무시). 다리를 번갈아 하는 종목이 다리마다
+    추출기를 따로 두는 데 쓴다 (D-83).
+
+    `pick`은 좌우 판정 각도를 합치는 방법이다.
+    `"mean"`(기본) = 평균, `"min"` = 작은 쪽(`invert` 뒤).
+    한 다리씩 차는 돈키 킥이 `"min"`을 쓴다 (평균이면 찬 다리 각도가 반으로 줄어듦, D-86).
     """
 
     left: Triple
@@ -102,6 +111,9 @@ class ChainSpec:
     invert: bool = False
     pair: bool = False
     hold: tuple[Triple, Triple] | None = None
+    hold_fn: FormFn | None = None
+    single: bool = False
+    pick: Literal["mean", "min"] = "mean"
 
 
 def _vis(p: Point | None, min_vis: float) -> Point | None:
@@ -139,7 +151,8 @@ def _sides(joints: Joints, spec: ChainSpec, min_vis: float) -> list[tuple[float,
     if spec.pair:
         r = _pair_angle(joints, spec, min_vis)
         return [] if r is None else [r]
-    return [r for tri in (spec.left, spec.right) if (r := _triple_angle(joints, tri, min_vis))]
+    tris = (spec.left,) if spec.single else (spec.left, spec.right)
+    return [r for tri in tris if (r := _triple_angle(joints, tri, min_vis))]
 
 
 def _mean_of_sides(joints: Joints, sides: tuple[Triple, Triple], min_vis: float) -> float | None:
@@ -183,6 +196,74 @@ INVERTED_SHOULDER_PRESS_SPEC = ChainSpec(
 GLUTE_BRIDGE_SPEC = ChainSpec(LEFT_TORSO_THIGH, RIGHT_TORSO_THIGH, knee_angle, invert=True)
 #: 사이드 레그 리프트: 판정 = 180 − 다리 벌림(왼·오른 엉덩이→발목 선 사이 각), 보조 = 무릎 (D-77)
 SIDE_LEG_LIFT_SPEC = ChainSpec(LEFT_LEG3, RIGHT_LEG3, knee_angle, invert=True, pair=True)
+
+
+_LEFT_ARM_LINE = (Joint.LEFT_SHOULDER, Joint.LEFT_WRIST)
+_RIGHT_ARM_LINE = (Joint.RIGHT_SHOULDER, Joint.RIGHT_WRIST)
+LEFT_ARM_REACH: Triple = (Joint.LEFT_HIP, Joint.LEFT_SHOULDER, Joint.LEFT_WRIST)
+RIGHT_ARM_REACH: Triple = (Joint.RIGHT_HIP, Joint.RIGHT_SHOULDER, Joint.RIGHT_WRIST)
+
+
+def arm_support(joints: Joints, min_vis: float) -> float | None:
+    """팔 지지 각도 = 180 − (어깨→손목 선이 화면 아래 방향에서 기운 각도), 보이는 쪽 평균.
+
+    손을 어깨 바로 아래 바닥에 짚으면 약 180°, 팔이 수평(옆에 둠·머리 위로 뻗음)이면 약 90°.
+    화면 아래를 중력 방향으로 보므로 폰을 세로로 세워 둔다고 가정한다 (자세 확인 D-75와 같음).
+    """
+    vals: list[float] = []
+    for sj, wj in (_LEFT_ARM_LINE, _RIGHT_ARM_LINE):
+        sh, wr = _vis(joints[sj], min_vis), _vis(joints[wj], min_vis)
+        if sh is None or wr is None:
+            continue
+        tilt = tilt_from_vertical_deg((sh.x, sh.y), (wr.x, wr.y))
+        if tilt is not None:
+            vals.append(FULL_EXTENSION_DEG - tilt)
+    return sum(vals) / len(vals) if vals else None
+
+
+def arm_reach(joints: Joints, min_vis: float) -> float | None:
+    """팔 뻗음 = 엉덩이–어깨–손목 내각, 보이는 쪽 평균.
+
+    팔을 머리 위로 뻗으면 약 180°, 옆에 두면 작다.
+    """
+    return _mean_of_sides(joints, (LEFT_ARM_REACH, RIGHT_ARM_REACH), min_vis)
+
+
+def right_hip_angle(joints: Joints, min_vis: float) -> float | None:
+    """오른쪽 엉덩이 내각(어깨–엉덩이–무릎). 왼다리 추출기의 '반대 다리' 값 (D-83)."""
+    r = _triple_angle(joints, RIGHT_TORSO_THIGH, min_vis)
+    return None if r is None else r[0]
+
+
+def left_hip_angle(joints: Joints, min_vis: float) -> float | None:
+    """왼쪽 엉덩이 내각(어깨–엉덩이–무릎). 오른다리 추출기의 '반대 다리' 값 (D-83)."""
+    r = _triple_angle(joints, LEFT_TORSO_THIGH, min_vis)
+    return None if r is None else r[0]
+
+
+#: 하이 니 다리별 사슬: 판정 = 그 다리 엉덩이 내각, 보조 = 반대 다리 엉덩이 내각 (D-83)
+HIGH_KNEE_LEFT_SPEC = ChainSpec(LEFT_TORSO_THIGH, LEFT_TORSO_THIGH, right_hip_angle, single=True)
+HIGH_KNEE_RIGHT_SPEC = ChainSpec(RIGHT_TORSO_THIGH, RIGHT_TORSO_THIGH, left_hip_angle, single=True)
+#: 마운틴 클라이머 다리별 사슬: 하이 니와 같고, 유지 = 팔 지지 각도 (D-84)
+MOUNTAIN_CLIMBER_LEFT_SPEC = ChainSpec(
+    LEFT_TORSO_THIGH, LEFT_TORSO_THIGH, right_hip_angle, single=True, hold_fn=arm_support
+)
+MOUNTAIN_CLIMBER_RIGHT_SPEC = ChainSpec(
+    RIGHT_TORSO_THIGH, RIGHT_TORSO_THIGH, left_hip_angle, single=True, hold_fn=arm_support
+)
+#: 하이 니·마운틴 클라이머 확신도용: 두 다리가 모두 보여야 유효 프레임 (쌍으로 세므로)
+BOTH_LEGS_QUALITY_SPEC = ChainSpec(LEFT_TORSO_THIGH, RIGHT_TORSO_THIGH, knee_angle, pair=True)
+#: 슈퍼맨: 판정 = 몸 활 각도(어깨–엉덩이–발목), 보조 = 팔 뻗음 (D-85)
+SUPERMAN_SPEC = ChainSpec(LEFT_BODY_LINE, RIGHT_BODY_LINE, arm_reach)
+#: 돈키 킥: 판정 = 180 − 엉덩이 내각, 좌우 중 작은 쪽(찬 다리), 보조 = 무릎, 유지 = 팔 지지 (D-86)
+DONKEY_KICK_SPEC = ChainSpec(
+    LEFT_TORSO_THIGH,
+    RIGHT_TORSO_THIGH,
+    knee_angle,
+    invert=True,
+    pick="min",
+    hold_fn=arm_support,
+)
 
 
 def _torso_leg_ratio(joints: Joints, min_vis: float) -> float | None:
@@ -267,12 +348,21 @@ class ChainFeatureExtractor:
 
         if self._spec.invert:
             sides = [(FULL_EXTENSION_DEG - a, v) for a, v in sides]
-        raw = sum(a for a, _ in sides) / len(sides)
+        raw = (
+            min(a for a, _ in sides)
+            if self._spec.pick == "min"
+            else sum(a for a, _ in sides) / len(sides)
+        )
         aux: float | None = None
         if self._spec.aux is not None:
             aux_raw = _mean_of_sides(joints, self._spec.aux, mv)
             aux = None if aux_raw is None else self._aux_filter(aux_raw, frame.t)
-        hold = None if self._spec.hold is None else _mean_of_sides(joints, self._spec.hold, mv)
+        if self._spec.hold is not None:
+            hold = _mean_of_sides(joints, self._spec.hold, mv)
+        elif self._spec.hold_fn is not None:
+            hold = self._spec.hold_fn(joints, mv)
+        else:
+            hold = None
         floor_y, leg_length = floor_and_leg(joints, mv)
         return ChainFeatures(
             t=frame.t,
@@ -288,3 +378,47 @@ class ChainFeatureExtractor:
             core_visibility=sum(v for _, v in sides) / len(sides),
             torso_leg_ratio=_torso_leg_ratio(joints, mv),
         )
+
+
+@dataclass(frozen=True, slots=True)
+class AlternatingFeatures:
+    """다리를 번갈아 하는 종목의 프레임 특징: 다리별 특징 두 개 (D-83).
+
+    이상 징후·데모가 쓰는 공통 속성(`t`, `valid`, `torso_leg_ratio`, `angle`)도 준다.
+    """
+
+    t: int
+    left: ChainFeatures
+    right: ChainFeatures
+
+    @property
+    def valid(self) -> bool:
+        """두 다리가 모두 보여야 유효 (쌍으로 세므로)."""
+        return self.left.valid and self.right.valid
+
+    @property
+    def angle(self) -> float | None:
+        """더 많이 굽힌 다리의 판정 각도 (화면 표시용)."""
+        vals = [f.angle for f in (self.left, self.right) if f.angle is not None]
+        return min(vals) if vals else None
+
+    @property
+    def torso_leg_ratio(self) -> float | None:
+        return self.left.torso_leg_ratio
+
+
+class AlternatingFeatureExtractor:
+    """다리마다 `ChainFeatureExtractor`를 하나씩 둔 스트리밍 추출기 (D-83)."""
+
+    def __init__(
+        self,
+        cfg: FeaturesCfg,
+        left: ChainSpec,
+        right: ChainSpec,
+        posture: TorsoRangeCfg | None = None,
+    ) -> None:
+        self._left = ChainFeatureExtractor(cfg, left, posture)
+        self._right = ChainFeatureExtractor(cfg, right, posture)
+
+    def update(self, frame: SkeletonFrame) -> AlternatingFeatures:
+        return AlternatingFeatures(frame.t, self._left.update(frame), self._right.update(frame))

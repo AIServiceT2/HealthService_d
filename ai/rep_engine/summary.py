@@ -18,13 +18,19 @@ from rep_engine.schemas import (
     AvgMinMax,
     AvgOnly,
     AvgStd,
+    DonkeyKickPoseSummary,
+    DonkeyKickRepEvent,
     FormTag,
     GluteBridgePoseSummary,
     GluteBridgeRepEvent,
+    HighKneePoseSummary,
+    HighKneeRepEvent,
     InvertedShoulderPressPoseSummary,
     InvertedShoulderPressRepEvent,
     LungePoseSummary,
     LungeRepEvent,
+    MountainClimberPoseSummary,
+    MountainClimberRepEvent,
     PoseSummary,
     PushupPoseSummary,
     PushupRepEvent,
@@ -34,6 +40,8 @@ from rep_engine.schemas import (
     SideLegLiftRepEvent,
     SitupPoseSummary,
     SitupRepEvent,
+    SupermanPoseSummary,
+    SupermanRepEvent,
 )
 from rep_engine.stats import mean, pstdev
 
@@ -326,6 +334,139 @@ def side_leg_lift_pose_summary(
     return SideLegLiftPoseSummary(
         leg_spread_deg=_min_max_avg(spread),
         top_knee_angle=AvgOnly(avg=r_angle(mean(knee))) if knee else None,
+        rep_duration_ms=_duration(acc),
+        depth_consistency_deg=depth_std,
+        form_tags=_ordered(tags),
+    )
+
+
+# --- 하이 니·마운틴 클라이머·슈퍼맨·돈키 킥 (D-83~D-86) ----------------------
+
+
+def _avg_only(vals: Sequence[float]) -> AvgOnly | None:
+    return AvgOnly(avg=r_angle(mean(vals))) if vals else None
+
+
+def high_knee_pose_summary(
+    reps: Sequence[HighKneeRepEvent], cfg: FormTagsCfg
+) -> HighKneePoseSummary:
+    """시도 렙 전체로 사유 태그를, 인정 렙(두 다리 모두)으로 수치를 만든다 (D-83)."""
+    tags = _reason_tags(reps, cfg)
+    acc = [e for e in reps if e.accepted]
+    if not acc:
+        return HighKneePoseSummary(
+            knee_drive_deg=None,
+            leg_asymmetry_deg=None,
+            standing_hip_angle_deg=None,
+            rep_duration_ms=None,
+            depth_consistency_deg=None,
+            form_tags=_ordered(tags),
+        )
+    legs = [a for e in acc for a in (e.left_min_hip_angle, e.right_min_hip_angle)]
+    depth_std = r_angle(pstdev(legs))
+    asym = [abs(e.left_min_hip_angle - e.right_min_hip_angle) for e in acc]
+    stand = [e.min_standing_hip_angle for e in acc if e.min_standing_hip_angle is not None]
+    asym_avg = r_angle(mean(asym))
+    if depth_std > cfg.depth_std_deg:
+        tags.append(FormTag.DEPTH_INCONSISTENT)
+    if asym_avg > cfg.asymmetry_deg:
+        tags.append(FormTag.KNEE_ASYMMETRY)
+    return HighKneePoseSummary(
+        knee_drive_deg=_flexion(legs),
+        leg_asymmetry_deg=AvgOnly(avg=asym_avg),
+        standing_hip_angle_deg=_avg_only(stand),
+        rep_duration_ms=_duration(acc),
+        depth_consistency_deg=depth_std,
+        form_tags=_ordered(tags),
+    )
+
+
+def mountain_climber_pose_summary(
+    reps: Sequence[MountainClimberRepEvent], cfg: FormTagsCfg
+) -> MountainClimberPoseSummary:
+    """시도 렙 전체로 사유 태그를, 인정 렙(두 다리 모두)으로 수치를 만든다 (D-84)."""
+    tags = _reason_tags(reps, cfg)
+    acc = [e for e in reps if e.accepted]
+    if not acc:
+        return MountainClimberPoseSummary(
+            knee_tuck_deg=None,
+            leg_asymmetry_deg=None,
+            back_leg_hip_angle_deg=None,
+            arm_support_deg=None,
+            rep_duration_ms=None,
+            depth_consistency_deg=None,
+            form_tags=_ordered(tags),
+        )
+    legs = [a for e in acc for a in (e.left_min_tuck_angle, e.right_min_tuck_angle)]
+    depth_std = r_angle(pstdev(legs))
+    asym = [abs(e.left_min_tuck_angle - e.right_min_tuck_angle) for e in acc]
+    back = [e.min_back_leg_hip_angle for e in acc if e.min_back_leg_hip_angle is not None]
+    arms = [e.min_arm_support_angle for e in acc if e.min_arm_support_angle is not None]
+    asym_avg = r_angle(mean(asym))
+    if depth_std > cfg.depth_std_deg:
+        tags.append(FormTag.DEPTH_INCONSISTENT)
+    if asym_avg > cfg.asymmetry_deg:
+        tags.append(FormTag.KNEE_ASYMMETRY)
+    return MountainClimberPoseSummary(
+        knee_tuck_deg=_flexion(legs),
+        leg_asymmetry_deg=AvgOnly(avg=asym_avg),
+        back_leg_hip_angle_deg=_avg_only(back),
+        arm_support_deg=_avg_only(arms),
+        rep_duration_ms=_duration(acc),
+        depth_consistency_deg=depth_std,
+        form_tags=_ordered(tags),
+    )
+
+
+def superman_pose_summary(
+    reps: Sequence[SupermanRepEvent], cfg: FormTagsCfg
+) -> SupermanPoseSummary:
+    """시도 렙 전체로 사유 태그를, 인정 렙으로 수치를 만든다 (D-85)."""
+    tags = _reason_tags(reps, cfg)
+    acc = [e for e in reps if e.accepted]
+    if not acc:
+        return SupermanPoseSummary(
+            body_arch_deg=None,
+            arm_reach_deg=None,
+            rep_duration_ms=None,
+            depth_consistency_deg=None,
+            form_tags=_ordered(tags),
+        )
+    depth_std = r_angle(pstdev([e.min_body_arch_angle for e in acc]))
+    reach = [e.arm_reach_at_top for e in acc if e.arm_reach_at_top is not None]
+    if depth_std > cfg.depth_std_deg:
+        tags.append(FormTag.DEPTH_INCONSISTENT)
+    return SupermanPoseSummary(
+        body_arch_deg=_flexion([e.min_body_arch_angle for e in acc]),
+        arm_reach_deg=_avg_only(reach),
+        rep_duration_ms=_duration(acc),
+        depth_consistency_deg=depth_std,
+        form_tags=_ordered(tags),
+    )
+
+
+def donkey_kick_pose_summary(
+    reps: Sequence[DonkeyKickRepEvent], cfg: FormTagsCfg
+) -> DonkeyKickPoseSummary:
+    """시도 렙 전체로 사유 태그를, 인정 렙으로 수치를 만든다 (D-86)."""
+    tags = _reason_tags(reps, cfg)
+    acc = [e for e in reps if e.accepted]
+    if not acc:
+        return DonkeyKickPoseSummary(
+            kick_hip_angle_deg=None,
+            kick_knee_angle_deg=None,
+            rep_duration_ms=None,
+            depth_consistency_deg=None,
+            form_tags=_ordered(tags),
+        )
+    kick = [e.max_kick_hip_angle for e in acc]
+    depth_std = r_angle(pstdev(kick))
+    knee = [e.knee_angle_at_top for e in acc if e.knee_angle_at_top is not None]
+    if depth_std > cfg.depth_std_deg:
+        tags.append(FormTag.DEPTH_INCONSISTENT)
+    return DonkeyKickPoseSummary(
+        kick_hip_angle_deg=_min_max_avg(kick),
+        kick_knee_angle_deg=_avg_only(knee),
         rep_duration_ms=_duration(acc),
         depth_consistency_deg=depth_std,
         form_tags=_ordered(tags),
