@@ -46,7 +46,7 @@
 | --- | --- | --- | --- | --- | --- |
 | 김지은 | Apple M3, macOS 27.0.1 | 성공 — `docker compose up -d db` → `backend/`에서 `python3.11 -m venv .venv`, `.venv/bin/pip install -r requirements.txt`, `.venv/bin/uvicorn app.main:app --port 8000` → `GET /health` `{"status":"ok"}`. `python -m scripts.seed`로 만든 `SUBMITTED` 건을 `POST /submissions/{id}/prepare` → `PREPARED`, `hit_count` 30. 같은 건 다시 계산 → 409 `{"detail":"PREPARED 상태는 계산할 수 없음"}` | `미실행` (폰에서 직접 열어 보지 않음) | 성공 — 서버 `.venv/bin/python -m pytest -v` → 3 passed. 앱 `mobile/`에서 `npm ci`, `npm test` → 4 pass (목데이터 커밋 67666ba 반영 후 다시 실행), `npm run typecheck` → 오류 없음 | ① pytest 경고 그대로: `StarletteDeprecationWarning: Using httpx with starlette.testclient is deprecated; install httpx2 instead.` (원문의 백틱만 뺌) ② 테스트가 끝날 때 `TRUNCATE workout_submission`을 하는데 개발용 DB(`jeonunsi`)와 같은 DB라, 시드로 넣은 제출건도 지워짐 ③ 앱 테스트가 STACK.md의 Jest + React Native Testing Library가 아니라 `tsx --test`(Node 테스트)임 → 테크리더 확인 필요 |
 | 강준석 | | | | | |
-| 성민규 | | | | | |
+| 성민규 | `확인 필요` | `미실행` (2026-11-23, uvicorn은 띄우지 않음) | `미실행` | 성공 (2026-11-23, `main` 0338917) — `docker compose up -d db-test` 후 `backend/`에서 `.venv/bin/python -m pytest -q` → 371 passed (US-02 #1·#3 테스트 포함). `mobile/`에서 `npm test` → 34 pass, `npm run typecheck` → 오류 없음. `ai/`에서 `.venv/bin/python -m pytest -q` → 실패 없음 | 첫 기능 때와 같은 `StarletteDeprecationWarning` 경고 1건 |
 | 손범수 | | | | | |
 | 이시은 | | | | | |
 
@@ -64,11 +64,11 @@
 
 | 항목 | 담당 | 다음 시간 전까지 |
 | --- | --- | --- |
-| 2절 #2, #4~#7 (스냅샷 전체, LLM, 권한) | 미정 | 미정 |
+| 2절 #2, #4~#7 (스냅샷 전체, LLM, 권한) → **2026-11-23 확인:** #4·#5·#6·#7은 서버 테스트 통과로 완료 (LLM은 모의 응답, 기본 문구는 가안). #2는 카탈로그 변경 후 수치 고정만 확인, 확정 능력치·확신도는 스냅샷에 없어 미완료. 근거 테스트는 `backlog.md` US-02 | 미정 | #4~#7 완료, #2 미완료 |
 | 3절 실행 확인 (강준석·성민규·손범수·이시은) | 각 본인 | 미정 |
 | 화면에서 기능 확인 (폰에서 직접 열어 보기) | 김지은 | 미정 |
 | API 경로·`snapshot.hit_count` 키를 API.md에 확정 (지금은 코드에만 '제안'으로 있음) → **2026-11-10 반영:** `API.md` '항목 1'에 노션 API-031·032 기준으로 적음. 경로가 `POST /internal/submissions/{id}/snapshot`·`GET /submissions/{id}/reward-preview`로 바뀌었고(2절 #1의 `/prepare`는 지금 코드에 없음), 타격 수 키는 `hitCount` (테이블 `submission_snapshot.hit_count`) | PM, 개발자1·2 합의 | 반영함 (개발자1·2 확인 필요) |
-| 확인된 실행·테스트 명령을 CLAUDE.md·README에 반영 | 테크리더 | 미정 |
+| 확인된 실행·테스트 명령을 CLAUDE.md·README에 반영 → **2026-11-23:** 테스트 명령을 `CLAUDE.md` '기술 스택'에 반영. 실행 명령은 이번에 돌려 보지 않아 `확인 필요`로 둠. README는 아직 | 테크리더 | CLAUDE.md 테스트 명령 반영함, 실행 명령·README 남음 |
 | 테스트 DB를 개발 DB와 분리할지, 앱 테스트 도구(STACK.md Jest vs `tsx --test`) → **테스트 DB는 2026-11-10 분리함** (PR #133: docker-compose `db-test` 55432, `TEST_DATABASE_URL`). 앱 테스트 도구는 미정 | 테크리더 | 테스트 DB 반영함, 앱 테스트 도구 미정 |
 
 **임시 응답을 쓴 곳** (서버가 병합된 뒤 실제 주소로 바꿨는지)
