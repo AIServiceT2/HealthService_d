@@ -525,11 +525,11 @@ def test_us01_recount_api_older_catalog_rejects_high_knee(monkeypatch: pytest.Mo
 
 @pytest.mark.parametrize("exercise", EXERCISES)
 def test_demo_extra_exercise_reaches_goal_of_5(exercise: ExtraExercise) -> None:
-    """키로 고른 새 운동도 그 운동으로 판정하고, 인정 5회에서 목표 달성이 된다 (D-88)."""
+    """버튼으로 고른 새 운동도 그 운동으로 판정하고, 인정 5회에서 목표 달성이 된다 (D-88)."""
     from tools.synth_extra import synth_frames
-    from tools.webcam_demo import ALL_EXERCISES, DEMO_CATALOG, EXTRA_EXERCISE_KEYS, Demo
+    from tools.webcam_demo import ALL_EXERCISES, DEMO_CATALOG, Demo
 
-    assert exercise in ALL_EXERCISES and exercise in dict(EXTRA_EXERCISE_KEYS)
+    assert exercise in ALL_EXERCISES
     demo = Demo(720, 1280, "lite", "test", False, DEMO_CATALOG)
     assert demo.set_exercise(exercise, start_t=0)
     goal_seen_at: int | None = None
@@ -540,3 +540,25 @@ def test_demo_extra_exercise_reaches_goal_of_5(exercise: ExtraExercise) -> None:
     assert goal_seen_at == 5
     assert len(demo.graph_lines()) == 3
     assert any(line.startswith("angle ") and line != "angle -" for line in demo.status_lines(15.0))
+
+
+def test_demo_buttons_keys_and_font_fit() -> None:
+    """버튼 11개: 키 1~9·0·-가 버튼 순서대로 운동을 고르고, 긴 글자는 버튼 안에 들어가게 줄인다."""
+    from tools.webcam_demo import (
+        BUTTON_FONT_SCALE,
+        BUTTON_KEYS,
+        BUTTON_TEXT_PAD,
+        EXERCISE_BUTTONS,
+        button_font_scale,
+        key_to_exercise,
+    )
+
+    assert len(BUTTON_KEYS) == len(EXERCISE_BUTTONS)
+    assert [key_to_exercise(ord(k)) for k in BUTTON_KEYS] == [ex for ex, _ in EXERCISE_BUTTONS]
+    assert key_to_exercise(ord("8")) == "HIGH_KNEE"
+    assert key_to_exercise(ord("-")) == "DONKEY_KICK"
+    assert key_to_exercise(ord("r")) is None
+    assert button_font_scale(50, 104) == BUTTON_FONT_SCALE  # 들어가면 그대로
+    shrunk = button_font_scale(140, 104)
+    assert shrunk < BUTTON_FONT_SCALE
+    assert 140 * shrunk / BUTTON_FONT_SCALE <= 104 - 2 * BUTTON_TEXT_PAD + 1e-9

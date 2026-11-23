@@ -239,7 +239,7 @@ curl -X POST http://localhost:8001/internal/recount \
 | --- | --- | --- |
 | `download_models` | MediaPipe lite/full/heavy `.task`를 `models/`로 받기 | 실행 확인 |
 | `extract_keypoints` | 영상 → 세션 JSON (15fps, 얼굴 null, 청크 분할) | 사람 없는 테스트 영상으로만 확인 |
-| `webcam_demo` | 실시간 렙 판정 화면. 위쪽 버튼(또는 1~7 키)으로 운동 7종, 8·9·0·- 키로 4종(하이 니·마운틴 클라이머·슈퍼맨·돈키 킥) 선택, 목표 횟수(기본 5회) 달성 표시. `--snapshots`로 인정 렙 최저점 사진 저장 | 스쿼트는 리더가 카메라로 실행 확인. 운동 선택·목표는 합성 입력과 화면 그리기로만 확인(2026-11-17, 카메라 미확인) |
+| `webcam_demo` | 실시간 렙 판정 화면. 위쪽 버튼(또는 1~9·0·- 키)으로 운동 11종 선택, 목표 횟수(기본 5회) 달성 표시. `--snapshots`로 인정 렙 최저점 사진 저장 | 스쿼트는 리더가 카메라로 실행 확인. 운동 선택·목표는 합성 입력과 화면 그리기로만 확인(2026-11-17, 카메라 미확인) |
 | `plot_session` | 세션 → kneeAngle 그래프 PNG | 합성 세션으로 확인 |
 | `evaluate` | 라벨 CSV 전체 평가 | 합성 샘플로 확인 |
 | `compare_models` | lite/full/heavy 정확도·추론 시간 | 사람 없는 영상으로만 확인 (시간 비교 무의미, D-60) |
