@@ -30,13 +30,15 @@ from rep_engine.adapters import Point, SkeletonFrame
 from rep_engine.config import FeaturesCfg, TorsoRangeCfg
 from rep_engine.features.filters import OneEuroFilter
 from rep_engine.features.geometry import angle_deg, distance, tilt_from_vertical_deg
-from rep_engine.features.posture import posture_ok
+from rep_engine.features.posture import posture_ok, torso_from_up
 from rep_engine.landmarks import Joint
 
 Triple = tuple[Joint, Joint, Joint]
 Joints = tuple[Point | None, ...]
 #: (관절 목록, min_visibility) → 보조 각도(도) 또는 None
 FormFn = Callable[[Joints, float], float | None]
+#: (관절 목록, min_visibility) → (판정 값, 쓰인 관절 평균 가시도) 또는 None (관절이 안 보임)
+JudgeFn = Callable[[Joints, float], tuple[float, float] | None]
 
 FULL_EXTENSION_DEG = 180.0  # 일직선 = 180° (정의상 상수)
 
@@ -114,6 +116,11 @@ class ChainSpec:
     hold_fn: FormFn | None = None
     single: bool = False
     pick: Literal["mean", "min"] = "mean"
+    #: 관절 3개 내각이 아닌 판정 값을 직접 계산하는 함수. 있으면 `left`·`right`·`pair`는 무시
+    #: (버드독: 180 − min(팔 뻗음, 다리 뻗음), D-91)
+    judge_fn: JudgeFn | None = None
+    #: 관절 3개 내각이 아닌 둘째 판정 값. `aux`가 있으면 `aux`를 쓴다 (사이드 런지 다리 벌림, D-90)
+    aux_fn: FormFn | None = None
 
 
 def _vis(p: Point | None, min_vis: float) -> Point | None:
@@ -148,6 +155,9 @@ def _pair_angle(joints: Joints, spec: ChainSpec, min_vis: float) -> tuple[float,
 
 def _sides(joints: Joints, spec: ChainSpec, min_vis: float) -> list[tuple[float, float]]:
     """판정 각도 후보 (각도, 가시도). 좌우 사슬 각각, `pair`면 두 사슬 사이 각도 하나."""
+    if spec.judge_fn is not None:
+        j = spec.judge_fn(joints, min_vis)
+        return [] if j is None else [j]
     if spec.pair:
         r = _pair_angle(joints, spec, min_vis)
         return [] if r is None else [r]
@@ -354,8 +364,12 @@ class ChainFeatureExtractor:
             else sum(a for a, _ in sides) / len(sides)
         )
         aux: float | None = None
-        if self._spec.aux is not None:
-            aux_raw = _mean_of_sides(joints, self._spec.aux, mv)
+        if self._spec.aux is not None or self._spec.aux_fn is not None:
+            aux_raw = (
+                _mean_of_sides(joints, self._spec.aux, mv)
+                if self._spec.aux is not None
+                else self._spec.aux_fn(joints, mv)  # type: ignore[misc]
+            )
             aux = None if aux_raw is None else self._aux_filter(aux_raw, frame.t)
         if self._spec.hold is not None:
             hold = _mean_of_sides(joints, self._spec.hold, mv)
@@ -378,6 +392,90 @@ class ChainFeatureExtractor:
             core_visibility=sum(v for _, v in sides) / len(sides),
             torso_leg_ratio=_torso_leg_ratio(joints, mv),
         )
+
+
+# --- 리버스 크런치·사이드 런지·버드독 (D-89~D-91) -----------------------------
+
+
+def torso_tilt(joints: Joints, min_vis: float) -> float | None:
+    """상체 방향(엉덩이→어깨 선이 화면 위쪽에서 기운 각도). 누우면 약 90°, 서면 0° (D-75와 같음)."""
+    return torso_from_up(joints, min_vis)
+
+
+def _one_arm_support(joints: Joints, sj: Joint, wj: Joint, min_vis: float) -> float | None:
+    sh, wr = _vis(joints[sj], min_vis), _vis(joints[wj], min_vis)
+    if sh is None or wr is None:
+        return None
+    tilt = tilt_from_vertical_deg((sh.x, sh.y), (wr.x, wr.y))
+    return None if tilt is None else FULL_EXTENSION_DEG - tilt
+
+
+def left_arm_support(joints: Joints, min_vis: float) -> float | None:
+    """왼팔 하나의 팔 지지 각도 (`arm_support`와 같은 정의)."""
+    return _one_arm_support(joints, *_LEFT_ARM_LINE, min_vis)
+
+
+def right_arm_support(joints: Joints, min_vis: float) -> float | None:
+    """오른팔 하나의 팔 지지 각도."""
+    return _one_arm_support(joints, *_RIGHT_ARM_LINE, min_vis)
+
+
+def left_knee_angle(joints: Joints, min_vis: float) -> float | None:
+    r = _triple_angle(joints, LEFT_LEG3, min_vis)
+    return None if r is None else r[0]
+
+
+def right_knee_angle(joints: Joints, min_vis: float) -> float | None:
+    r = _triple_angle(joints, RIGHT_LEG3, min_vis)
+    return None if r is None else r[0]
+
+
+def leg_spread_complement(joints: Joints, min_vis: float) -> float | None:
+    """180 − 다리 벌림(왼·오른 엉덩이→발목 선 사이 각도). 두 다리가 다 보여야 계산한다.
+
+    둘째 판정 각도는 '작을수록 잘 됨'이라 벌림을 180에서 뺀다 (사이드 런지, D-90).
+    """
+    r = _pair_angle(joints, _SPREAD_SPEC, min_vis)
+    return None if r is None else FULL_EXTENSION_DEG - r[0]
+
+
+def _bird_dog_judge(arm: Triple, leg: Triple) -> JudgeFn:
+    def judge(joints: Joints, min_vis: float) -> tuple[float, float] | None:
+        a = _triple_angle(joints, arm, min_vis)
+        g = _triple_angle(joints, leg, min_vis)
+        if a is None or g is None:
+            return None
+        return FULL_EXTENSION_DEG - min(a[0], g[0]), (a[1] + g[1]) / 2.0
+
+    return judge
+
+
+_SPREAD_SPEC = ChainSpec(LEFT_LEG3, RIGHT_LEG3, knee_angle, pair=True)
+
+#: 리버스 크런치: 판정 = 엉덩이 내각, 보조 = 무릎, 유지 = 상체 방향(누워 있음) (D-89)
+REVERSE_CRUNCH_SPEC = ChainSpec(LEFT_TORSO_THIGH, RIGHT_TORSO_THIGH, knee_angle, hold_fn=torso_tilt)
+#: 사이드 런지 다리별: 판정 = 그 다리 무릎, 보조 = 반대 다리 무릎, 둘째 = 180 − 다리 벌림 (D-90)
+SIDE_LUNGE_LEFT_SPEC = ChainSpec(
+    LEFT_LEG3, LEFT_LEG3, right_knee_angle, single=True, aux_fn=leg_spread_complement
+)
+SIDE_LUNGE_RIGHT_SPEC = ChainSpec(
+    RIGHT_LEG3, RIGHT_LEG3, left_knee_angle, single=True, aux_fn=leg_spread_complement
+)
+#: 버드독 쪽별: '왼쪽 동작' = 왼팔 + 오른다리, 보조 = 받치는 오른팔의 팔 지지 (D-91)
+BIRD_DOG_LEFT_SPEC = ChainSpec(
+    LEFT_ARM_REACH,
+    LEFT_ARM_REACH,
+    right_arm_support,
+    single=True,
+    judge_fn=_bird_dog_judge(LEFT_ARM_REACH, RIGHT_TORSO_THIGH),
+)
+BIRD_DOG_RIGHT_SPEC = ChainSpec(
+    RIGHT_ARM_REACH,
+    RIGHT_ARM_REACH,
+    left_arm_support,
+    single=True,
+    judge_fn=_bird_dog_judge(RIGHT_ARM_REACH, LEFT_TORSO_THIGH),
+)
 
 
 @dataclass(frozen=True, slots=True)

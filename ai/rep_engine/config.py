@@ -222,6 +222,65 @@ class DonkeyKickCfg(FlexionCfg):
     min_arm_support_angle: float = Field(gt=0, le=180)
 
 
+class ReverseCrunchCfg(FlexionCfg):
+    """리버스 크런치 (D-89). 판정 각도 = 엉덩이 내각(어깨–엉덩이–무릎, 보이는 쪽 평균).
+
+    누워서 무릎을 90°로 든 자세(약 90°)에서 무릎을 가슴 쪽으로 말아 올릴수록 작아진다.
+    """
+
+    #: 렙 내내 상체 방향(엉덩이→어깨 선이 화면 위쪽에서 기운 각도)이 이 값 이상이어야 인정.
+    #: 어깨가 바닥에 붙어 상체가 누워 있는지 본다 (상체를 일으키는 윗몸 일으키기 제외)
+    min_torso_tilt: float = Field(gt=0, le=180)
+
+
+class SideLungeCfg(FlexionCfg):
+    """사이드 런지 (D-90). **정면 촬영.**
+
+    다리마다 판정 각도 = 그 다리의 무릎 내각(엉덩이–무릎–발목).
+
+    한쪽 다리를 옆으로 굽혔다 펴면 그 쪽 1번, 왼쪽 1번 + 오른쪽 1번 = 1렙 (하이 니와 같은 짝 규칙).
+    """
+
+    #: 굽힌 순간 반대 다리 무릎 내각이 이 값 이상이어야 인정 (두 무릎을 굽히는 스쿼트 제외)
+    min_other_knee_angle: float = Field(gt=0, le=180)
+    #: 렙 동안 두 다리 벌림(왼·오른 엉덩이→발목 선 사이 각도) 최댓값이 이 값 이상이어야 인정
+    #: (옆으로 벌리지 않고 무릎만 굽히는 동작 제외)
+    min_leg_spread_deg: float = Field(gt=0, lt=180)
+    #: 짝으로 묶을 수 있는 두 쪽 사이 최대 간격 (ms)
+    max_pair_gap_ms: int = Field(gt=0)
+
+
+class BirdDogCfg(FlexionCfg):
+    """버드독 (D-91). 네발 자세에서 **반대쪽** 팔과 다리를 함께 뻗는다. 측면 촬영.
+
+    한쪽 동작(왼팔+오른다리 또는 오른팔+왼다리)마다 판정 각도 = 180 − min(팔 뻗음, 다리 뻗음).
+    팔 뻗음 = 엉덩이–어깨–손목 내각, 다리 뻗음 = 어깨–엉덩이–무릎 내각. 둘 다 뻗어야 작아진다.
+    왼쪽 동작 1번 + 오른쪽 동작 1번 = 1렙.
+    """
+
+    #: 뻗은 순간 받치는(반대쪽) 팔의 팔 지지 각도가 이 값 이상이어야 인정
+    min_support_arm_angle: float = Field(gt=0, le=180)
+    #: 짝으로 묶을 수 있는 두 쪽 사이 최대 간격 (ms)
+    max_pair_gap_ms: int = Field(gt=0)
+
+
+class CalfRaiseCfg(FlexionCfg):
+    """카프 레이즈 (D-92). 판정 값 = 100 − 발목 높이(%) — 각도가 아니다.
+
+    발목 높이(%) = (바닥 발목 위치 − 지금 발목 위치) ÷ 다리 길이(엉덩이–발목) × 100,
+    보이는 발목 평균.
+    공통 골격에 발뒤꿈치·발끝이 없어(MoveNet) 발목이 올라간 정도로만 본다. 서 있으면 100,
+    발뒤꿈치를 들수록 작아진다. 다른 종목과 같은 상태 머신을 쓰려고 이렇게 바꿨다.
+    """
+
+    #: 바닥 높이 = 최근 이 시간 동안 발목이 가장 낮았던 위치 (ms)
+    floor_window_ms: int = Field(gt=0)
+    #: 렙 동안 발목 높이가 이 값(%)을 넘으면 점프로 보고 인정하지 않음
+    max_lift_pct: float = Field(gt=0, lt=100)
+    #: 렙 내내 무릎 내각이 이 값 이상이어야 인정 (무릎을 굽혀 튀는 동작 제외)
+    min_knee_angle: float = Field(gt=0, le=180)
+
+
 class TorsoRangeCfg(_Cfg):
     """상체 방향 허용 범위 (D-75). 상체 방향 = 엉덩이→어깨 선이 화면 위쪽에서 기운 각도.
 
@@ -255,6 +314,10 @@ class PostureCfg(_Cfg):
     mountain_climber: TorsoRangeCfg | None = None
     superman: TorsoRangeCfg | None = None
     donkey_kick: TorsoRangeCfg | None = None
+    reverse_crunch: TorsoRangeCfg | None = None
+    side_lunge: TorsoRangeCfg | None = None
+    bird_dog: TorsoRangeCfg | None = None
+    calf_raise: TorsoRangeCfg | None = None
 
 
 class LivenessCfg(_Cfg):
@@ -375,6 +438,10 @@ class AnomalyByExerciseCfg(_Cfg):
     mountain_climber: AnomalyOverrideCfg | None = None
     superman: AnomalyOverrideCfg | None = None
     donkey_kick: AnomalyOverrideCfg | None = None
+    reverse_crunch: AnomalyOverrideCfg | None = None
+    side_lunge: AnomalyOverrideCfg | None = None
+    bird_dog: AnomalyOverrideCfg | None = None
+    calf_raise: AnomalyOverrideCfg | None = None
 
 
 def merge_anomaly(base: AnomalyCfg, override: AnomalyOverrideCfg) -> AnomalyCfg:
@@ -411,6 +478,10 @@ class EngineConfig(_Cfg):
     mountain_climber: MountainClimberCfg | None = None
     superman: SupermanCfg | None = None
     donkey_kick: DonkeyKickCfg | None = None
+    reverse_crunch: ReverseCrunchCfg | None = None
+    side_lunge: SideLungeCfg | None = None
+    bird_dog: BirdDogCfg | None = None
+    calf_raise: CalfRaiseCfg | None = None
     #: 없으면 어느 종목도 자세를 확인하지 않는다 (cat_2026-11-17 전 카탈로그)
     posture: PostureCfg | None = None
     liveness: LivenessCfg

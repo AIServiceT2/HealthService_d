@@ -51,7 +51,7 @@ COORD_MAX = 2.0
 
 
 #: 엔진이 판정하는 종목. 영문 값 표기는 제안·팀 확인 필요 (DATA-MODEL.md '아직 정하지 못한 것',
-#: DECISIONS D-66·D-71~D-73·D-83~D-86).
+#: DECISIONS D-66·D-71~D-73·D-83~D-86·D-89~D-92).
 #: MVP 범위(mvp-scope.md)는 스쿼트뿐이며 나머지 종목은 엔진에만 있다.
 ExerciseType = Literal[
     "SQUAT",
@@ -65,6 +65,10 @@ ExerciseType = Literal[
     "MOUNTAIN_CLIMBER",
     "SUPERMAN",
     "DONKEY_KICK",
+    "REVERSE_CRUNCH",
+    "SIDE_LUNGE",
+    "BIRD_DOG",
+    "CALF_RAISE",
 ]
 
 
@@ -464,6 +468,111 @@ class DonkeyKickRepEvent(ApiModel):
         return 180.0 - self.max_kick_hip_angle
 
 
+class ReverseCrunchRepEvent(ApiModel):
+    """리버스 크런치 렙 1개 (D-89).
+
+    - `minCrunchHipAngle`: 렙 동안 엉덩이 내각(어깨–엉덩이–무릎) 최저값.
+      무릎을 90°로 든 자세 약 90°, 무릎을 가슴 쪽으로 말아 올릴수록 작다.
+    - `kneeAngleAtTop`: 가장 말아 올린 순간의 무릎 내각. 안 보이면 null.
+    - `minTorsoTilt`: 렙 동안 상체 방향(누우면 약 90°) 최저값. 상체를 일으키면 작아진다.
+      못 쟀으면 null.
+    """
+
+    index: int = Field(ge=1)
+    start_t: int
+    bottom_t: int
+    end_t: int
+    accepted: bool
+    reason: RepReason | None
+    min_crunch_hip_angle: float
+    knee_angle_at_top: float | None
+    min_torso_tilt: float | None
+    invalid_ratio: float
+
+    @property
+    def depth_angle(self) -> float:
+        return self.min_crunch_hip_angle
+
+
+class SideLungeRepEvent(ApiModel):
+    """사이드 런지 렙 1개 = 왼쪽 1번 + 오른쪽 1번 (D-90). 두 쪽 모두 인정이어야 인정. 정면 촬영.
+
+    - `leftMinKneeAngle`·`rightMinKneeAngle`: 그 쪽으로 굽혔을 때 굽힌 다리 무릎 내각 최저값.
+    - `leftReason`·`rightReason`: 쪽별 미인정 사유 (인정이면 null).
+    - `minOtherKneeAngle`: 굽힌 순간 반대(편) 다리 무릎 내각 중 작은 값. 못 쟀으면 null.
+    - `minLateralSpread`: 두 쪽 중 덜 벌린 쪽의 다리 벌림 최댓값(도). 못 쟀으면 null.
+    """
+
+    index: int = Field(ge=1)
+    start_t: int
+    bottom_t: int
+    end_t: int
+    accepted: bool
+    reason: RepReason | None
+    left_min_knee_angle: float
+    right_min_knee_angle: float
+    left_reason: RepReason | None
+    right_reason: RepReason | None
+    min_other_knee_angle: float | None
+    min_lateral_spread: float | None
+    invalid_ratio: float
+
+    @property
+    def depth_angle(self) -> float:
+        return max(self.left_min_knee_angle, self.right_min_knee_angle)
+
+
+class BirdDogRepEvent(ApiModel):
+    """버드독 렙 1개 = 왼쪽 동작(왼팔+오른다리) 1번 + 오른쪽 동작(오른팔+왼다리) 1번 (D-91).
+
+    - `leftSideExtension`·`rightSideExtension`: 그 쪽 동작에서 min(팔 뻗음, 다리 뻗음)의 최댓값(도).
+      팔 뻗음 = 엉덩이–어깨–손목 내각, 다리 뻗음 = 어깨–엉덩이–무릎 내각. 수평으로 뻗으면 약 180°.
+    - `leftReason`·`rightReason`: 쪽별 미인정 사유 (인정이면 null).
+    - `minSupportArmAngle`: 뻗은 순간 받치는 팔의 팔 지지 각도 중 작은 값. 못 쟀으면 null.
+    """
+
+    index: int = Field(ge=1)
+    start_t: int
+    bottom_t: int
+    end_t: int
+    accepted: bool
+    reason: RepReason | None
+    left_side_extension: float
+    right_side_extension: float
+    left_reason: RepReason | None
+    right_reason: RepReason | None
+    min_support_arm_angle: float | None
+    invalid_ratio: float
+
+    @property
+    def depth_angle(self) -> float:
+        """판정 값(180 − 뻗음) 중 덜 뻗은 쪽."""
+        return 180.0 - min(self.left_side_extension, self.right_side_extension)
+
+
+class CalfRaiseRepEvent(ApiModel):
+    """카프 레이즈 렙 1개 (D-92). **각도가 아니라 발목 높이(%)로 판정한다.**
+
+    - `maxAnkleLiftPct`: 렙 동안 발목이 바닥 위치에서 올라간 최대 높이 ÷ 다리 길이 × 100.
+    - `minKneeAngleInRep`: 렙 동안 무릎 내각 최저값. 무릎을 굽히면 작다. 못 쟀으면 null.
+    """
+
+    index: int = Field(ge=1)
+    start_t: int
+    bottom_t: int
+    end_t: int
+    accepted: bool
+    reason: RepReason | None
+    max_ankle_lift_pct: float
+    min_knee_angle_in_rep: float | None
+    invalid_ratio: float
+
+    @property
+    def depth_angle(self) -> float:
+        """판정 값(100 − 발목 높이%)의 최저값. 각도가 아니다."""
+        return 100.0 - self.max_ankle_lift_pct
+
+
 #: 세션 결과의 렙 (종목별 모양). 필드 이름이 서로 달라 JSON만으로 구별된다.
 AnyRepEvent = (
     RepEvent
@@ -477,6 +586,10 @@ AnyRepEvent = (
     | MountainClimberRepEvent
     | SupermanRepEvent
     | DonkeyKickRepEvent
+    | ReverseCrunchRepEvent
+    | SideLungeRepEvent
+    | BirdDogRepEvent
+    | CalfRaiseRepEvent
 )
 
 
@@ -734,6 +847,67 @@ class DonkeyKickPoseSummary(ApiModel):
     form_tags: list[FormTag]
 
 
+class ReverseCrunchPoseSummary(ApiModel):
+    """리버스 크런치 자세 요약 (L4 입력, D-89). 인정 렙이 0개면 수치 필드는 null.
+
+    - `hipCurlDeg` = 180 − 엉덩이 내각 최저값 (무릎을 얼마나 말아 올렸는지).
+    - `torsoTiltDeg`: 렙별 상체 방향 최저값의 평균 (어깨가 바닥에 붙어 있었는지).
+    """
+
+    hip_curl_deg: AvgMinMax | None
+    torso_tilt_deg: AvgOnly | None
+    rep_duration_ms: AvgStd | None
+    depth_consistency_deg: float | None
+    form_tags: list[FormTag]
+
+
+class SideLungePoseSummary(ApiModel):
+    """사이드 런지 자세 요약 (L4 입력, D-90). 인정 렙이 0개면 수치 필드는 null.
+
+    - `lungeKneeBendDeg` = 180 − 쪽별 굽힌 무릎 내각 최저값 (인정 렙의 두 쪽 모두).
+    - `sideAsymmetryDeg`: 렙마다 |왼 − 오른 무릎 최저값|의 평균.
+    - `lateralSpreadDeg`: 렙별 다리 벌림 (덜 벌린 쪽).
+    """
+
+    lunge_knee_bend_deg: AvgMinMax | None
+    side_asymmetry_deg: AvgOnly | None
+    lateral_spread_deg: AvgOnly | None
+    rep_duration_ms: AvgStd | None
+    depth_consistency_deg: float | None
+    form_tags: list[FormTag]
+
+
+class BirdDogPoseSummary(ApiModel):
+    """버드독 자세 요약 (L4 입력, D-91). 인정 렙이 0개면 수치 필드는 null.
+
+    - `extensionDeg`: 쪽별 min(팔 뻗음, 다리 뻗음) 최댓값 (인정 렙의 두 쪽 모두).
+    - `sideAsymmetryDeg`: 렙마다 |왼쪽 동작 − 오른쪽 동작|의 평균.
+    - `supportArmDeg`: 뻗은 순간 받치는 팔의 팔 지지 각도.
+    """
+
+    extension_deg: AvgMinMax | None
+    side_asymmetry_deg: AvgOnly | None
+    support_arm_deg: AvgOnly | None
+    rep_duration_ms: AvgStd | None
+    depth_consistency_deg: float | None
+    form_tags: list[FormTag]
+
+
+class CalfRaisePoseSummary(ApiModel):
+    """카프 레이즈 자세 요약 (L4 입력, D-92). 인정 렙이 0개면 수치 필드는 null.
+
+    - `ankleLiftPct`: 렙별 발목 높이 최댓값(%). 각도가 아니다.
+    - `kneeAngleDeg`: 렙별 무릎 내각 최저값의 평균 (무릎을 폈는지).
+    - `depthConsistencyDeg`: 이 종목만 발목 높이(%)의 표준편차다 (필드 이름은 종목 공통).
+    """
+
+    ankle_lift_pct: AvgMinMax | None
+    knee_angle_deg: AvgOnly | None
+    rep_duration_ms: AvgStd | None
+    depth_consistency_deg: float | None
+    form_tags: list[FormTag]
+
+
 AnyPoseSummary = (
     PoseSummary
     | PushupPoseSummary
@@ -746,6 +920,10 @@ AnyPoseSummary = (
     | MountainClimberPoseSummary
     | SupermanPoseSummary
     | DonkeyKickPoseSummary
+    | ReverseCrunchPoseSummary
+    | SideLungePoseSummary
+    | BirdDogPoseSummary
+    | CalfRaisePoseSummary
 )
 
 

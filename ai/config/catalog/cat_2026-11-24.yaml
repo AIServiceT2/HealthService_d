@@ -1,0 +1,304 @@
+# 전운시 렙 판정 카탈로그. 모든 값은 가안(팀 합의 필요) — docs/DECISIONS.md 참고.
+# cat_2026-11-23과 기존 11종목·공통 값은 같고, 리버스 크런치(reverse_crunch)·사이드 런지(side_lunge)·
+# 버드독(bird_dog)·카프 레이즈(calf_raise) 섹션과 그 자세 확인(posture)만 더했다 (D-89~D-92).
+# 옛 버전 파일은 고치지 않는다 (제출건 스냅샷이 카탈로그 버전을 고정하므로, 03 R9).
+# SPEC 11장 값에서 추가·변경한 키는 주석으로 표시했다.
+catalog_version: cat_2026-11-24
+features:
+  min_visibility: 0.3          # [가정] 0.5 → 0.3. 다리가 가늘고 긴 사람의 다리를 놓쳐서 낮춤 (D-80)
+  one_euro: { min_cutoff: 1.0, beta: 0.05, d_cutoff: 1.0 }
+  filter_reset_gap_ms: 500
+  calibration_window_ms: 1000
+squat:
+  descent_start_angle: 160
+  attempt_angle: 145
+  depth_accept_angle: 100
+  stand_angle: 160
+  bottom_hysteresis_deg: 8
+  depth_mode: angle            # angle | angle_or_hip_drop
+  hip_drop_accept: 0.25
+  min_rep_ms: 800
+  min_descent_ms: 300
+  max_rep_ms: 10000
+  max_invalid_ratio_in_rep: 0.2
+  max_gap_in_rep_ms: 1000
+# [추가] 푸시업. 판정 각도 = 팔꿈치 내각(어깨–팔꿈치–손목). 측면 촬영 가정.
+# 모든 값은 실측 근거 없는 [가정] (D-67). 시간 기준은 스쿼트 값을 그대로 씀.
+pushup:
+  flex_start_angle: 150        # [가정] 팔을 편 자세(약 170~180°)에서 이 각도 아래로 굽히면 렙 시작
+  attempt_angle: 130           # [가정] 이 아래까지 굽혀야 시도로 기록
+  depth_accept_angle: 90       # [가정] 팔꿈치 90° 이하까지 내려가야 인정
+  rest_angle: 150              # [가정] 다시 이 각도 이상 펴면 렙 끝
+  bottom_hysteresis_deg: 8
+  min_rep_ms: 800
+  min_descent_ms: 300
+  max_rep_ms: 10000
+  max_invalid_ratio_in_rep: 0.2
+  max_gap_in_rep_ms: 1000
+  body_line_dev_deg: 20        # [가정] 몸통 일직선 이탈 평균이 이 값을 넘으면 BODY_LINE_BROKEN
+  min_knee_angle: 160          # [가정] 렙 내내 무릎 160° 이상 (무릎 대고 하는 푸시업 제외, D-78)
+# [추가] 윗몸 일으키기. 판정 각도 = 상체 각도(어깨–엉덩이–발목 내각 = 180 − 상체가 바닥에서 들린 각도).
+# 상체 각도와 엉덩이 각도(어깨–엉덩이–무릎)를 둘 다 넘어야 인정 (D-70). 무릎 세우고 누운 측면 촬영 가정.
+# 모든 값은 실측 근거 없는 [가정] (D-67).
+situp:
+  flex_start_angle: 165        # [가정] 상체가 15° 넘게 들리면 렙 시작
+  attempt_angle: 150           # [가정] 30° 넘게 들려야 시도로 기록
+  depth_accept_angle: 120      # [가정] 60° 이상 들려야 인정 (상체 조건)
+  rest_angle: 165              # [가정] 다시 15° 이하로 누우면 렙 끝
+  hip_accept_angle: 80         # [가정] 렙 동안 엉덩이 각도가 80° 이하까지 접혀야 인정 (엉덩이 조건)
+  # [가정] 발이 바닥에 붙어 있어야 인정 (D-82): 다리를 들어 배에 붙이면 발목이 올라가 상체 각도가
+  # 거짓으로 작아짐. 다리 길이의 15% 넘게 뜨면 미인정 (힘껏 일어날 때 발이 살짝 뜨는 것은 허용). 렙 안만 봄
+  feet_down: { max_foot_lift_ratio: 0.15, floor_window_ms: 3000, airborne_lookback_ms: 0 }
+  bottom_hysteresis_deg: 8
+  min_rep_ms: 800
+  min_descent_ms: 300
+  max_rep_ms: 10000
+  max_invalid_ratio_in_rep: 0.2
+  max_gap_in_rep_ms: 1000
+# [추가] 런지 (D-71). 판정 각도 = 무릎 내각(엉덩이–무릎–발목, 보이는 다리 평균). 측면 촬영 가정.
+# 스쿼트와 구별하려고 최저점 좌우 엉덩이 각도 차 조건을 더했다. 모든 값은 실측 근거 없는 [가정].
+lunge:
+  flex_start_angle: 160        # [가정] 스쿼트 descent_start_angle과 같은 값
+  attempt_angle: 145           # [가정] 스쿼트와 같음
+  depth_accept_angle: 100      # [가정] 무릎 100° 이하 (스쿼트 인정 깊이와 같음)
+  rest_angle: 160              # [가정]
+  min_hip_spread_deg: 40       # [가정] 최저점 |왼쪽 − 오른쪽 엉덩이 내각| 이 이상이어야 런지로 인정
+  # [가정] 점프 판정 (D-79): 바닥 쪽 발목이 다리 길이의 8% 넘게 뜨면 점프. 바닥 = 최근 3초 중 가장
+  # 낮은 발목 위치. 렙 시작 0.7초 전부터 봄 (점프 착지 후 렙 포함)
+  feet_down: { max_foot_lift_ratio: 0.08, floor_window_ms: 3000, airborne_lookback_ms: 700 }
+  bottom_hysteresis_deg: 8
+  min_rep_ms: 800
+  min_descent_ms: 300
+  max_rep_ms: 10000
+  max_invalid_ratio_in_rep: 0.2
+  max_gap_in_rep_ms: 1000
+# [추가] 인버티드 숄더 프레스, 파이크 자세 (D-72). 판정 각도 = 팔꿈치 내각. 측면 촬영 가정.
+# 렙 동안 엉덩이 각도(어깨–엉덩이–발목)가 기준 이하여야 인정 (일반 푸시업과 구별). 값은 [가정].
+inverted_shoulder_press:
+  flex_start_angle: 150        # [가정] 푸시업과 같음
+  attempt_angle: 130           # [가정] 푸시업과 같음
+  depth_accept_angle: 90       # [가정] 팔꿈치 90° 이하
+  rest_angle: 150              # [가정]
+  pike_hip_accept_angle: 110   # [가정] 렙 동안 엉덩이 각도 최저값이 이 이하 (엉덩이를 높이 접음)
+  bottom_hysteresis_deg: 8
+  min_rep_ms: 800
+  min_descent_ms: 300
+  max_rep_ms: 10000
+  max_invalid_ratio_in_rep: 0.2
+  max_gap_in_rep_ms: 1000
+# [추가] 글루트 브릿지 (D-73). 판정 각도 = 엉덩이 굽힘 = 180 − 엉덩이 내각(어깨–엉덩이–무릎).
+# 누운 자세 약 45°, 일직선 0°. 엉덩이를 들수록 작아진다. 측면 촬영 가정. 값은 [가정].
+glute_bridge:
+  flex_start_angle: 35         # [가정] 엉덩이 내각 145° 넘게 들면 렙 시작
+  attempt_angle: 25            # [가정] 내각 155° 넘게 들어야 시도로 기록
+  depth_accept_angle: 15       # [가정] 내각 165° 이상(거의 일직선)까지 들어야 인정
+  rest_angle: 35               # [가정] 다시 내각 145° 이하로 내리면 렙 끝
+  bottom_hysteresis_deg: 5     # [가정] 각도 범위가 좁아(약 45°) 다른 종목(8°)보다 작게
+  min_rep_ms: 800
+  min_descent_ms: 300
+  max_rep_ms: 10000
+  max_invalid_ratio_in_rep: 0.2
+  max_gap_in_rep_ms: 1000
+# [추가] 사이드 레그 리프트 (D-77). 판정 각도 = 180 − 다리 벌림(왼·오른 엉덩이→발목 선 사이 각도).
+# 다리를 모으면 약 180°, 위쪽 다리를 들수록 작아진다. 옆으로 누운 몸의 앞쪽(배 쪽)을 찍는다. 값은 [가정].
+side_leg_lift:
+  flex_start_angle: 170        # [가정] 다리를 10° 넘게 벌리면 렙 시작
+  attempt_angle: 160           # [가정] 20° 넘게 벌려야 시도로 기록
+  depth_accept_angle: 150      # [가정] 30° 이상 벌려야 인정 (종아리가 엉덩이보다 확실히 높음)
+  rest_angle: 170              # [가정] 다시 10° 이하로 모으면 렙 끝
+  bottom_hysteresis_deg: 5     # [가정] 각도 범위가 좁아(약 45°) 작게
+  min_rep_ms: 800
+  min_descent_ms: 300
+  max_rep_ms: 10000
+  max_invalid_ratio_in_rep: 0.2
+  max_gap_in_rep_ms: 1000
+# [추가] 하이 니 (D-83). 다리마다 판정 각도 = 엉덩이 내각(어깨–엉덩이–무릎). 측면 촬영 가정.
+# 왼다리 1번 + 오른다리 1번 = 1렙, 두 다리 모두 인정이어야 인정. 시간 값은 다리 하나 기준. 값은 [가정].
+high_knee:
+  flex_start_angle: 155        # [가정] 엉덩이 내각 155° 아래로 올리면 그 다리의 동작 시작
+  attempt_angle: 130           # [가정] 130° 아래까지 올려야 시도로 기록
+  depth_accept_angle: 100      # [가정] 100° 이하 (허벅지가 수평에서 10° 이내 = 무릎이 엉덩이 높이 근처)
+  rest_angle: 155              # [가정] 다시 155° 이상으로 내리면 그 다리 끝
+  min_other_hip_angle: 150     # [가정] 올린 순간 반대 다리가 거의 펴져 있어야 함 (스쿼트 제외)
+  max_pair_gap_ms: 1000        # [가정] 두 다리 사이 간격이 1초를 넘으면 짝으로 묶지 않음
+  bottom_hysteresis_deg: 8
+  min_rep_ms: 150              # [가정] 다리 하나 기준. 빠른 종목이라 공통 800ms 대신 (초당 3걸음이면 다리 하나 약 0.3초)
+  min_descent_ms: 60           # [가정]
+  max_rep_ms: 3000             # [가정]
+  max_invalid_ratio_in_rep: 0.2
+  max_gap_in_rep_ms: 500       # [가정] 다리 하나 동작이 짧아 공통 1000ms 대신
+# [추가] 마운틴 클라이머 (D-84). 다리마다 판정 각도 = 엉덩이 내각(어깨–엉덩이–무릎). 측면 촬영 가정.
+# 쌍으로 세는 규칙은 하이 니와 같다. 손으로 바닥을 짚고 있어야 인정. 값은 [가정].
+mountain_climber:
+  flex_start_angle: 155        # [가정]
+  attempt_angle: 135           # [가정]
+  depth_accept_angle: 110      # [가정] 무릎을 가슴 쪽으로 당겨 엉덩이 내각 110° 이하
+  rest_angle: 155              # [가정]
+  min_other_hip_angle: 140     # [가정] 당긴 순간 반대 다리가 뒤로 뻗어 있어야 함
+  max_pair_gap_ms: 1000        # [가정]
+  min_arm_support_angle: 130   # [가정] 어깨→손목 선이 아래 방향에서 50° 이내 (손을 바닥에 짚음)
+  bottom_hysteresis_deg: 8
+  min_rep_ms: 150              # [가정] 다리 하나 기준
+  min_descent_ms: 60           # [가정]
+  max_rep_ms: 3000             # [가정]
+  max_invalid_ratio_in_rep: 0.2
+  max_gap_in_rep_ms: 500       # [가정]
+# [추가] 슈퍼맨 (D-85). 판정 각도 = 몸 활 각도(어깨–엉덩이–발목 내각). 엎드려 일직선 약 180°.
+# 팔·가슴과 다리를 들수록 작아진다. 들었다 내리면 1렙 (버티는 시간은 보지 않음). 측면 촬영 가정. 값은 [가정].
+superman:
+  flex_start_angle: 174        # [가정] 6° 넘게 휘면 렙 시작
+  attempt_angle: 168           # [가정] 12° 넘게 휘어야 시도로 기록
+  depth_accept_angle: 162      # [가정] 18° 이상 휘어야 인정
+  rest_angle: 174              # [가정]
+  min_arm_reach_angle: 140     # [가정] 가장 높이 든 순간 엉덩이–어깨–손목 140° 이상 (팔을 머리 위로 뻗음)
+  bottom_hysteresis_deg: 3     # [가정] 각도 범위가 좁아(약 20°) 작게
+  min_rep_ms: 800
+  min_descent_ms: 300
+  max_rep_ms: 10000
+  max_invalid_ratio_in_rep: 0.2
+  max_gap_in_rep_ms: 1000
+# [추가] 돈키 킥 (D-86). 판정 각도 = 180 − 엉덩이 내각(어깨–엉덩이–무릎), 좌우 중 작은 쪽(찬 다리).
+# 네발 자세 약 90°, 허벅지가 몸통과 일직선이면 0°. 측면 촬영 가정. 값은 [가정].
+donkey_kick:
+  flex_start_angle: 75         # [가정] 엉덩이 내각 105° 넘게 차면 렙 시작
+  attempt_angle: 55            # [가정] 125° 넘게 차야 시도로 기록
+  depth_accept_angle: 35       # [가정] 145° 이상 (허벅지가 몸통 선에서 35° 이내까지 올라감)
+  rest_angle: 75               # [가정]
+  min_arm_support_angle: 130   # [가정] 마운틴 클라이머와 같음 (손을 바닥에 짚은 네발 자세)
+  bottom_hysteresis_deg: 5     # [가정]
+  min_rep_ms: 800
+  min_descent_ms: 300
+  max_rep_ms: 10000
+  max_invalid_ratio_in_rep: 0.2
+  max_gap_in_rep_ms: 1000
+# [추가] 리버스 크런치 (D-89). 판정 각도 = 엉덩이 내각(어깨–엉덩이–무릎). 누워서 측면 촬영.
+# 무릎을 90°로 든 자세 약 90°, 무릎을 가슴 쪽으로 말아 올릴수록 작다. 값은 [가정].
+reverse_crunch:
+  flex_start_angle: 80         # [가정]
+  attempt_angle: 65            # [가정]
+  depth_accept_angle: 50       # [가정] 엉덩이 내각 50° 이하 (무릎이 가슴 가까이)
+  rest_angle: 80               # [가정]
+  min_torso_tilt: 65           # [가정] 렙 내내 상체가 누워 있어야 함 (윗몸 일으키기 제외)
+  bottom_hysteresis_deg: 5     # [가정]
+  min_rep_ms: 800
+  min_descent_ms: 300
+  max_rep_ms: 10000
+  max_invalid_ratio_in_rep: 0.2
+  max_gap_in_rep_ms: 1000
+# [추가] 사이드 런지 (D-90). **정면 촬영.** 쪽별 판정 각도 = 굽힌 다리 무릎 내각(화면 2D 각도).
+# 왼쪽 1번 + 오른쪽 1번 = 1렙, 두 쪽 모두 인정이어야 인정. 값은 [가정].
+side_lunge:
+  flex_start_angle: 160        # [가정]
+  attempt_angle: 140           # [가정]
+  depth_accept_angle: 120      # [가정] 정면에서 본 무릎 각도라 실제 굽힘보다 덜 굽어 보임 (실측 필요)
+  rest_angle: 160              # [가정]
+  min_other_knee_angle: 160    # [가정] 굽힌 순간 반대 다리는 펴져 있어야 함 (스쿼트 제외)
+  min_leg_spread_deg: 40       # [가정] 두 다리 사이 각도 40° 이상 (옆으로 벌림)
+  max_pair_gap_ms: 3000        # [가정]
+  bottom_hysteresis_deg: 8
+  min_rep_ms: 800
+  min_descent_ms: 300
+  max_rep_ms: 10000
+  max_invalid_ratio_in_rep: 0.2
+  max_gap_in_rep_ms: 1000
+# [추가] 버드독 (D-91). 쪽별 판정 값 = 180 − min(팔 뻗음, 다리 뻗음). 네발 자세 측면 촬영.
+# 왼팔+오른다리 1번 + 오른팔+왼다리 1번 = 1렙. 값은 [가정].
+bird_dog:
+  flex_start_angle: 70         # [가정] 팔·다리 모두 110° 넘게 뻗으면 시작
+  attempt_angle: 50            # [가정] 130° 넘게 뻗어야 시도로 기록
+  depth_accept_angle: 30       # [가정] 팔·다리 모두 150° 이상 (거의 수평으로 뻗음)
+  rest_angle: 70               # [가정]
+  min_support_arm_angle: 130   # [가정] 받치는 팔이 바닥을 짚고 있어야 함 (슈퍼맨 제외)
+  max_pair_gap_ms: 3000        # [가정]
+  bottom_hysteresis_deg: 5     # [가정]
+  min_rep_ms: 800
+  min_descent_ms: 300
+  max_rep_ms: 10000
+  max_invalid_ratio_in_rep: 0.2
+  max_gap_in_rep_ms: 1000
+# [추가] 카프 레이즈 (D-92). 판정 값 = 100 − 발목 높이(%) — **각도가 아니다.** 측면 촬영, 서 있음.
+# 발목 높이 = 바닥 위치에서 발목이 올라간 정도 ÷ 다리 길이(엉덩이–발목) × 100. 값은 [가정].
+calf_raise:
+  flex_start_angle: 98.5       # [가정] 발목이 다리 길이의 1.5% 넘게 올라가면 시작
+  attempt_angle: 97.5          # [가정] 2.5% 넘어야 시도로 기록
+  depth_accept_angle: 96       # [가정] 4% 이상 들어야 인정 (발목 약 3.5cm, 다리 길이 85cm 기준)
+  rest_angle: 98.5             # [가정]
+  floor_window_ms: 10000       # [가정] 바닥 위치 = 최근 10초 중 발목이 가장 낮았던 곳
+  max_lift_pct: 15             # [가정] 15% 넘게 뜨면 점프로 보고 미인정
+  min_knee_angle: 160          # [가정] 렙 내내 무릎을 펴고 있어야 함
+  bottom_hysteresis_deg: 0.5   # [가정] 단위가 % (값 범위가 약 5로 좁음)
+  min_rep_ms: 500              # [가정]
+  min_descent_ms: 200          # [가정]
+  max_rep_ms: 6000             # [가정]
+  max_invalid_ratio_in_rep: 0.2
+  max_gap_in_rep_ms: 1000
+# [추가] 자세(서기·엎드리기·눕기) 확인 (D-75). 상체 방향 = 엉덩이→어깨 선이 화면 위쪽에서 기운 각도
+# (0° 섬, 90° 수평, 180° 거꾸로). 범위를 벗어난 프레임은 무효 → 고른 종목과 다른 자세로는 렙이 안 됨.
+# 폰을 세로로 세워 둔다고 가정. 운동을 자동으로 알아내지는 않는다. 모든 값은 실측 근거 없는 [가정].
+posture:
+  squat: { min_deg: 0, max_deg: 60 }                     # [가정] 서 있음 (앉을 때 상체 숙임 포함)
+  lunge: { min_deg: 0, max_deg: 45 }                     # [가정] 서 있음 (런지는 상체를 세움)
+  pushup: { min_deg: 40, max_deg: 105 }                  # [가정] 엎드림 (엉덩이 처짐 포함, 파이크 제외)
+  # situp: 확인하지 않음. 깊이 일어나면 꼭대기 상체가 거의 서서 '선 자세'와 구별 안 됨 (D-75)
+  inverted_shoulder_press: { min_deg: 100, max_deg: 180 } # [가정] 어깨가 엉덩이보다 아래 (일반 푸시업 제외)
+  glute_bridge: { min_deg: 60, max_deg: 130 }            # [가정] 누움 (선 자세 제외)
+  side_leg_lift: { min_deg: 60, max_deg: 120 }           # [가정] 옆으로 누움 (서서 다리 들기 제외)
+  high_knee: { min_deg: 0, max_deg: 30 }                 # [가정] 서 있음 (상체를 세움)
+  mountain_climber: { min_deg: 40, max_deg: 115 }        # [가정] 엎드린 플랭크 (엉덩이 들림 포함)
+  superman: { min_deg: 60, max_deg: 120 }                # [가정] 엎드려 누움 (가슴을 들어도 수평 근처)
+  donkey_kick: { min_deg: 60, max_deg: 120 }             # [가정] 네발 자세 (몸통 수평 근처)
+  reverse_crunch: { min_deg: 60, max_deg: 135 }          # [가정] 누움 (엉덩이를 말아 올리면 어깨가 엉덩이보다 낮아짐)
+  side_lunge: { min_deg: 0, max_deg: 45 }                # [가정] 서 있음 (정면)
+  bird_dog: { min_deg: 60, max_deg: 120 }                # [가정] 네발 자세
+  calf_raise: { min_deg: 0, max_deg: 30 }                # [가정] 서 있음
+liveness:
+  hand_above_head_margin: 0.2
+  head_height_ratio: 0.9       # [추가] 코 대신 어깨 기준 머리 높이 추정 (D-02)
+  liveness_hold_ms: 1000
+  wrong_hand_hold_ms: 1000
+  min_valid_ratio: 0.3
+confidence:
+  weights: { vis: 0.25, valid: 0.25, track: 0.2, consistency: 0.15, unaccepted: 0.15 }
+  consistency_k: { duration_cv: 3.0, depth_std: 0.1 }
+  min_reps_for_consistency: 3  # [추가] SPEC 7.1 "인정 렙 3개 미만이면 0.5"
+  neutral_score: 0.5           # [추가] 위 경우와 시도 렙 0개일 때 쓰는 값
+  liveness_penalty: 0.5
+  calibration: [[0.0, 0.0], [1.0, 1.0]]
+form_tags:
+  shallow_ratio: 0.3
+  depth_std_deg: 12
+  trunk_lean_deg: 45
+  asymmetry_deg: 15
+  too_fast_ratio: 0.2
+  out_of_frame_ratio: 0.2
+anomaly:
+  regular_timing_min_reps: 5
+  regular_timing_std_ms: 40
+  frozen_ms: 2000
+  frozen_motion_ratio: 0.00002   # [추가] 프레임 간 관절 이동량 / 이미지 대각선 이 값 이하면 '얼어붙음' (사실상 같은 좌표)
+  zero_jitter_min_ms: 2000       # [추가] 정지 구간이 이 길이 이상일 때만 떨림 검사
+  zero_jitter_ratio: 0.0002      # [추가] 정지 구간 평균 떨림 / 이미지 대각선 이 값 미만이면 ZERO_JITTER
+  stationary_speed_ratio: 0.06   # [추가] 관절 평균 속도 / 이미지 대각선 (초당) 이 값 미만이면 '정지 구간'
+  proportion_shift_ratio: 0.2
+  reset_gap_ms: 1000
+  reset_count: 3
+  min_avg_rep_ms: 1000
+# [추가] 종목별 이상 징후 덮어쓰기 (D-87). 적은 값만 위 anomaly를 덮어쓴다. 값은 [가정].
+# 하이 니·마운틴 클라이머는 1렙(두 다리)이 1초 안팎이라 공통 기준이면 정상 동작도 UNREALISTIC_PACE가 된다.
+anomaly_by_exercise:
+  high_knee: { min_avg_rep_ms: 400, regular_timing_std_ms: 20 }         # [가정]
+  mountain_climber: { min_avg_rep_ms: 400, regular_timing_std_ms: 20 }  # [가정]
+  calf_raise: { min_avg_rep_ms: 600 }                                    # [가정] 빠른 카프 레이즈는 1렙 1초 안쪽 (D-92)
+recount:
+  recount_tolerance: 0.10
+  confidence_diff_warn: 0.15
+  auto_approve_threshold: 0.90
+  liveness_policy: restart      # restart | review
+  rep_match_iou: 0.5            # [추가] SPEC 9.2 렙 매칭 IoU 기준
+# 모델 계열별 덮어쓰기 (D-01). 키 구조는 위와 같고 바꿀 값만 쓴다.
+model_overrides:
+  mediapipe: {}
+  movenet:
+    features:
+      min_visibility: 0.2        # [가정] MoveNet score는 MediaPipe보다 낮게 나옴. 0.3 → 0.2 (D-80)
+    liveness: {}

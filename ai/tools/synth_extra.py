@@ -1,4 +1,5 @@
-"""합성 하이 니·마운틴 클라이머·슈퍼맨·돈키 킥 세션 생성기 (테스트용). 실측 데이터가 아니다.
+"""합성 하이 니·마운틴 클라이머·슈퍼맨·돈키 킥·리버스 크런치·사이드 런지·버드독·카프 레이즈
+세션 생성기 (테스트용). 실측 데이터가 아니다.
 
 `synth_more.py`와 같은 방식: 측면 촬영을 2D로 직접 만든다 (가로 u: 머리 쪽 −, 발 쪽 +, 선 자세에서는
 앞 +, 세로 v: 위 +, 단위 = 몸 길이). 판정 각도를 시간에 따라 바꿔 관절을 기하학적으로 계산한다.
@@ -15,6 +16,18 @@
   위로 뻗는다. `arms="side"`면 팔을 몸 옆(엉덩이 쪽)에 둔다.
 - 돈키 킥(`DONKEY_KICK`): 네발 자세(손목은 어깨 아래, 무릎은 엉덩이 아래). 판정 각도 u = 180 − 왼쪽
   엉덩이 내각. 찬 다리는 무릎을 90° 굽힌 채 허벅지를 뒤로 든다. 오른다리는 받친다.
+- 리버스 크런치(`REVERSE_CRUNCH`): 누움(머리 −u). 엉덩이 내각 θ만큼 허벅지를 머리 쪽으로
+  말아 올리고, 90° 아래로 말수록 엉덩이가 조금 들린다. 무릎은 90° 굽힘, 팔은 몸 옆 바닥.
+- 사이드 런지(`SIDE_LUNGE`): **정면**(u: 화면 가로). 왼쪽 동작 = 왼다리 무릎 내각 θ로 굽히고
+  (정강이 수직, 엉덩이는 반대쪽으로 옮겨 감) 오른다리는 편 채 바닥까지 뻗는다.
+  오른쪽 동작은 좌우를 뒤집는다.
+  `legs="both"`면 두 무릎을 같이 굽히고(스쿼트 흉내), `stance="narrow"`면 발을 벌리지 않고
+  굽힌 다리 무릎만 바깥으로 꺾는다(다리 벌림이 작음).
+- 버드독(`BIRD_DOG`): 네발 자세. 판정 값 u = 180 − min(팔 뻗음, 다리 뻗음).
+  왼쪽 동작 = 왼팔+오른다리를 같은 각도(180 − u)까지 뻗는다(쉬는 자세 각도보다 작아지지는 않음).
+  `legs="same_side"`면 같은 쪽 팔·다리(왼팔+왼다리)를 뻗는다.
+- 카프 레이즈(`CALF_RAISE`): 선 자세 측면. 판정 값 u = 100 − 발목 높이(%). 몸 전체를 다리 길이 ×
+  (100 − u)% 만큼 올린다. `knee_bend`로 무릎 내각을 바꾼다(기본 178°).
 
 출력은 모델 원본 형식(MediaPipe 33 / MoveNet 17)이며 얼굴 인덱스는 null이다.
 """
@@ -39,9 +52,38 @@ from rep_engine.landmarks import (
 from rep_engine.schemas import Chunk, Device, Frame, Landmark, Platform, SessionMeta
 from tools.synth import CHUNK_FRAMES, FOREARM, MODEL_VERSIONS, SHIN, THIGH, TORSO, UPPER_ARM, Model
 
-ExtraExercise = Literal["HIGH_KNEE", "MOUNTAIN_CLIMBER", "SUPERMAN", "DONKEY_KICK"]
+ExtraExercise = Literal[
+    "HIGH_KNEE",
+    "MOUNTAIN_CLIMBER",
+    "SUPERMAN",
+    "DONKEY_KICK",
+    "REVERSE_CRUNCH",
+    "SIDE_LUNGE",
+    "BIRD_DOG",
+    "CALF_RAISE",
+]
 Vec2 = tuple[float, float]
 Pose = dict[Joint, Vec2]
+
+LEG = THIGH + SHIN
+ARM = UPPER_ARM + FOREARM
+#: 네발 자세 (버드독): 손목은 어깨 아래, 무릎은 엉덩이 아래 바닥
+_QUAD_SHOULDER = (0.0, ARM)
+_QUAD_HIP = (TORSO, THIGH)
+
+
+def _angle_between(a: tuple[float, float], b: tuple[float, float]) -> float:
+    dot = a[0] * b[0] + a[1] * b[1]
+    return math.degrees(math.acos(dot / (math.hypot(*a) * math.hypot(*b))))
+
+
+#: 버드독 쉬는 자세의 팔 뻗음(엉덩이–어깨–손목)과 다리 뻗음(어깨–엉덩이–무릎) 각도
+BIRD_DOG_ARM_REST = _angle_between(
+    (_QUAD_HIP[0] - _QUAD_SHOULDER[0], _QUAD_HIP[1] - _QUAD_SHOULDER[1]), (0.0, -1.0)
+)
+BIRD_DOG_LEG_REST = _angle_between(
+    (_QUAD_SHOULDER[0] - _QUAD_HIP[0], _QUAD_SHOULDER[1] - _QUAD_HIP[1]), (0.0, -1.0)
+)
 
 #: 쉬는 자세의 판정 각도 (하이 니·마운틴 클라이머: 다리별 엉덩이 내각, 슈퍼맨: 몸 활 각도,
 #: 돈키 킥: 180 − 엉덩이 내각)
@@ -50,25 +92,49 @@ REST_ANGLE: dict[ExtraExercise, float] = {
     "MOUNTAIN_CLIMBER": 176.0,
     "SUPERMAN": 179.0,
     "DONKEY_KICK": 90.0,
+    "REVERSE_CRUNCH": 92.0,
+    "SIDE_LUNGE": 178.0,
+    "BIRD_DOG": 180.0 - min(BIRD_DOG_ARM_REST, BIRD_DOG_LEG_REST),
+    "CALF_RAISE": 100.0,
 }
-ALTERNATING: frozenset[ExtraExercise] = frozenset({"HIGH_KNEE", "MOUNTAIN_CLIMBER"})
+ALTERNATING: frozenset[ExtraExercise] = frozenset(
+    {"HIGH_KNEE", "MOUNTAIN_CLIMBER", "SIDE_LUNGE", "BIRD_DOG"}
+)
 #: 화면 배치 (가로 기준점 비율, 바닥 높이 비율, 화면 세로 대비 몸 길이 비율)
 _LAYOUT: dict[ExtraExercise, tuple[float, float, float]] = {
     "HIGH_KNEE": (0.5, 0.85, 0.45),
     "MOUNTAIN_CLIMBER": (0.2, 0.7, 0.3),
     "SUPERMAN": (0.5, 0.7, 0.3),
     "DONKEY_KICK": (0.3, 0.7, 0.3),
+    "REVERSE_CRUNCH": (0.5, 0.7, 0.3),
+    "SIDE_LUNGE": (0.4, 0.85, 0.3),
+    "BIRD_DOG": (0.3, 0.7, 0.3),
+    "CALF_RAISE": (0.5, 0.85, 0.45),
 }
 SIDE_OFFSET = 0.03  # 좌우 관절을 구분하는 작은 화면 오프셋
-LEG = THIGH + SHIN
-ARM = UPPER_ARM + FOREARM
 SUPERMAN_HIP_V = 0.1  # 엎드렸을 때 엉덩이 높이 (몸 두께)
-#: 종목별 기본 `leg_ms`: 번갈아 하는 종목은 다리 하나 0.45초, 나머지는 렙 하나 1.6초(= 0.8초 × 2)
+#: 종목별 기본 `leg_ms` (번갈아 하는 종목은 한쪽 동작 시간, 나머지는 렙 시간의 절반).
+#: 하이 니·마운틴 클라이머 0.45초, 사이드 런지·버드독 1.6초, 그 밖 렙 1.2~1.6초
 DEFAULT_LEG_MS: dict[ExtraExercise, int] = {
     "HIGH_KNEE": 450,
     "MOUNTAIN_CLIMBER": 450,
     "SUPERMAN": 800,
     "DONKEY_KICK": 800,
+    "REVERSE_CRUNCH": 800,
+    "SIDE_LUNGE": 1600,
+    "BIRD_DOG": 1600,
+    "CALF_RAISE": 600,
+}
+#: 종목별 기본 카탈로그 (`catalog_version`을 주지 않으면)
+DEFAULT_CATALOG: dict[ExtraExercise, str] = {
+    "HIGH_KNEE": "cat_2026-11-23",
+    "MOUNTAIN_CLIMBER": "cat_2026-11-23",
+    "SUPERMAN": "cat_2026-11-23",
+    "DONKEY_KICK": "cat_2026-11-23",
+    "REVERSE_CRUNCH": "cat_2026-11-24",
+    "SIDE_LUNGE": "cat_2026-11-24",
+    "BIRD_DOG": "cat_2026-11-24",
+    "CALF_RAISE": "cat_2026-11-24",
 }
 
 
@@ -106,8 +172,12 @@ class ExtraSynthConfig:
     lead_in_ms: int = 1500
     tail_ms: int = 1000
     visibility: float = 0.9
-    #: 하이 니·마운틴 클라이머 다리 움직임: 번갈아 / 동시에 / 왼다리만
-    legs: Literal["alternate", "both", "left_only"] = "alternate"
+    #: 번갈아 하는 종목의 움직임: 번갈아 / 동시에 / 왼쪽만 / (버드독) 같은 쪽 팔·다리
+    legs: Literal["alternate", "both", "left_only", "same_side"] = "alternate"
+    #: 사이드 런지 발 위치: 기본(옆으로 벌림) / 좁게(무릎만 바깥으로 꺾음)
+    stance: Literal["default", "narrow"] = "default"
+    #: 카프 레이즈 무릎 내각 (도)
+    knee_bend: float = 178.0
     #: 팔 위치: 기본(마운틴 클라이머·돈키 킥은 바닥 짚기, 슈퍼맨은 머리 위로 뻗기) / 몸 옆
     arms: Literal["default", "side"] = "default"
     #: 이 관절들의 가시도를 0으로
@@ -115,7 +185,8 @@ class ExtraSynthConfig:
     #: [start, end) ms 동안 사람 미검출 (landmarks=null)
     invalid_ranges: list[tuple[int, int]] = field(default_factory=list)
     session_id: str = "synth-extra-1"
-    catalog_version: str = "cat_2026-11-23"
+    #: None이면 종목 기본값 (`DEFAULT_CATALOG`)
+    catalog_version: str | None = None
 
 
 def _leg_ms(cfg: ExtraSynthConfig, r: ExtraRep) -> int:
@@ -294,6 +365,149 @@ def donkey_kick_pose(judge: float, arms: str) -> Pose:
     return pose
 
 
+def reverse_crunch_pose(hip_angle: float) -> Pose:
+    """엉덩이 내각 θ → 누운 공통 골격 (머리 −u, 무릎 90° 굽힘, 팔은 몸 옆 바닥)."""
+    shoulder = (-TORSO, 0.05)
+    hip = (0.0, 0.05 + max(0.0, 90.0 - hip_angle) / 90.0 * 0.12)
+    thigh = _rot(_unit(hip, shoulder), -hip_angle)  # 시계 방향 = 위 → 머리 쪽
+    knee = _add(hip, thigh, THIGH)
+    pose: Pose = {}
+    _put(pose, Joint.LEFT_SHOULDER, Joint.RIGHT_SHOULDER, shoulder)
+    _put(pose, Joint.LEFT_ELBOW, Joint.RIGHT_ELBOW, _add(shoulder, (UPPER_ARM, 0.0)))
+    _put(pose, Joint.LEFT_WRIST, Joint.RIGHT_WRIST, _add(shoulder, (ARM, 0.0)))
+    _put(pose, Joint.LEFT_HIP, Joint.RIGHT_HIP, hip)
+    _put(pose, Joint.LEFT_KNEE, Joint.RIGHT_KNEE, knee)
+    _put(pose, Joint.LEFT_ANKLE, Joint.RIGHT_ANKLE, _add(knee, _rot(thigh, -90.0), SHIN))
+    return pose
+
+
+_HIP_HALF = 0.1  # 정면에서 본 엉덩이 반폭
+_SHOULDER_HALF = 0.15
+
+
+def _side_lunge_one(knee: float, stance: str) -> Pose:
+    """왼다리를 굽힌 사이드 런지 (정면, 사람의 왼쪽 = 화면 −u). 오른다리는 편다."""
+    phi = math.radians(180.0 - knee)
+    pose: Pose = {}
+    if stance == "narrow":  # 발을 벌리지 않고 무릎만 바깥으로 꺾음
+        h = math.sqrt(THIGH**2 + SHIN**2 - 2 * THIGH * SHIN * math.cos(math.radians(knee)))
+        hip_b, ankle_b = (-_HIP_HALF, h), (-_HIP_HALF, 0.0)
+        along = (THIGH**2 - SHIN**2 + h**2) / (2 * h)
+        out = math.sqrt(max(0.0, THIGH**2 - along**2))
+        knee_b = (-_HIP_HALF - out, h - along)
+        hip_o = (_HIP_HALF, h)
+        ankle_o = (_HIP_HALF, h - LEG)
+    else:
+        ankle_b = (-0.5, 0.0)
+        knee_b = (-0.5, SHIN)
+        hip_b = _add(knee_b, (math.sin(phi), math.cos(phi)), THIGH)
+        hip_o = _add(hip_b, (2 * _HIP_HALF, 0.0))
+        dx = math.sqrt(max(0.0, LEG**2 - hip_o[1] ** 2))
+        ankle_o = (hip_o[0] + dx, 0.0)
+    knee_o = _lerp(hip_o, ankle_o, THIGH / LEG)
+    center = _lerp(hip_b, hip_o, 0.5)
+    sh = _add(center, (0.0, TORSO))
+    for side, x in ((-1, -_SHOULDER_HALF), (+1, _SHOULDER_HALF)):
+        p = _add(sh, (x, 0.0))
+        lj, ej, wj = (
+            (Joint.LEFT_SHOULDER, Joint.LEFT_ELBOW, Joint.LEFT_WRIST)
+            if side < 0
+            else (Joint.RIGHT_SHOULDER, Joint.RIGHT_ELBOW, Joint.RIGHT_WRIST)
+        )
+        pose[lj] = p
+        pose[ej] = _add(p, (0.0, -UPPER_ARM))
+        pose[wj] = _add(p, (0.0, -ARM))
+    pose.update(
+        {
+            Joint.LEFT_HIP: hip_b,
+            Joint.LEFT_KNEE: knee_b,
+            Joint.LEFT_ANKLE: ankle_b,
+            Joint.RIGHT_HIP: hip_o,
+            Joint.RIGHT_KNEE: knee_o,
+            Joint.RIGHT_ANKLE: ankle_o,
+        }
+    )
+    return pose
+
+
+_LR = {
+    Joint.LEFT_SHOULDER: Joint.RIGHT_SHOULDER,
+    Joint.LEFT_ELBOW: Joint.RIGHT_ELBOW,
+    Joint.LEFT_WRIST: Joint.RIGHT_WRIST,
+    Joint.LEFT_HIP: Joint.RIGHT_HIP,
+    Joint.LEFT_KNEE: Joint.RIGHT_KNEE,
+    Joint.LEFT_ANKLE: Joint.RIGHT_ANKLE,
+}
+_LR.update({v: k for k, v in list(_LR.items())})
+
+
+def _flip(pose: Pose) -> Pose:
+    """좌우 뒤집기 (u → −u, 왼·오른 관절 이름 바꿈)."""
+    return {_LR[j]: (-u, v) for j, (u, v) in pose.items()}
+
+
+def side_lunge_pose(left_knee: float, right_knee: float, legs: str, stance: str) -> Pose:
+    """쪽별 무릎 내각 → 정면 공통 골격. 더 굽힌 쪽을 그린다 (번갈아 하므로 한쪽만 움직임)."""
+    if legs == "both":  # 두 무릎을 같이 굽힘 (스쿼트 흉내): 왼다리 모양을 좌우로 복제
+        left = _side_lunge_one(left_knee, "narrow")
+        both = {j: p for j, p in left.items() if j in _LR and "LEFT" in j.name}
+        mirrored = {_LR[j]: (-u, v) for j, (u, v) in both.items()}
+        return {**both, **mirrored}
+    if left_knee <= right_knee:
+        return _side_lunge_one(left_knee, stance)
+    return _flip(_side_lunge_one(right_knee, stance))
+
+
+def bird_dog_pose(left_u: float, right_u: float, legs: str) -> Pose:
+    """쪽별 판정 값 → 네발 자세 공통 골격 (머리 −u). 왼쪽 동작 = 왼팔 + 오른다리."""
+    shoulder, hip = _QUAD_SHOULDER, _QUAD_HIP
+    to_hip = _unit(shoulder, hip)
+    to_shoulder = _unit(hip, shoulder)
+    pose: Pose = {}
+    _put(pose, Joint.LEFT_SHOULDER, Joint.RIGHT_SHOULDER, shoulder)
+    _put(pose, Joint.LEFT_HIP, Joint.RIGHT_HIP, hip)
+    left_ext, right_ext = 180.0 - left_u, 180.0 - right_u
+    arm_ext = {"L": left_ext, "R": right_ext}
+    leg_ext = {"R": left_ext, "L": right_ext} if legs != "same_side" else dict(arm_ext)
+    for side, sign, (ej, wj) in (
+        ("L", -1, (Joint.LEFT_ELBOW, Joint.LEFT_WRIST)),
+        ("R", +1, (Joint.RIGHT_ELBOW, Joint.RIGHT_WRIST)),
+    ):
+        a = max(BIRD_DOG_ARM_REST, arm_ext[side])
+        d = _rot(to_hip, -a)  # 시계 방향 = 아래 → 앞(머리 쪽)
+        pose[ej] = _shift(_add(shoulder, d, UPPER_ARM), sign)
+        pose[wj] = _shift(_add(shoulder, d, ARM), sign)
+    for side, sign, (kj, aj) in (
+        ("L", -1, (Joint.LEFT_KNEE, Joint.LEFT_ANKLE)),
+        ("R", +1, (Joint.RIGHT_KNEE, Joint.RIGHT_ANKLE)),
+    ):
+        g = max(BIRD_DOG_LEG_REST, leg_ext[side])
+        thigh = _rot(to_shoulder, g)  # 반시계 = 아래 → 뒤
+        e = (g - BIRD_DOG_LEG_REST) / (180.0 - BIRD_DOG_LEG_REST)
+        knee = _add(hip, thigh, THIGH)
+        pose[kj] = _shift(knee, sign)
+        pose[aj] = _shift(_add(knee, _rot(thigh, 90.0 * (1.0 - e)), SHIN), sign)
+    return pose
+
+
+def calf_raise_pose(judge: float, knee_bend: float) -> Pose:
+    """판정 값 u = 100 − 발목 높이(%) → 선 자세 측면 공통 골격 (몸 전체를 들어 올림)."""
+    lift = (100.0 - judge) / 100.0 * LEG
+    a = math.radians((180.0 - knee_bend) / 2.0)
+    ankle = (0.0, lift)
+    knee = _add(ankle, (math.sin(a), math.cos(a)), SHIN)
+    hip = _add(knee, (-math.sin(a), math.cos(a)), THIGH)
+    shoulder = _add(hip, (0.0, TORSO))
+    pose: Pose = {}
+    _put(pose, Joint.LEFT_SHOULDER, Joint.RIGHT_SHOULDER, shoulder)
+    _put(pose, Joint.LEFT_ELBOW, Joint.RIGHT_ELBOW, _add(shoulder, (0.0, -UPPER_ARM)))
+    _put(pose, Joint.LEFT_WRIST, Joint.RIGHT_WRIST, _add(shoulder, (0.0, -ARM)))
+    _put(pose, Joint.LEFT_HIP, Joint.RIGHT_HIP, hip)
+    _put(pose, Joint.LEFT_KNEE, Joint.RIGHT_KNEE, knee)
+    _put(pose, Joint.LEFT_ANKLE, Joint.RIGHT_ANKLE, ankle)
+    return pose
+
+
 def pose_at(cfg: ExtraSynthConfig, t: int) -> Pose:
     """시각 t의 공통 골격 (몸 길이 단위 2D)."""
     left, right = angles_at(cfg, t)
@@ -303,6 +517,14 @@ def pose_at(cfg: ExtraSynthConfig, t: int) -> Pose:
         return mountain_climber_pose(left, right, cfg.arms)
     if cfg.exercise == "SUPERMAN":
         return superman_pose(left, cfg.arms)
+    if cfg.exercise == "REVERSE_CRUNCH":
+        return reverse_crunch_pose(left)
+    if cfg.exercise == "SIDE_LUNGE":
+        return side_lunge_pose(left, right, cfg.legs, cfg.stance)
+    if cfg.exercise == "BIRD_DOG":
+        return bird_dog_pose(left, right, cfg.legs)
+    if cfg.exercise == "CALF_RAISE":
+        return calf_raise_pose(left, cfg.knee_bend)
     return donkey_kick_pose(left, cfg.arms)
 
 
@@ -364,7 +586,7 @@ def synth_meta(cfg: ExtraSynthConfig) -> SessionMeta:
     return SessionMeta(
         session_id=cfg.session_id,
         exercise_type=cfg.exercise,
-        catalog_version=cfg.catalog_version,
+        catalog_version=cfg.catalog_version or DEFAULT_CATALOG[cfg.exercise],
         fps=cfg.fps,
         image_width=cfg.image_width,
         image_height=cfg.image_height,
