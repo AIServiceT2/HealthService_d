@@ -3,12 +3,12 @@
 화면: 위쪽 운동 선택 버튼, 스켈레톤, 현재 판정 각도, 상태, 목표(기본 5회)·인정/시도 수,
 마지막 미인정 사유, 최근 5초 각도 그래프, FPS. 목표 횟수를 채우면 'GOAL DONE'을 띄운다.
 마우스: 위쪽 버튼을 눌러 운동 선택 (누르면 그 운동으로 새 세션 시작)
-키: 1~7 운동 선택(버튼과 같음) · 8 하이 니 · 9 마운틴 클라이머 · 0 슈퍼맨 · - 돈키 킥
-    · L 무작위 동작 확인 시작 · R 리셋 · S 세션 JSON 저장 · Q 종료
+키: 1~9·0·- 운동 선택(버튼 순서와 같음) · L 무작위 동작 확인 시작 · R 리셋
+    · S 세션 JSON 저장 · Q 종료
 
 운동 11종(스쿼트·푸시업·윗몸 일으키기·런지·인버티드 숄더 프레스·글루트 브릿지·사이드 레그 리프트·
 하이 니·마운틴 클라이머·슈퍼맨·돈키 킥)을 고를 수 있도록 기본 카탈로그는 `cat_2026-11-23`이다
-(자세 확인 D-75 포함). 뒤의 4종은 버튼 없이 키(8·9·0·-)나 `--exercise`로 고른다 (D-88).
+(자세 확인 D-75 포함). 버튼 11개를 한 줄에 두고, 글자가 버튼보다 길면 글자 크기를 줄인다 (D-88).
 엔진은 운동을 자동으로 알아내지 않으므로 고른 운동과 같은 동작을 해야 한다.
 바닥 운동은 몸 옆면이 보이게 폰·노트북을 둔다
 (사이드 레그 리프트는 옆으로 누운 몸의 앞쪽, 배 쪽이 보이게).
@@ -63,7 +63,8 @@ IN_REP_STATES = frozenset({DESCENDING, ASCENDING, FLEXING, EXTENDING})
 #: 운동 11종을 모두 판정할 수 있는 카탈로그 (D-71~D-77, D-83~D-87)
 DEMO_CATALOG = "cat_2026-11-23"
 DEFAULT_TARGET_REPS = 5
-#: 선택 버튼 (종목, 화면 이름). 순서 = 키 1~7. OpenCV 기본 글꼴은 한글을 못 그려 영문으로 쓴다
+#: 선택 버튼 (종목, 화면 이름). 순서 = `BUTTON_KEYS`.
+#: OpenCV 기본 글꼴은 한글을 못 그려 영문으로 쓴다
 EXERCISE_BUTTONS: tuple[tuple[ExerciseType, str], ...] = (
     ("SQUAT", "SQUAT"),
     ("PUSHUP", "PUSHUP"),
@@ -72,17 +73,17 @@ EXERCISE_BUTTONS: tuple[tuple[ExerciseType, str], ...] = (
     ("INVERTED_SHOULDER_PRESS", "PIKE PRESS"),
     ("GLUTE_BRIDGE", "BRIDGE"),
     ("SIDE_LEG_LIFT", "SIDE LEG"),
+    ("HIGH_KNEE", "HIGH KNEE"),
+    ("MOUNTAIN_CLIMBER", "CLIMBER"),
+    ("SUPERMAN", "SUPERMAN"),
+    ("DONKEY_KICK", "DONKEY"),
 )
-#: 버튼 없이 키로만 고르는 운동 (종목, 키). 버튼 줄에 넣지 않은 이유는 D-88
-EXTRA_EXERCISE_KEYS: tuple[tuple[ExerciseType, str], ...] = (
-    ("HIGH_KNEE", "8"),
-    ("MOUNTAIN_CLIMBER", "9"),
-    ("SUPERMAN", "0"),
-    ("DONKEY_KICK", "-"),
-)
-ALL_EXERCISES: tuple[ExerciseType, ...] = tuple(ex for ex, _ in EXERCISE_BUTTONS) + tuple(
-    ex for ex, _ in EXTRA_EXERCISE_KEYS
-)
+#: 버튼별 선택 키 (버튼 순서와 같음). 키보드 숫자 줄 순서: 1~9, 0, -
+BUTTON_KEYS = "1234567890-"
+ALL_EXERCISES: tuple[ExerciseType, ...] = tuple(ex for ex, _ in EXERCISE_BUTTONS)
+#: 버튼 글자 기본 크기. 글자가 버튼보다 길면 들어갈 만큼 줄인다 (버튼 11개라 좁음, D-88)
+BUTTON_FONT_SCALE = 0.55
+BUTTON_TEXT_PAD = 4  # 버튼 안쪽 좌우 여백 (px)
 #: 종목 → 카탈로그 섹션 이름 (그래프 기준선용)
 _SECTION: dict[str, str] = {
     "SQUAT": "squat",
@@ -152,6 +153,22 @@ def button_rects(width: int, n: int = len(EXERCISE_BUTTONS)) -> list[tuple[int, 
         )
         for i in range(n)
     ]
+
+
+def button_font_scale(text_width: int, button_width: int) -> float:
+    """기본 크기(`BUTTON_FONT_SCALE`)로 잰 글자 폭이 버튼 안에 들어가도록 줄인 글자 크기."""
+    room = max(1, button_width - 2 * BUTTON_TEXT_PAD)
+    if text_width <= room:
+        return BUTTON_FONT_SCALE
+    return BUTTON_FONT_SCALE * room / text_width
+
+
+def key_to_exercise(key: int) -> ExerciseType | None:
+    """눌린 키(cv2.waitKey 값)에 해당하는 운동. 운동 선택 키가 아니면 None."""
+    for (ex, _), k in zip(EXERCISE_BUTTONS, BUTTON_KEYS, strict=True):
+        if key == ord(k):
+            return ex
+    return None
 
 
 def hit_button(rects: list[tuple[int, int, int, int]], x: int, y: int) -> int | None:
@@ -463,10 +480,14 @@ def _draw(img: Any, frame: Frame, demo: Demo, fps: float) -> None:
     ):
         selected = ex == demo.exercise
         cv2.rectangle(img, (x0, y0), (x1, y1), LIME if selected else GRAY, -1 if selected else 2)
-        text = f"{i + 1} {label}"
-        (tw, th), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.55, 2)
+        text = f"{BUTTON_KEYS[i]} {label}"
+        (tw, _), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, BUTTON_FONT_SCALE, 2)
+        scale = button_font_scale(tw, x1 - x0)
+        thick = 2 if scale >= BUTTON_FONT_SCALE else 1
+        (tw, th), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, scale, thick)
         org = ((x0 + x1 - tw) // 2, (y0 + y1 + th) // 2)
-        cv2.putText(img, text, org, cv2.FONT_HERSHEY_SIMPLEX, 0.55, BLACK if selected else WHITE, 2)
+        color = BLACK if selected else WHITE
+        cv2.putText(img, text, org, cv2.FONT_HERSHEY_SIMPLEX, scale, color, thick)
     for i, line in enumerate(demo.status_lines(fps)):
         y = BUTTON_BAR_H + 26 + 26 * i
         cv2.putText(img, line, (10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.7, YELLOW, 2)
@@ -587,11 +608,9 @@ def run(
                     demo.set_exercise(EXERCISE_BUTTONS[idx][0], t_ms)
             if key in (ord("q"), ord("Q")):
                 break
-            extra = {ord(k): ex for ex, k in EXTRA_EXERCISE_KEYS}
-            if ord("1") <= key < ord("1") + len(EXERCISE_BUTTONS):
-                demo.set_exercise(EXERCISE_BUTTONS[key - ord("1")][0], t_ms)
-            elif key in extra:
-                demo.set_exercise(extra[key], t_ms)
+            picked = key_to_exercise(key)
+            if picked is not None:
+                demo.set_exercise(picked, t_ms)
             elif key in (ord("r"), ord("R")):
                 demo.reset(start_t=t_ms)
             elif key in (ord("l"), ord("L")):
@@ -634,7 +653,7 @@ def main(argv: list[str] | None = None) -> int:
         "--exercise",
         choices=list(ALL_EXERCISES),
         default="SQUAT",
-        help="처음 고를 운동 (화면 위 버튼·1~7 키, 8 9 0 - 키로 바꿀 수 있음)",
+        help="처음 고를 운동 (화면 위 버튼이나 1~9·0·- 키로 바꿀 수 있음)",
     )
     p.add_argument(
         "--mp-confidence",
