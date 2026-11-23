@@ -3,7 +3,7 @@
 # 버드독(bird_dog)·카프 레이즈(calf_raise) 섹션과 그 자세 확인(posture)만 더했다 (D-89~D-92).
 # 옛 버전 파일은 고치지 않는다 (제출건 스냅샷이 카탈로그 버전을 고정하므로, 03 R9).
 # SPEC 11장 값에서 추가·변경한 키는 주석으로 표시했다.
-catalog_version: cat_2026-11-24
+catalog_version: cat_2026-11-23b
 features:
   min_visibility: 0.3          # [가정] 0.5 → 0.3. 다리가 가늘고 긴 사람의 다리를 놓쳐서 낮춤 (D-80)
   one_euro: { min_cutoff: 1.0, beta: 0.05, d_cutoff: 1.0 }

@@ -131,10 +131,10 @@ DEFAULT_CATALOG: dict[ExtraExercise, str] = {
     "MOUNTAIN_CLIMBER": "cat_2026-11-23",
     "SUPERMAN": "cat_2026-11-23",
     "DONKEY_KICK": "cat_2026-11-23",
-    "REVERSE_CRUNCH": "cat_2026-11-24",
-    "SIDE_LUNGE": "cat_2026-11-24",
-    "BIRD_DOG": "cat_2026-11-24",
-    "CALF_RAISE": "cat_2026-11-24",
+    "REVERSE_CRUNCH": "cat_2026-11-23b",
+    "SIDE_LUNGE": "cat_2026-11-23b",
+    "BIRD_DOG": "cat_2026-11-23b",
+    "CALF_RAISE": "cat_2026-11-23b",
 }
 
 

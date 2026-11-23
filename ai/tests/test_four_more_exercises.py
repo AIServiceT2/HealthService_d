@@ -1,6 +1,6 @@
 """리버스 크런치·사이드 런지·버드독·카프 레이즈 판정 (D-89~D-93).
 
-합성 데이터, 기준값은 cat_2026-11-24의 [가정] 값.
+합성 데이터, 기준값은 cat_2026-11-23b의 [가정] 값.
 
 US-01 "가동범위 기준에 못 미친 렙은 미인정"을 종목만 바꿔 확인한다. 이 종목들은 MVP 범위
 밖이며(mvp-scope.md) 엔진에만 있다.
@@ -40,7 +40,7 @@ from service.app import TOKEN_ENV, app
 from tools import synth, synth_floor, synth_more
 from tools.synth_extra import ExtraExercise, ExtraRep, ExtraSynthConfig, rep_windows, synth_session
 
-NEW = "cat_2026-11-24"
+NEW = "cat_2026-11-23b"
 PREV = "cat_2026-11-23"
 #: 종목별 판정 값 (인정되는 값, 가동범위 미달 값, 시도로도 안 치는 값).
 #: 리버스 크런치: 엉덩이 내각 / 사이드 런지: 굽힌 무릎 내각 / 버드독: 180 − min(팔·다리 뻗음)
@@ -205,7 +205,7 @@ def test_us01_four_counters_registered(new_catalog: Catalog) -> None:
 
 
 def test_us01_new_catalog_keeps_existing_sections() -> None:
-    """cat_2026-11-24는 cat_2026-11-23에 네 종목·자세 범위·카프 레이즈 이상 징후만 더했다."""
+    """cat_2026-11-23b는 cat_2026-11-23에 네 종목·자세 범위·카프 레이즈 이상 징후만 더했다."""
     prev = yaml.safe_load((DEFAULT_CATALOG_DIR / f"{PREV}.yaml").read_text())
     new = _catalog_data()
     assert set(new) - set(prev) == set(SECTIONS.values())
