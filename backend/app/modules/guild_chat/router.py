@@ -1,13 +1,13 @@
 """길드 채팅 API. 노션 '전운시 API 명세서' API-072~075 (2026-11-24 저장소에서 추가, 기능명세 JN-040).
 
-구현: API-073 메시지 보내기.
+구현: API-072 메시지 목록, API-073 메시지 보내기.
 로그인 확인은 auth 모듈의 get_current_user (Bearer access token, JWT).
 에러 본문 { code, message, details }은 전역 처리기(app/core/errors.py)가 만든다.
 """
 
 import uuid
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
@@ -16,7 +16,7 @@ from app.modules.auth.dependencies import get_current_user
 from app.modules.auth.models import User
 from app.modules.guild.schemas import ErrorResponse
 from app.modules.guild_chat import service
-from app.modules.guild_chat.schemas import MessageCreate, MessageRead, MessageSender
+from app.modules.guild_chat.schemas import MessageCreate, MessageList, MessageRead, MessageSender
 
 router = APIRouter(
     tags=["guild-chat"],
@@ -48,6 +48,47 @@ def _membership_errors(fn):
         raise AppError(404, "NOT_FOUND", "길드가 없습니다.")
     except service.NotGuildMember:
         raise AppError(403, "FORBIDDEN", "길드 소속원만 이용할 수 있습니다.")
+
+
+@router.get(
+    "/guilds/{guild_id}/chat/messages",
+    summary="[API-072] 길드 채팅 메시지 목록",
+    description=(
+        "권한: GUILD_MEMBER. items는 오래된 것 → 최근 순. 아무 값도 없으면 최근 limit개. "
+        "cursor(앞 응답의 nextCursor)는 더 이전 메시지, after(messageId)는 그 메시지 뒤에 온 메시지 "
+        "(재연결 뒤 빠진 메시지 채우기, nextCursor는 null). cursor와 after는 함께 쓸 수 없다. "
+        "숨긴 메시지는 deleted: true이고 body·payload가 null. limit 기본 20, 최대 50."
+    ),
+    response_model=MessageList,
+    response_model_by_alias=True,
+    responses={
+        400: {"model": ErrorResponse, "description": "VALIDATION_FAILED cursor와 after는 함께 쓸 수 없습니다. (cursor 형식, after 메시지, limit 범위)"},
+        401: _UNAUTHENTICATED,
+        403: _NOT_MEMBER,
+        404: _NO_GUILD,
+    },
+)
+def list_messages(
+    guild_id: uuid.UUID,
+    cursor: str | None = Query(default=None, description="더 이전 메시지 페이지 커서 (앞 응답의 nextCursor)"),
+    after: uuid.UUID | None = Query(default=None, description="이 messageId 뒤에 온 메시지만"),
+    limit: int = Query(default=20, ge=1, le=50, description="기본 20, 최대 50"),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if cursor is not None and after is not None:
+        raise AppError(400, "VALIDATION_FAILED", "cursor와 after는 함께 쓸 수 없습니다.")
+    try:
+        page = _membership_errors(lambda: service.list_messages(db, user.id, guild_id, cursor, after, limit))
+    except service.InvalidCursor:
+        raise AppError(400, "VALIDATION_FAILED", "입력값이 올바르지 않습니다.", {"cursor": "형식이 올바르지 않습니다."})
+    except service.AfterMessageNotFound:
+        raise AppError(400, "VALIDATION_FAILED", "입력값이 올바르지 않습니다.", {"after": "이 길드의 메시지가 아닙니다."})
+    return MessageList(
+        items=[_read(v) for v in page.items],
+        next_cursor=page.next_cursor,
+        has_more_after=page.has_more_after,
+    )
 
 
 @router.post(

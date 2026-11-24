@@ -44,3 +44,11 @@ class MessageRead(_CamelModel):
     payload: dict[str, Any] | None
     created_at: datetime
     deleted: bool
+
+
+class MessageList(_CamelModel):
+    """API-072 응답 200: { items, nextCursor, hasMoreAfter }. items는 오래된 것 → 최근 순."""
+
+    items: list[MessageRead]
+    next_cursor: str | None
+    has_more_after: bool
