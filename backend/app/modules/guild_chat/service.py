@@ -6,10 +6,11 @@
 import base64
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Any
 
 from sqlalchemy import select, tuple_
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -18,6 +19,9 @@ from app.modules.guild.models import Guild
 from app.modules.guild_chat.hub import hub
 from app.modules.guild_chat.models import GuildChatMessage, MessageType
 from app.modules.guild_chat.schemas import MessageRead
+from app.modules.snapshot.models import SubmissionSnapshot
+from app.modules.submission.models import WorkoutSubmission
+from app.modules.workout_session.models import WorkoutSession
 
 # WebSocket 닫기 코드 (노션 API-075)
 CLOSE_UNAUTHENTICATED = 4401
@@ -291,3 +295,64 @@ def delete_message(db: Session, user_id: uuid.UUID, guild_id: uuid.UUID, message
             {"type": "MESSAGE_DELETED", "messageId": str(result.message_id), "deletedBy": result.deleted_by},
         )
     return result
+
+
+# ---- 서버가 만드는 알림 (기능명세 JN-040) ----
+# 알림에는 관절 좌표·확신도·경험치·피해량·아이템을 넣지 않는다. 같은 알림은 DB 유니크 제약으로 한 번만 생긴다
+# (WORKOUT_DONE은 submission_id, BOSS_*는 길드·종류·weekStart). 부르는 쪽은 실패해도 원래 작업을 되돌리지 않는다.
+
+
+def _insert_notice(db: Session, **values: Any) -> GuildChatMessage | None:
+    """알림을 저장한다. 이미 같은 알림이 있으면 아무것도 하지 않고 None."""
+    new_id = db.execute(
+        insert(GuildChatMessage)
+        .values(id=uuid.uuid4(), created_at=datetime.now(UTC), **values)
+        .on_conflict_do_nothing()
+        .returning(GuildChatMessage.id)
+    ).scalar_one_or_none()
+    db.commit()
+    return None if new_id is None else db.get(GuildChatMessage, new_id)
+
+
+def post_workout_done(db: Session, submission_id: uuid.UUID) -> bool:
+    """지급 완료(API-041) 뒤 '운동 완료' 알림을 만든다. 만들었으면 True.
+
+    길드원이 아니거나 타격 수가 0(일일 상한 초과)이면 만들지 않는다 [제안].
+    payload는 운동 종류·타격 수·공략 대상 종류만 (노션 JN-040).
+    """
+    submission = db.get(WorkoutSubmission, submission_id)
+    user = db.get(User, submission.user_id)
+    snapshot = db.get(SubmissionSnapshot, submission_id)
+    if user.guild_id is None or snapshot is None or snapshot.hit_count <= 0:
+        return False
+    session = db.get(WorkoutSession, submission.session_id)
+    message = _insert_notice(
+        db,
+        guild_id=user.guild_id,
+        type=MessageType.WORKOUT_DONE,
+        sender_user_id=user.id,
+        submission_id=submission_id,
+        payload={
+            "exerciseCode": submission.exercise_code,
+            "hitCount": snapshot.hit_count,
+            "targetType": session.target_type,
+        },
+    )
+    if message is None:
+        return False
+    _publish_created(user.guild_id, _view(message, user))
+    return True
+
+
+def post_boss_notice(db: Session, guild_id: uuid.UUID, kind: MessageType, week_start: date, hp_max: int) -> bool:
+    """주간 보스 알림(BOSS_DEFEATED·BOSS_WEEK_STARTED)을 길드·종류·주마다 한 번 만든다. 만들었으면 True."""
+    message = _insert_notice(
+        db,
+        guild_id=guild_id,
+        type=kind,
+        payload={"weekStart": week_start.isoformat(), "hpMax": hp_max},
+    )
+    if message is None:
+        return False
+    _publish_created(guild_id, _view(message, None))
+    return True

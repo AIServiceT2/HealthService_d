@@ -1,6 +1,7 @@
 """지급 규칙. 다른 모듈은 이 파일의 함수로만 지급 내역·아이템을 다룬다."""
 
 import base64
+import logging
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -8,13 +9,18 @@ from datetime import UTC, datetime
 from sqlalchemy import func, select, tuple_, update
 from sqlalchemy.orm import Session
 
+from app.modules.battle import service as battle_service
 from app.modules.character.models import Character
+from app.modules.guild_chat import service as guild_chat_service
 from app.modules.reward.models import Item, ItemStatus, RewardLedger
 from app.modules.reward.rules import PROTECTION_PERIOD
 from app.modules.snapshot.models import SubmissionSnapshot
 from app.modules.submission.constants import SubmissionStatus
 from app.modules.submission.models import WorkoutSubmission
 from app.modules.workout_session.models import WorkoutSession
+
+
+logger = logging.getLogger(__name__)
 
 
 class SubmissionNotFound(Exception):
@@ -122,7 +128,21 @@ def grant(db: Session, submission_id: uuid.UUID, idempotency_key: uuid.UUID) -> 
     except Exception:
         db.rollback()
         raise
+    _notify_guild_chat(db, submission_id)
     return result
+
+
+def _notify_guild_chat(db: Session, submission_id: uuid.UUID) -> None:
+    """지급을 커밋한 뒤 길드 채팅 알림(운동 완료·보스 처치)을 만든다 (JN-040).
+
+    알림을 만들지 못해도 지급은 되돌리지 않는다 (이미 커밋됨). 같은 건을 다시 불러도 알림은 한 번만 생긴다.
+    """
+    try:
+        guild_chat_service.post_workout_done(db, submission_id)
+        battle_service.post_boss_defeated_if_needed(db, submission_id)
+    except Exception:
+        db.rollback()
+        logger.exception("길드 채팅 알림을 만들지 못했습니다 (submission_id=%s)", submission_id)
 
 
 # ---- 24시간 잠금 해제 (노션 API-042) ----
