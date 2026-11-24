@@ -5,6 +5,7 @@
 """
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 
 from app.core.errors import install_error_handlers
 from app.modules.auth.router import router as auth_router
@@ -20,6 +21,7 @@ from app.modules.snapshot.router import router as snapshot_router
 from app.modules.submission.router import router as submission_router
 from app.modules.submission.router import stub_router as submission_stub_router
 from app.modules.workout_session.router import router as workout_session_router
+from app.modules.workout_session.voice_cues import STATIC_DIR
 
 app = FastAPI(title="전운시 API")
 install_error_handlers(app)  # 에러 본문 { code, message, details } (노션 API 명세서 공통 규칙)
@@ -38,3 +40,6 @@ app.include_router(reward_router)
 app.include_router(battle_router)
 app.include_router(result_router)
 app.include_router(llm_router)
+
+# 음성 안내 녹음 파일 (API-071). backend/static/voice/<멘트 코드>.m4a → /static/voice/<멘트 코드>.m4a
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")

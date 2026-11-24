@@ -1,4 +1,4 @@
-"""session API. 노션 '전운시 API 명세서' API-018~027.
+"""session API. 노션 '전운시 API 명세서' API-018~027, API-071(음성 안내 멘트).
 
 API-026(제출)은 submission 모듈에 있다 (submission/router.py stub_router).
 로그인 확인은 auth 모듈의 get_current_user (Bearer access token).
@@ -6,7 +6,7 @@ API-026(제출)은 submission 모듈에 있다 (submission/router.py stub_router
 
 import uuid
 
-from fastapi import APIRouter, Depends, Path, Request, Response
+from fastapi import APIRouter, Depends, Path, Query, Request, Response
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
@@ -15,13 +15,14 @@ from app.core.errors import AppError
 from app.modules.auth.dependencies import get_current_user
 from app.modules.auth.models import User
 from app.modules.submission.service import submission_for_session
-from app.modules.workout_session import service
+from app.modules.workout_session import service, voice_cues
 from app.modules.workout_session.catalog import (
     CATALOG_VERSION,
     CHUNK_MAX_BYTES,
     CHUNK_MAX_FRAMES,
     EXERCISES,
 )
+from app.modules.workout_session.voice_cues import VOICE_CUE_VERSION
 from app.modules.workout_session.schemas import (
     ChunkSpecOut,
     ErrorResponse,
@@ -41,6 +42,8 @@ from app.modules.workout_session.schemas import (
     SessionStatusResponse,
     StartSessionRequest,
     StartSessionResponse,
+    VoiceCueOut,
+    VoiceCuesResponse,
 )
 
 # 입력 오류는 전역 처리기가 422가 아니라 400 VALIDATION_FAILED로 돌려준다 (API-021 LIVENESS_FAILED만 422).
@@ -265,3 +268,46 @@ def api_027(
 ) -> Response:
     service.discard_session(db, user.id, id)
     return Response(status_code=204)
+
+
+@router.get(
+    "/voice-cues",
+    summary="[API-071] 음성 안내 멘트 목록",
+    description=(
+        "권한: PLAYER. 운동 시작 전에 불러 녹음 파일을 미리 받아 둔다 (운동 중에는 서버를 부르지 않음). "
+        "exerciseCode가 없으면 공통 멘트만, 있으면 공통 + 그 운동 멘트. "
+        "audioUrl은 backend/static/voice/<code>.m4a(.mp3)가 있으면 /static/voice/ 주소, 녹음 전이면 null. "
+        "카운트 최대 횟수(30)·멘트 문구는 [가안] (노션 JN-039 미정)"
+    ),
+    response_model=VoiceCuesResponse,
+)
+def api_071(
+    request: Request,
+    exercise_code: str | None = Query(default=None, alias="exerciseCode"),
+    _: User = Depends(get_current_user),
+) -> VoiceCuesResponse:
+    if exercise_code is not None and exercise_code not in EXERCISES:
+        raise AppError(400, "VALIDATION_FAILED", "모르는 운동 종류입니다.", {"reason": "UNKNOWN_EXERCISE"})
+    return VoiceCuesResponse(
+        version=VOICE_CUE_VERSION,
+        cues=[
+            VoiceCueOut(
+                code=c.code,
+                type=c.type,
+                exercise_code=c.exercise_code,
+                number=c.number,
+                reason_code=c.reason_code,
+                text=c.text,
+                audio_url=_audio_url(request, c.code),
+            )
+            for c in voice_cues.cues_for(exercise_code)
+        ],
+    )
+
+
+def _audio_url(request: Request, code: str) -> str | None:
+    """backend/static/voice/에 녹음 파일이 있으면 그 주소, 없으면 None (녹음 전)."""
+    file_name = voice_cues.audio_file_for(code)
+    if file_name is None:
+        return None
+    return str(request.url_for("static", path=f"voice/{file_name}"))

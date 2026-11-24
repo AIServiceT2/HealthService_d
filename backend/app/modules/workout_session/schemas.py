@@ -172,3 +172,21 @@ class SessionDetailResponse(_CamelModel):
     liveness_passed: bool | None
     received_chunks: list[int]
     submission_id: uuid.UUID | None
+
+
+# ---- API-071 음성 안내 멘트 목록 ----
+
+
+class VoiceCueOut(_CamelModel):
+    code: str
+    type: Literal["COUNT", "SET_DONE", "WORKOUT_DONE", "FORM"]
+    exercise_code: str | None = None
+    number: int | None = None
+    reason_code: str | None = None
+    text: str
+    audio_url: str | None = None  # 녹음 전이면 null (노션 API-071)
+
+
+class VoiceCuesResponse(_CamelModel):
+    version: str
+    cues: list[VoiceCueOut]
