@@ -6,7 +6,7 @@
 import base64
 import uuid
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import select, tuple_
@@ -32,6 +32,14 @@ class InvalidCursor(Exception):
 
 class AfterMessageNotFound(Exception):
     """after에 넣은 메시지가 그 길드에 없다."""
+
+
+class MessageNotFound(Exception):
+    pass
+
+
+class CannotDelete(Exception):
+    """본인 TEXT도 아니고 길드장도 아니다."""
 
 
 @dataclass(frozen=True)
@@ -194,3 +202,59 @@ def list_messages(
     page = rows[:limit]
     next_cursor = _encode_cursor(page[-1][0]) if len(rows) > limit else None
     return MessagePage([_view(m, u) for m, u in reversed(page)], next_cursor, False)
+
+
+# ---- 메시지 삭제(숨김) (노션 API-074) ----
+
+DELETED_BY_AUTHOR = "AUTHOR"
+DELETED_BY_LEADER = "LEADER"
+
+
+@dataclass(frozen=True)
+class DeleteResult:
+    message_id: uuid.UUID
+    # AUTHOR | LEADER
+    deleted_by: str
+
+
+def _deleted_by_role(message: GuildChatMessage) -> str:
+    # 길드장이 자기 메시지를 숨기면 AUTHOR
+    return DELETED_BY_AUTHOR if message.deleted_by == message.sender_user_id else DELETED_BY_LEADER
+
+
+def delete_message(db: Session, user_id: uuid.UUID, guild_id: uuid.UUID, message_id: uuid.UUID) -> DeleteResult:
+    """메시지를 지우지 않고 숨긴다 (노션 API-074). 본인은 자기 TEXT만, 길드장은 그 길드의 모든 메시지.
+
+    - 길드원이 아니면 NotGuildMember(403), 그 길드에 메시지가 없으면 MessageNotFound(404)
+    - 숨길 권한이 없으면 CannotDelete(403)
+    - 이미 숨긴 메시지는 바꾸지 않고 처음 결과를 돌려준다 (동시에 와도 행 잠금으로 하나씩 처리)
+    """
+    try:
+        if db.get(Guild, guild_id) is None:
+            raise MessageNotFound(str(message_id))
+        user = db.get(User, user_id)
+        if user is None or user.guild_id != guild_id:
+            raise NotGuildMember(str(user_id))
+        message = db.scalars(
+            select(GuildChatMessage)
+            .where(GuildChatMessage.id == message_id, GuildChatMessage.guild_id == guild_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        ).one_or_none()
+        if message is None:
+            raise MessageNotFound(str(message_id))
+
+        is_author_text = message.type == MessageType.TEXT and message.sender_user_id == user_id
+        is_leader = db.scalar(select(Guild.leader_user_id).where(Guild.id == guild_id)) == user_id
+        if not (is_author_text or is_leader):
+            raise CannotDelete(str(user_id))
+
+        if message.deleted_at is None:
+            message.deleted_at = datetime.now(UTC)
+            message.deleted_by = user_id
+        result = DeleteResult(message.id, _deleted_by_role(message))
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    return result

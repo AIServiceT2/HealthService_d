@@ -1,6 +1,6 @@
 """길드 채팅 API. 노션 '전운시 API 명세서' API-072~075 (2026-11-24 저장소에서 추가, 기능명세 JN-040).
 
-구현: API-072 메시지 목록, API-073 메시지 보내기.
+구현: API-072 메시지 목록, API-073 메시지 보내기, API-074 메시지 삭제(숨김).
 로그인 확인은 auth 모듈의 get_current_user (Bearer access token, JWT).
 에러 본문 { code, message, details }은 전역 처리기(app/core/errors.py)가 만든다.
 """
@@ -16,7 +16,13 @@ from app.modules.auth.dependencies import get_current_user
 from app.modules.auth.models import User
 from app.modules.guild.schemas import ErrorResponse
 from app.modules.guild_chat import service
-from app.modules.guild_chat.schemas import MessageCreate, MessageList, MessageRead, MessageSender
+from app.modules.guild_chat.schemas import (
+    MessageCreate,
+    MessageDeleted,
+    MessageList,
+    MessageRead,
+    MessageSender,
+)
 
 router = APIRouter(
     tags=["guild-chat"],
@@ -123,3 +129,36 @@ def send_message(
     if not created:
         response.status_code = 200
     return _read(view)
+
+
+@router.delete(
+    "/guilds/{guild_id}/chat/messages/{message_id}",
+    summary="[API-074] 길드 채팅 메시지 삭제",
+    description=(
+        "권한: GUILD_MEMBER. 지우지 않고 숨긴다. 본인은 자기 TEXT만, 길드장은 그 길드의 모든 메시지(알림 포함)를 숨길 수 있다. "
+        "이미 숨긴 메시지를 다시 요청하면 같은 결과를 돌려준다. deletedBy는 AUTHOR | LEADER "
+        "(길드장이 자기 메시지를 숨기면 AUTHOR)."
+    ),
+    response_model=MessageDeleted,
+    response_model_by_alias=True,
+    responses={
+        401: _UNAUTHENTICATED,
+        403: {"model": ErrorResponse, "description": "FORBIDDEN 본인 메시지나 길드장만 삭제할 수 있습니다. (길드 소속원이 아니어도 403)"},
+        404: {"model": ErrorResponse, "description": "NOT_FOUND 메시지가 없습니다."},
+    },
+)
+def delete_message(
+    guild_id: uuid.UUID,
+    message_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        result = service.delete_message(db, user.id, guild_id, message_id)
+    except service.NotGuildMember:
+        raise AppError(403, "FORBIDDEN", "길드 소속원만 이용할 수 있습니다.")
+    except service.CannotDelete:
+        raise AppError(403, "FORBIDDEN", "본인 메시지나 길드장만 삭제할 수 있습니다.")
+    except service.MessageNotFound:
+        raise AppError(404, "NOT_FOUND", "메시지가 없습니다.")
+    return MessageDeleted(message_id=result.message_id, deleted_by=result.deleted_by)

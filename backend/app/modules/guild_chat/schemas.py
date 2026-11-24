@@ -2,7 +2,7 @@
 
 import uuid
 from datetime import datetime
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, StringConstraints
 from pydantic.alias_generators import to_camel
@@ -52,3 +52,11 @@ class MessageList(_CamelModel):
     items: list[MessageRead]
     next_cursor: str | None
     has_more_after: bool
+
+
+class MessageDeleted(_CamelModel):
+    """API-074 응답 200: { messageId, deleted: true, deletedBy }. deletedBy는 AUTHOR | LEADER."""
+
+    message_id: uuid.UUID
+    deleted: bool = True
+    deleted_by: Literal["AUTHOR", "LEADER"]
