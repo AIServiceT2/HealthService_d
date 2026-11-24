@@ -12,6 +12,7 @@ from app.modules.auth.router import router as auth_router
 from app.modules.battle.router import router as battle_router
 from app.modules.character.router import router as character_router
 from app.modules.guild.router import router as guild_router
+from app.modules.guild_chat.router import router as guild_chat_router
 from app.modules.health.router import router as health_router
 from app.modules.llm.router import router as llm_router
 from app.modules.result.router import router as result_router
@@ -32,6 +33,7 @@ app.include_router(submission_router)
 app.include_router(auth_router)
 app.include_router(character_router)
 app.include_router(guild_router)
+app.include_router(guild_chat_router)
 app.include_router(workout_session_router)
 app.include_router(submission_stub_router)
 app.include_router(snapshot_router)
