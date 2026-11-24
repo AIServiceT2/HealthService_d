@@ -2,7 +2,7 @@
   "title": "전운시 DB (ERD)",
   "exported_at": "2026-11-10T05:12:16.006Z",
   "source": "https://app.notion.com/p/41326201378781cbb4c3c015193d2f88",
-  "table_count": 16,
+  "table_count": 17,
   "tables": [
     {
       "name": "EXERCISE_TYPE",
@@ -779,6 +779,105 @@
           "description": "마지막 수정 시각. 앱이 다시 받을지 판단 (API-071 version)"
         }
       ]
+    },
+    {
+      "name": "GUILD_CHAT_MESSAGE",
+      "label": "길드 채팅 메시지",
+      "columns": [
+        {
+          "name": "id",
+          "type": "UUID",
+          "constraints": [
+            "PK"
+          ],
+          "description": "메시지 ID"
+        },
+        {
+          "name": "guild_id",
+          "type": "UUID",
+          "constraints": [
+            "FK",
+            "NOT NULL"
+          ],
+          "description": "길드. 길드가 없어지면 메시지도 지움(CASCADE). (guild_id, created_at, id) 인덱스로 최근 메시지 조회"
+        },
+        {
+          "name": "type",
+          "type": "VARCHAR",
+          "constraints": [
+            "NOT NULL"
+          ],
+          "description": "TEXT / WORKOUT_DONE / BOSS_DEFEATED / BOSS_WEEK_STARTED"
+        },
+        {
+          "name": "sender_user_id",
+          "type": "UUID",
+          "constraints": [
+            "FK",
+            "NULL"
+          ],
+          "description": "보낸 사람(TEXT) 또는 운동한 길드원(WORKOUT_DONE). BOSS_* 알림이면 NULL"
+        },
+        {
+          "name": "body",
+          "type": "VARCHAR",
+          "constraints": [
+            "NULL"
+          ],
+          "description": "TEXT일 때 1~300자 [제안]. 알림이면 NULL"
+        },
+        {
+          "name": "payload",
+          "type": "JSONB",
+          "constraints": [
+            "NULL"
+          ],
+          "description": "알림 내용. WORKOUT_DONE {exerciseCode, hitCount, targetType}, BOSS_* {weekStart, hpMax}. TEXT면 NULL"
+        },
+        {
+          "name": "submission_id",
+          "type": "UUID",
+          "constraints": [
+            "FK",
+            "UNIQUE",
+            "NULL"
+          ],
+          "description": "WORKOUT_DONE의 제출건. 제출건 1건에 알림 1개 (중복 방지). 다른 종류면 NULL"
+        },
+        {
+          "name": "client_message_id",
+          "type": "UUID",
+          "constraints": [
+            "NULL"
+          ],
+          "description": "앱이 만든 메시지 ID. (sender_user_id, client_message_id) UNIQUE로 같은 메시지 재전송 방지. 알림이면 NULL"
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "constraints": [
+            "NOT NULL"
+          ],
+          "description": "만든 시각"
+        },
+        {
+          "name": "deleted_at",
+          "type": "TIMESTAMP",
+          "constraints": [
+            "NULL"
+          ],
+          "description": "숨긴 시각 (소프트 삭제). NULL이면 보임"
+        },
+        {
+          "name": "deleted_by",
+          "type": "UUID",
+          "constraints": [
+            "FK",
+            "NULL"
+          ],
+          "description": "숨긴 사람 (본인 또는 길드장)"
+        }
+      ]
     }
   ],
   "relationships": [
@@ -895,6 +994,24 @@
       "cardinality": "||--o{",
       "to": "VOICE_CUE",
       "label": "운동별 음성 멘트"
+    },
+    {
+      "from": "GUILD",
+      "cardinality": "||--o{",
+      "to": "GUILD_CHAT_MESSAGE",
+      "label": "채팅 메시지"
+    },
+    {
+      "from": "USER",
+      "cardinality": "||--o{",
+      "to": "GUILD_CHAT_MESSAGE",
+      "label": "보냄"
+    },
+    {
+      "from": "WORKOUT_SUBMISSION",
+      "cardinality": "||--o|",
+      "to": "GUILD_CHAT_MESSAGE",
+      "label": "운동 완료 알림 (최대 1)"
     }
   ],
   "changes_from_DATA_MODEL_md": [
@@ -1005,6 +1122,12 @@
       "DATA-MODEL.md": "없음",
       "3NF 안": "VOICE_CUE(code, type, exercise_code, number, reason_code, text, audio_url, updated_at) 추가",
       "이유": "카운트·운동 완료·자세 교정 음성 멘트(JN-039, API-071). 녹음 파일을 나중에 추가해도 앱을 다시 배포하지 않게 서버가 파일 주소를 관리. 켜기·끄기 설정은 폰에만 저장해 USER에는 칼럼을 두지 않음"
+    },
+    {
+      "바꾼 곳": "길드 채팅 메시지 (2026-11-24 팀 요청 반영)",
+      "DATA-MODEL.md": "없음",
+      "3NF 안": "GUILD_CHAT_MESSAGE(id, guild_id, type, sender_user_id, body, payload, submission_id, client_message_id, created_at, deleted_at, deleted_by) 추가",
+      "이유": "길드 채팅(JN-040, API-072~075). 텍스트와 서버 알림을 한 테이블에 두어 한 번에 시간순 조회. 알림 수치는 payload에 그때 값으로 남김 (보스 테이블이 ERD에 없어 FK 없이 weekStart로 기록). 보스 알림 중복 방지는 서버 코드에서 검사"
     }
   ],
   "undecided": [
@@ -1017,7 +1140,11 @@
     "운영자 역할 저장 방식, 문의(INQUIRY)·카탈로그 버전(CATALOG) 테이블은 범위 확인 기능이라 MVP 포함이 확정되면 추가",
     "POSE_CHUNK 원본 좌표의 보관·삭제 기간 (제출 후 REP_EVENT로 옮기고 지울지)",
     "음성 안내 녹음 파일의 저장소와 audio_url을 채우는 방법 (운영자 화면·업로드 API 없음), 녹음 전(NULL) 대체 방식(무음 / 기기 TTS)",
-    "음성 카운트 최대 횟수와 자세 교정 멘트 반복 간격 → VOICE_CUE에 담을 칼럼이 늘 수 있음"
+    "음성 카운트 최대 횟수와 자세 교정 멘트 반복 간격 → VOICE_CUE에 담을 칼럼이 늘 수 있음",
+    "길드 채팅: 메시지 보관 기간 (오래된 메시지를 지울지)",
+    "길드 채팅: 메시지 신고·운영자 처리 (신고·회수 F-07이 MVP 제외라 지금은 없음)",
+    "길드 채팅: 보내기 간격 제한(도배 방지) 값",
+    "길드 채팅: 운동 완료 알림을 길드원에게 보여 줄 범위와 끄기 설정 (PRD 미정: 같은 길드원에게 리플레이를 공개할지)"
   ],
   "table_summary": [
     {
@@ -1115,7 +1242,13 @@
       "테이블명": "VOICE_CUE",
       "역할": "운동 중 음성 안내 멘트·녹음 파일 주소",
       "PK": "code"
+    },
+    {
+      "번호": "17",
+      "테이블명": "GUILD_CHAT_MESSAGE",
+      "역할": "길드 채팅 메시지·운동 완료·보스 알림",
+      "PK": "id"
     }
   ],
-  "erd_mermaid": "erDiagram\n    GUILD ||--o{ USER : \"소속 (0~1)\"\n    USER ||--o{ GUILD : \"길드장\"\n    USER ||--|| CHARACTER : \"캐릭터 1개\"\n    USER ||--o{ WORKOUT_SUBMISSION : \"신청\"\n    USER ||--o{ WORKOUT_SESSION : \"운동 세션\"\n    WORKOUT_SESSION ||--o| WORKOUT_SUBMISSION : \"제출 (최대 1)\"\n    WORKOUT_SESSION ||--o{ POSE_CHUNK : \"좌표 청크\"\n    GUILD ||--o{ GUILD_INVITATION : \"초대 코드\"\n    EXERCISE_TYPE ||--o{ WORKOUT_SUBMISSION : \"운동 종류\"\n    WORKOUT_SUBMISSION ||--o{ REP_EVENT : \"렍 기록\"\n    WORKOUT_SUBMISSION ||--o| SUBMISSION_SNAPSHOT : \"보상 스냅샷 (PREPARED부터)\"\n    WORKOUT_SUBMISSION ||--o| DAILY_CAP_RESERVATION : \"상한 예약\"\n    WORKOUT_SUBMISSION ||--o| REVIEW_REQUEST : \"확인 요청 (최대 1)\"\n    USER ||--o{ REVIEW_REQUEST : \"확인자\"\n    REJECT_REASON ||--o{ REVIEW_REQUEST : \"반려 사유\"\n    WORKOUT_SUBMISSION ||--o| REWARD_LEDGER : \"지급 (한 번만)\"\n    WORKOUT_SUBMISSION ||--o{ ITEM : \"획득\"\n    USER ||--o{ ITEM : \"보유\"\n    EXERCISE_TYPE ||--o{ VOICE_CUE : \"운동별 음성 멘트\"\n\n    EXERCISE_TYPE {\n        string code PK \"SQUAT 등\"\n        string name \"스쿼트\"\n        int daily_cap \"스쿼트 200\"\n    }\n    REJECT_REASON {\n        string code PK\n        string label \"기록이상/본인확인실패/도용의심\"\n    }\n    USER {\n        uuid id PK\n        string nickname \"LLM에 보내지 않음\"\n        date birth_date \"14세 미만 가입 불가\"\n        uuid guild_id FK \"nullable\"\n    }\n    GUILD {\n        uuid id PK\n        string name \"LLM·확인자 화면에 보내지 않음\"\n        uuid leader_user_id FK\n    }\n    CHARACTER {\n        uuid user_id PK, FK\n        int exp \"level은 exp로 계산\"\n        string avatar_id \"nullable, 선택 범위 미정\"\n    }\n    WORKOUT_SESSION {\n        uuid id PK\n        uuid user_id FK\n        string exercise_code FK\n        string status \"ACTIVE/PAUSED/SUBMITTED/DISCARDED\"\n        int goal_reps\n        int goal_sets\n        string target_type \"DUNGEON / BOSS, 미정\"\n        uuid target_id\n        bool liveness_passed \"무작위 동작 확인, 확인 전 NULL\"\n        timestamp started_at\n    }\n    POSE_CHUNK {\n        uuid session_id PK, FK\n        int seq PK\n        jsonb frames \"얼굴 제외 관절 좌표\"\n        timestamp received_at\n    }\n    WORKOUT_SUBMISSION {\n        uuid id PK\n        uuid user_id FK\n        uuid session_id FK \"UNIQUE\"\n        string exercise_code FK\n        string status \"SUBMITTED~REVOKED 9개\"\n        timestamp started_at\n        timestamp ended_at\n        int counted_reps \"서버 재계산 인정량\"\n        int version \"If-Match 동시 수정 검사\"\n        float confidence \"0~1, 기준 미확정\"\n        string approval_path \"AI_AUTO / REVIEWER\"\n        text ai_story \"L3\"\n        text ai_form_tip \"L4\"\n        text ai_summary \"L1\"\n        text ai_flags \"L2\"\n    }\n    REP_EVENT {\n        uuid submission_id PK, FK\n        int rep_no PK\n        timestamp ts\n        bool counted \"인정 여부\"\n        jsonb keypoints \"얼굴 제외 관절 좌표 묶음\"\n    }\n    SUBMISSION_SNAPSHOT {\n        uuid submission_id PK, FK\n        string catalog_version\n        int hit_count\n        int exp\n        int total_damage\n        float weakness_multiplier\n        int drop_count\n    }\n    DAILY_CAP_RESERVATION {\n        uuid submission_id PK, FK\n        int amount \"보상 대상 인정량\"\n        timestamp released_at \"취소·반려 시 해제\"\n    }\n    REVIEW_REQUEST {\n        uuid submission_id PK, FK\n        uuid reviewer_user_id FK \"신청자 본인 불가\"\n        timestamp requested_at\n        string reason_code FK \"반려 때 필수\"\n        text reason_text \"반려 때 필수\"\n    }\n    REWARD_LEDGER {\n        uuid submission_id PK, FK \"멱등 키\"\n        timestamp rewarded_at \"보호 기간 = +24시간\"\n    }\n    ITEM {\n        uuid id PK\n        uuid user_id FK\n        uuid submission_id FK\n        string status \"LOCKED / 해제 이름 미정\"\n    }\n    GUILD_INVITATION {\n        string code PK\n        uuid guild_id FK\n        uuid created_by FK \"길드장\"\n        timestamp expires_at\n    }\n    VOICE_CUE {\n        string code PK\n        string type \"COUNT / SET_DONE / WORKOUT_DONE / FORM\"\n        string exercise_code FK \"공통이면 NULL\"\n        int number \"COUNT일 때 횟수\"\n        string reason_code \"FORM일 때 미인정 사유\"\n        string text \"멘트 문구\"\n        string audio_url \"녹음 전 NULL\"\n        timestamp updated_at\n    }"
+  "erd_mermaid": "erDiagram\n    GUILD ||--o{ USER : \"소속 (0~1)\"\n    USER ||--o{ GUILD : \"길드장\"\n    USER ||--|| CHARACTER : \"캐릭터 1개\"\n    USER ||--o{ WORKOUT_SUBMISSION : \"신청\"\n    USER ||--o{ WORKOUT_SESSION : \"운동 세션\"\n    WORKOUT_SESSION ||--o| WORKOUT_SUBMISSION : \"제출 (최대 1)\"\n    WORKOUT_SESSION ||--o{ POSE_CHUNK : \"좌표 청크\"\n    GUILD ||--o{ GUILD_INVITATION : \"초대 코드\"\n    EXERCISE_TYPE ||--o{ WORKOUT_SUBMISSION : \"운동 종류\"\n    WORKOUT_SUBMISSION ||--o{ REP_EVENT : \"렍 기록\"\n    WORKOUT_SUBMISSION ||--o| SUBMISSION_SNAPSHOT : \"보상 스냅샷 (PREPARED부터)\"\n    WORKOUT_SUBMISSION ||--o| DAILY_CAP_RESERVATION : \"상한 예약\"\n    WORKOUT_SUBMISSION ||--o| REVIEW_REQUEST : \"확인 요청 (최대 1)\"\n    USER ||--o{ REVIEW_REQUEST : \"확인자\"\n    REJECT_REASON ||--o{ REVIEW_REQUEST : \"반려 사유\"\n    WORKOUT_SUBMISSION ||--o| REWARD_LEDGER : \"지급 (한 번만)\"\n    WORKOUT_SUBMISSION ||--o{ ITEM : \"획득\"\n    USER ||--o{ ITEM : \"보유\"\n    EXERCISE_TYPE ||--o{ VOICE_CUE : \"운동별 음성 멘트\"\n    GUILD ||--o{ GUILD_CHAT_MESSAGE : \"채팅 메시지\"\n    USER ||--o{ GUILD_CHAT_MESSAGE : \"보냄\"\n    WORKOUT_SUBMISSION ||--o| GUILD_CHAT_MESSAGE : \"운동 완료 알림 (최대 1)\"\n\n    EXERCISE_TYPE {\n        string code PK \"SQUAT 등\"\n        string name \"스쿼트\"\n        int daily_cap \"스쿼트 200\"\n    }\n    REJECT_REASON {\n        string code PK\n        string label \"기록이상/본인확인실패/도용의심\"\n    }\n    USER {\n        uuid id PK\n        string nickname \"LLM에 보내지 않음\"\n        date birth_date \"14세 미만 가입 불가\"\n        uuid guild_id FK \"nullable\"\n    }\n    GUILD {\n        uuid id PK\n        string name \"LLM·확인자 화면에 보내지 않음\"\n        uuid leader_user_id FK\n    }\n    CHARACTER {\n        uuid user_id PK, FK\n        int exp \"level은 exp로 계산\"\n        string avatar_id \"nullable, 선택 범위 미정\"\n    }\n    WORKOUT_SESSION {\n        uuid id PK\n        uuid user_id FK\n        string exercise_code FK\n        string status \"ACTIVE/PAUSED/SUBMITTED/DISCARDED\"\n        int goal_reps\n        int goal_sets\n        string target_type \"DUNGEON / BOSS, 미정\"\n        uuid target_id\n        bool liveness_passed \"무작위 동작 확인, 확인 전 NULL\"\n        timestamp started_at\n    }\n    POSE_CHUNK {\n        uuid session_id PK, FK\n        int seq PK\n        jsonb frames \"얼굴 제외 관절 좌표\"\n        timestamp received_at\n    }\n    WORKOUT_SUBMISSION {\n        uuid id PK\n        uuid user_id FK\n        uuid session_id FK \"UNIQUE\"\n        string exercise_code FK\n        string status \"SUBMITTED~REVOKED 9개\"\n        timestamp started_at\n        timestamp ended_at\n        int counted_reps \"서버 재계산 인정량\"\n        int version \"If-Match 동시 수정 검사\"\n        float confidence \"0~1, 기준 미확정\"\n        string approval_path \"AI_AUTO / REVIEWER\"\n        text ai_story \"L3\"\n        text ai_form_tip \"L4\"\n        text ai_summary \"L1\"\n        text ai_flags \"L2\"\n    }\n    REP_EVENT {\n        uuid submission_id PK, FK\n        int rep_no PK\n        timestamp ts\n        bool counted \"인정 여부\"\n        jsonb keypoints \"얼굴 제외 관절 좌표 묶음\"\n    }\n    SUBMISSION_SNAPSHOT {\n        uuid submission_id PK, FK\n        string catalog_version\n        int hit_count\n        int exp\n        int total_damage\n        float weakness_multiplier\n        int drop_count\n    }\n    DAILY_CAP_RESERVATION {\n        uuid submission_id PK, FK\n        int amount \"보상 대상 인정량\"\n        timestamp released_at \"취소·반려 시 해제\"\n    }\n    REVIEW_REQUEST {\n        uuid submission_id PK, FK\n        uuid reviewer_user_id FK \"신청자 본인 불가\"\n        timestamp requested_at\n        string reason_code FK \"반려 때 필수\"\n        text reason_text \"반려 때 필수\"\n    }\n    REWARD_LEDGER {\n        uuid submission_id PK, FK \"멱등 키\"\n        timestamp rewarded_at \"보호 기간 = +24시간\"\n    }\n    ITEM {\n        uuid id PK\n        uuid user_id FK\n        uuid submission_id FK\n        string status \"LOCKED / 해제 이름 미정\"\n    }\n    GUILD_INVITATION {\n        string code PK\n        uuid guild_id FK\n        uuid created_by FK \"길드장\"\n        timestamp expires_at\n    }\n    VOICE_CUE {\n        string code PK\n        string type \"COUNT / SET_DONE / WORKOUT_DONE / FORM\"\n        string exercise_code FK \"공통이면 NULL\"\n        int number \"COUNT일 때 횟수\"\n        string reason_code \"FORM일 때 미인정 사유\"\n        string text \"멘트 문구\"\n        string audio_url \"녹음 전 NULL\"\n        timestamp updated_at\n    }\n    GUILD_CHAT_MESSAGE {\n        uuid id PK\n        uuid guild_id FK\n        string type \"TEXT / WORKOUT_DONE / BOSS_*\"\n        uuid sender_user_id FK \"BOSS 알림이면 NULL\"\n        string body \"TEXT일 때 1~300자\"\n        jsonb payload \"알림 내용\"\n        uuid submission_id FK \"WORKOUT_DONE, UNIQUE\"\n        uuid client_message_id \"재전송 방지\"\n        timestamp created_at\n        timestamp deleted_at \"숨김\"\n        uuid deleted_by FK\n    }"
 }
