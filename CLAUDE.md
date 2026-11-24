@@ -55,7 +55,7 @@
 > 팀이 합의한 것만 씁니다. 예시를 그대로 두지 마세요.
 
 - `main`에 바로 커밋하거나 force push하지 않는다. 브랜치 → PR → 병합.
-- 브랜치 이름은 `종류/내용` 형식으로 쓰고, 종류는 커밋 종류와 맞춘다 (`feature/…`, `fix/…`, 문서는 `docs/주제`). (예: `docs/stack-decision`)
+- 브랜치 이름은 `종류/내용` 형식으로 쓰고, 종류는 커밋 종류와 맞춘다 (`feat/…`, `fix/…`, 문서는 `docs/주제`. `feature/…`는 쓰지 않는다). (예: `docs/stack-decision`)
 - 커밋 메시지는 `종류: 내용` 형식으로 한국어로 쓴다. (예: `docs: STACK.md 결정 기록 추가`) 종류는 아래 7개만 쓴다 (출처: 노션 「git workflow, commit convention」, 2026-11-17 확인).
   - `feat:` 새로 추가 / `edit:` 수정 (이름 변경 제외, 실제 문제를 고친 것은 `fix:`) / `rm:` 제거 / `fix:` 실제 문제를 고침 / `refactor:` 이름 변경 / `format:` 포맷만 맞춤 (코드 내용은 바꾸지 않음) / `docs:` md 문서
   - `docs/CODE-STYLE.md` 5번(`chore:`·`test:` 포함)과 다르다. 어느 쪽에 맞출지 팀 확인 필요.
