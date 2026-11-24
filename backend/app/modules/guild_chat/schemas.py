@@ -45,6 +45,20 @@ class MessageRead(_CamelModel):
     created_at: datetime
     deleted: bool
 
+    @classmethod
+    def from_view(cls, view) -> "MessageRead":
+        """service.MessageView → 응답 모델 (서비스를 import하지 않으려고 속성만 읽는다)."""
+        sender = view.sender
+        return cls(
+            message_id=view.message_id,
+            type=view.type,
+            sender=MessageSender(user_id=sender.user_id, nickname=sender.nickname) if sender else None,
+            body=view.body,
+            payload=view.payload,
+            created_at=view.created_at,
+            deleted=view.deleted,
+        )
+
 
 class MessageList(_CamelModel):
     """API-072 응답 200: { items, nextCursor, hasMoreAfter }. items는 오래된 것 → 최근 순."""

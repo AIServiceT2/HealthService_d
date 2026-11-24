@@ -4,6 +4,7 @@
 """
 
 import uuid
+from datetime import UTC, datetime
 
 import jwt
 from fastapi import Depends
@@ -24,24 +25,32 @@ def _unauthenticated() -> AppError:
     return AppError(401, "UNAUTHENTICATED", "Bearer 토큰이 필요하거나 유효하지 않습니다.")
 
 
-def get_current_user(
-    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
-    db: Session = Depends(get_db),
-) -> User:
-    if credentials is None:
-        raise _unauthenticated()
+def read_access_token(token: str) -> tuple[uuid.UUID, datetime]:
+    """access token을 검사해 (user_id, 만료 시각)을 돌려준다. 틀리거나 만료되면 401 AppError.
+
+    헤더를 쓰지 않는 WebSocket(길드 채팅 API-075)도 같은 검사를 쓰려고 get_current_user에서 나눴다.
+    """
     try:
         claims = jwt.decode(
-            credentials.credentials,
+            token,
             jwt_secret(),
             algorithms=[JWT_ALGORITHM],
             options={"require": ["sub", "exp"]},
         )
         if claims.get("type") != "access":
             raise _unauthenticated()
-        user_id = uuid.UUID(claims["sub"])
-    except (jwt.InvalidTokenError, ValueError):
+        return uuid.UUID(claims["sub"]), datetime.fromtimestamp(claims["exp"], UTC)
+    except (jwt.InvalidTokenError, ValueError, TypeError):
         raise _unauthenticated() from None
+
+
+def get_current_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    db: Session = Depends(get_db),
+) -> User:
+    if credentials is None:
+        raise _unauthenticated()
+    user_id, _ = read_access_token(credentials.credentials)
 
     user = db.get(User, user_id)
     if user is None:

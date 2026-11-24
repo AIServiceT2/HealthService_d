@@ -1,27 +1,30 @@
 """길드 채팅 API. 노션 '전운시 API 명세서' API-072~075 (2026-11-24 저장소에서 추가, 기능명세 JN-040).
 
-구현: API-072 메시지 목록, API-073 메시지 보내기, API-074 메시지 삭제(숨김).
+구현: API-072 메시지 목록, API-073 메시지 보내기, API-074 메시지 삭제(숨김), API-075 실시간 연결(WebSocket).
 로그인 확인은 auth 모듈의 get_current_user (Bearer access token, JWT).
 에러 본문 { code, message, details }은 전역 처리기(app/core/errors.py)가 만든다.
 """
 
+import asyncio
 import uuid
+from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, Query, Response
+from fastapi import APIRouter, Depends, Query, Response, WebSocket
+from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 
-from app.core.db import get_db
+from app.core.db import SessionLocal, get_db
 from app.core.errors import AppError
-from app.modules.auth.dependencies import get_current_user
+from app.modules.auth.dependencies import get_current_user, read_access_token
 from app.modules.auth.models import User
 from app.modules.guild.schemas import ErrorResponse
 from app.modules.guild_chat import service
+from app.modules.guild_chat.hub import CLOSE, Connection, hub
 from app.modules.guild_chat.schemas import (
     MessageCreate,
     MessageDeleted,
     MessageList,
     MessageRead,
-    MessageSender,
 )
 
 router = APIRouter(
@@ -35,15 +38,7 @@ _NO_GUILD = {"model": ErrorResponse, "description": "NOT_FOUND 길드가 없습�
 
 
 def _read(view: service.MessageView) -> MessageRead:
-    return MessageRead(
-        message_id=view.message_id,
-        type=view.type,
-        sender=MessageSender(user_id=view.sender.user_id, nickname=view.sender.nickname) if view.sender else None,
-        body=view.body,
-        payload=view.payload,
-        created_at=view.created_at,
-        deleted=view.deleted,
-    )
+    return MessageRead.from_view(view)
 
 
 def _membership_errors(fn):
@@ -162,3 +157,114 @@ def delete_message(
     except service.MessageNotFound:
         raise AppError(404, "NOT_FOUND", "메시지가 없습니다.")
     return MessageDeleted(message_id=result.message_id, deleted_by=result.deleted_by)
+
+
+# ---- 실시간 연결 (노션 API-075) ----
+
+# 연결 뒤 첫 메시지 AUTH를 기다리는 시간, PING 간격 [제안] (테스트에서 바꿀 수 있게 모듈 값으로 둠)
+AUTH_TIMEOUT_SECONDS = 5.0
+PING_INTERVAL_SECONDS = 30.0
+
+
+async def _close(websocket: WebSocket, code: int) -> None:
+    try:
+        await websocket.close(code)
+    except Exception:
+        pass  # 이미 끊긴 연결
+
+
+async def _authenticate(websocket: WebSocket) -> tuple[uuid.UUID, datetime] | None:
+    """첫 메시지 { type: "AUTH", accessToken }을 검사한다. 실패하면 4401로 닫고 None.
+
+    토큰이 주소·로그에 남지 않게 쿼리 대신 첫 메시지로 받는다 [제안].
+    """
+    try:
+        message = await asyncio.wait_for(websocket.receive_json(), timeout=AUTH_TIMEOUT_SECONDS)
+        if not isinstance(message, dict) or message.get("type") != "AUTH":
+            raise ValueError("AUTH가 아님")
+        token = message.get("accessToken")
+        if not isinstance(token, str):
+            raise ValueError("accessToken 없음")
+        return read_access_token(token)
+    except Exception:
+        await _close(websocket, service.CLOSE_UNAUTHENTICATED)
+        return None
+
+
+def _is_member(user_id: uuid.UUID, guild_id: uuid.UUID) -> bool:
+    with SessionLocal() as db:
+        return service.is_member(db, user_id, guild_id)
+
+
+async def _read_until_disconnect(websocket: WebSocket) -> None:
+    """앱이 보내는 메시지(PONG 등)는 읽고 버린다. 연결이 끊기면 끝난다."""
+    while True:
+        message = await websocket.receive()
+        if message["type"] == "websocket.disconnect":
+            return
+
+
+async def _ping(conn: Connection) -> None:
+    while True:
+        await asyncio.sleep(PING_INTERVAL_SECONDS)
+        conn.put({"type": "PING"})
+
+
+async def _write(websocket: WebSocket, conn: Connection, reader: asyncio.Task, expires_at: datetime) -> None:
+    """큐에 들어온 이벤트를 순서대로 보낸다. 앱이 끊거나, 닫으라는 표시가 오거나, 토큰이 만료되면 끝난다."""
+    while True:
+        remaining = (expires_at - datetime.now(UTC)).total_seconds()
+        if remaining <= 0:
+            await _close(websocket, service.CLOSE_UNAUTHENTICATED)
+            return
+        getter = asyncio.create_task(conn.queue.get())
+        done, _ = await asyncio.wait({getter, reader}, timeout=remaining, return_when=asyncio.FIRST_COMPLETED)
+        if getter not in done:
+            getter.cancel()
+            if reader in done:
+                return  # 앱이 연결을 끊음
+            await _close(websocket, service.CLOSE_UNAUTHENTICATED)  # 토큰 만료
+            return
+        item = getter.result()
+        if isinstance(item, tuple) and item[0] == CLOSE:
+            await _close(websocket, item[1])
+            return
+        try:
+            await websocket.send_json(item)
+        except Exception:
+            return
+
+
+@router.websocket("/guilds/{guild_id}/chat/ws")
+async def chat_websocket(websocket: WebSocket, guild_id: uuid.UUID):
+    """[API-075] 길드 채팅 실시간 연결. 권한: GUILD_MEMBER. 받기 전용 (보내기·삭제는 API-073·074).
+
+    1. 연결 뒤 5초 안에 { type: "AUTH", accessToken }을 보낸다. 없거나 틀리면 4401로 닫는다.
+    2. 길드 소속원이 아니면 4403으로 닫는다. 맞으면 { type: "READY", guildId }를 보낸다.
+    3. 이후 MESSAGE_CREATED / MESSAGE_DELETED / PING(30초마다)을 보낸다. 앱은 PING에 PONG으로 답한다.
+    4. 토큰이 만료되면 4401, 연결 중 탈퇴·내보내기되면 4403으로 닫는다.
+    서버 인스턴스 1개 기준 (hub.py).
+    """
+    await websocket.accept()
+    auth = await _authenticate(websocket)
+    if auth is None:
+        return
+    user_id, expires_at = auth
+
+    # 소속 확인 전에 등록한다: 확인과 등록 사이에 탈퇴해도 닫기 요청을 놓치지 않게
+    conn = Connection(guild_id=guild_id, user_id=user_id, loop=asyncio.get_running_loop())
+    hub.register(conn)
+    try:
+        if not await run_in_threadpool(_is_member, user_id, guild_id):
+            await _close(websocket, service.CLOSE_FORBIDDEN)
+            return
+        await websocket.send_json({"type": "READY", "guildId": str(guild_id)})
+        reader = asyncio.create_task(_read_until_disconnect(websocket))
+        pinger = asyncio.create_task(_ping(conn))
+        try:
+            await _write(websocket, conn, reader, expires_at)
+        finally:
+            reader.cancel()
+            pinger.cancel()
+    finally:
+        hub.unregister(conn)

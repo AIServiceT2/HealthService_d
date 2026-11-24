@@ -11,6 +11,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.modules.auth.models import User
+from app.modules.guild_chat import service as guild_chat_service
 from app.modules.guild.models import (
     INVITE_CODE_ALPHABET,
     INVITE_CODE_LENGTH,
@@ -367,6 +368,8 @@ def leave_guild(db: Session, user_id: uuid.UUID, guild_id: uuid.UUID) -> None:
     except Exception:
         db.rollback()
         raise
+    # 길드 채팅 실시간 연결(API-075)을 닫는다 (JN-040)
+    guild_chat_service.disconnect_member(guild_id, user_id)
 
 
 def kick_member(db: Session, leader_id: uuid.UUID, guild_id: uuid.UUID, target_id: uuid.UUID) -> None:
@@ -389,6 +392,8 @@ def kick_member(db: Session, leader_id: uuid.UUID, guild_id: uuid.UUID, target_i
     except Exception:
         db.rollback()
         raise
+    # 길드 채팅 실시간 연결(API-075)을 닫는다 (JN-040)
+    guild_chat_service.disconnect_member(guild_id, target_id)
 
 
 def delegate_leader(db: Session, leader_id: uuid.UUID, guild_id: uuid.UUID, target_id: uuid.UUID) -> Guild:

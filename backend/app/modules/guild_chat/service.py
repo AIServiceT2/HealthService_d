@@ -15,7 +15,13 @@ from sqlalchemy.orm import Session
 
 from app.modules.auth.models import User
 from app.modules.guild.models import Guild
+from app.modules.guild_chat.hub import hub
 from app.modules.guild_chat.models import GuildChatMessage, MessageType
+from app.modules.guild_chat.schemas import MessageRead
+
+# WebSocket 닫기 코드 (노션 API-075)
+CLOSE_UNAUTHENTICATED = 4401
+CLOSE_FORBIDDEN = 4403
 
 
 class GuildNotFound(Exception):
@@ -74,6 +80,23 @@ def _view(message: GuildChatMessage, sender: User | None) -> MessageView:
     )
 
 
+def _publish_created(guild_id: uuid.UUID, view: MessageView) -> None:
+    """커밋 뒤 그 길드의 실시간 연결(API-075)에 MESSAGE_CREATED를 보낸다."""
+    message = MessageRead.from_view(view).model_dump(mode="json", by_alias=True)
+    hub.broadcast(guild_id, {"type": "MESSAGE_CREATED", "message": message})
+
+
+def is_member(db: Session, user_id: uuid.UUID, guild_id: uuid.UUID) -> bool:
+    """실시간 연결(API-075)을 받을지. 없는 길드도 False."""
+    user = db.get(User, user_id)
+    return user is not None and user.guild_id == guild_id and db.get(Guild, guild_id) is not None
+
+
+def disconnect_member(guild_id: uuid.UUID, user_id: uuid.UUID) -> None:
+    """탈퇴(API-014)·내보내기(API-015) 뒤 그 사람의 채팅 연결을 4403으로 닫는다. 길드 모듈이 커밋 뒤 부른다."""
+    hub.close_user(guild_id, user_id, CLOSE_FORBIDDEN)
+
+
 def _require_member(db: Session, user_id: uuid.UUID, guild_id: uuid.UUID) -> User:
     """없는 길드면 GuildNotFound(404), 그 길드 소속원이 아니면 NotGuildMember(403)."""
     if db.get(Guild, guild_id) is None:
@@ -123,7 +146,9 @@ def send_message(
         if existing is None:
             raise
         return _view(existing, db.get(User, user_id)), False
-    return _view(message, user), True
+    view = _view(message, user)
+    _publish_created(guild_id, view)
+    return view, True
 
 
 # ---- 메시지 목록 (노션 API-072) ----
@@ -215,6 +240,8 @@ class DeleteResult:
     message_id: uuid.UUID
     # AUTHOR | LEADER
     deleted_by: str
+    # 이번 요청으로 숨겼는지 (이미 숨긴 메시지면 False)
+    changed: bool
 
 
 def _deleted_by_role(message: GuildChatMessage) -> str:
@@ -249,12 +276,18 @@ def delete_message(db: Session, user_id: uuid.UUID, guild_id: uuid.UUID, message
         if not (is_author_text or is_leader):
             raise CannotDelete(str(user_id))
 
-        if message.deleted_at is None:
+        changed = message.deleted_at is None
+        if changed:
             message.deleted_at = datetime.now(UTC)
             message.deleted_by = user_id
-        result = DeleteResult(message.id, _deleted_by_role(message))
+        result = DeleteResult(message.id, _deleted_by_role(message), changed)
         db.commit()
     except Exception:
         db.rollback()
         raise
+    if result.changed:
+        hub.broadcast(
+            guild_id,
+            {"type": "MESSAGE_DELETED", "messageId": str(result.message_id), "deletedBy": result.deleted_by},
+        )
     return result
