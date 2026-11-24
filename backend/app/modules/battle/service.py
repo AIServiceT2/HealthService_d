@@ -4,6 +4,7 @@
 피해가 들어가는 대상은 그 제출건의 세션에서 고른 공략 대상(target_type·target_id, API-020)이다.
 """
 
+import logging
 import uuid
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
@@ -15,11 +16,15 @@ from sqlalchemy.orm import Session
 from app.modules.auth.models import User
 from app.modules.battle.catalog import DUNGEONS, GUILD_BOSS_HP_MAX, Dungeon
 from app.modules.battle.models import GuildBoss
+from app.modules.guild_chat import service as guild_chat_service
+from app.modules.guild_chat.models import MessageType
 from app.modules.snapshot.models import SubmissionSnapshot
 from app.modules.submission.constants import SubmissionStatus
 from app.modules.submission.models import WorkoutSubmission
 from app.modules.workout_session.models import WorkoutSession
 from app.modules.workout_session.service import KST
+
+logger = logging.getLogger(__name__)
 
 TARGET_DUNGEON = "DUNGEON"
 TARGET_BOSS = "BOSS"
@@ -99,15 +104,48 @@ class BossStatus:
 def get_or_create_week_boss(db: Session, guild_id: uuid.UUID, week_start: date) -> GuildBoss:
     """그 길드의 그 주 보스. 없으면 만든다. 여러 명이 동시에 처음 조회해도 (guild_id, week_start)
     유니크 제약 + ON CONFLICT DO NOTHING으로 하나만 생긴다."""
-    db.execute(
+    created = db.execute(
         insert(GuildBoss)
         .values(id=uuid.uuid4(), guild_id=guild_id, week_start=week_start, hp_max=GUILD_BOSS_HP_MAX)
         .on_conflict_do_nothing(index_elements=[GuildBoss.guild_id, GuildBoss.week_start])
-    )
+    ).rowcount
     db.commit()
-    return db.scalars(
+    boss = db.scalars(
         select(GuildBoss).where(GuildBoss.guild_id == guild_id, GuildBoss.week_start == week_start)
     ).one()
+    if created:
+        # 그 주 보스가 처음 생기면 길드 채팅에 알린다 (JN-040). 실패해도 조회는 그대로
+        try:
+            guild_chat_service.post_boss_notice(
+                db, guild_id, MessageType.BOSS_WEEK_STARTED, boss.week_start, boss.hp_max
+            )
+        except Exception:
+            db.rollback()
+            logger.exception("보스 등장 알림을 만들지 못했습니다 (guild_id=%s)", guild_id)
+    return boss
+
+
+def _guild_damage(db: Session, boss: GuildBoss) -> int:
+    """지금 그 길드 소속원이 이 보스에 준 피해 합계 (API-046 guildTotalDamage와 같은 기준)."""
+    members = select(User.id).where(User.guild_id == boss.guild_id)
+    return int(db.scalar(_damage_query(TARGET_BOSS, boss.id).where(WorkoutSubmission.user_id.in_(members))))
+
+
+def post_boss_defeated_if_needed(db: Session, submission_id: uuid.UUID) -> bool:
+    """지급 완료(API-041) 뒤, 그 건의 공략 대상인 길드 보스 체력이 0이 되었으면 '보스 처치' 알림을 만든다 (JN-040).
+
+    알림은 길드·주마다 한 번 (이미 있으면 False). 공략 대상이 보스가 아니면 아무것도 하지 않는다.
+    """
+    submission = db.get(WorkoutSubmission, submission_id)
+    session = db.get(WorkoutSession, submission.session_id)
+    if session.target_type != TARGET_BOSS or session.target_id is None:
+        return False
+    boss = db.get(GuildBoss, session.target_id)
+    if boss is None or _guild_damage(db, boss) < boss.hp_max:
+        return False
+    return guild_chat_service.post_boss_notice(
+        db, boss.guild_id, MessageType.BOSS_DEFEATED, boss.week_start, boss.hp_max
+    )
 
 
 def get_guild_boss_status(
@@ -122,6 +160,4 @@ def get_guild_boss_status(
     if requester is None or requester.guild_id != guild_id:
         raise NotGuildMember(str(user_id))
     boss = get_or_create_week_boss(db, guild_id, week_start_kst(today))
-    members = select(User.id).where(User.guild_id == guild_id)
-    damage = db.scalar(_damage_query(TARGET_BOSS, boss.id).where(WorkoutSubmission.user_id.in_(members)))
-    return BossStatus(boss=boss, guild_total_damage=int(damage))
+    return BossStatus(boss=boss, guild_total_damage=_guild_damage(db, boss))

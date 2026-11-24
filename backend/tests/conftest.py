@@ -37,7 +37,7 @@ def _clean_tables():
     with engine.begin() as conn:
         conn.execute(
             text(
-                "TRUNCATE guild_boss, item, reward_ledger, review_request, workout_submission, workout_session, "
+                "TRUNCATE guild_chat_message, guild_boss, item, reward_ledger, review_request, workout_submission, workout_session, "
                 "pose_chunk, character, guild_invitation, guild, app_user, refresh_token CASCADE"
             )
         )

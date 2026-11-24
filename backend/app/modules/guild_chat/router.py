@@ -1,0 +1,270 @@
+"""길드 채팅 API. 노션 '전운시 API 명세서' API-072~075 (2026-11-24 저장소에서 추가, 기능명세 JN-040).
+
+구현: API-072 메시지 목록, API-073 메시지 보내기, API-074 메시지 삭제(숨김), API-075 실시간 연결(WebSocket).
+로그인 확인은 auth 모듈의 get_current_user (Bearer access token, JWT).
+에러 본문 { code, message, details }은 전역 처리기(app/core/errors.py)가 만든다.
+"""
+
+import asyncio
+import uuid
+from datetime import UTC, datetime
+
+from fastapi import APIRouter, Depends, Query, Response, WebSocket
+from fastapi.concurrency import run_in_threadpool
+from sqlalchemy.orm import Session
+
+from app.core.db import SessionLocal, get_db
+from app.core.errors import AppError
+from app.modules.auth.dependencies import get_current_user, read_access_token
+from app.modules.auth.models import User
+from app.modules.guild.schemas import ErrorResponse
+from app.modules.guild_chat import service
+from app.modules.guild_chat.hub import CLOSE, Connection, hub
+from app.modules.guild_chat.schemas import (
+    MessageCreate,
+    MessageDeleted,
+    MessageList,
+    MessageRead,
+)
+
+router = APIRouter(
+    tags=["guild-chat"],
+    responses={"4XX": {"model": ErrorResponse, "description": "공통 에러 본문 { code, message, details }"}},
+)
+
+_UNAUTHENTICATED = {"model": ErrorResponse, "description": "UNAUTHENTICATED 로그인이 필요합니다."}
+_NOT_MEMBER = {"model": ErrorResponse, "description": "FORBIDDEN 길드 소속원만 이용할 수 있습니다."}
+_NO_GUILD = {"model": ErrorResponse, "description": "NOT_FOUND 길드가 없습니다."}
+
+
+def _read(view: service.MessageView) -> MessageRead:
+    return MessageRead.from_view(view)
+
+
+def _membership_errors(fn):
+    """길드 없음 404, 소속원 아님 403 (노션 API-072~074 Error Code)."""
+    try:
+        return fn()
+    except service.GuildNotFound:
+        raise AppError(404, "NOT_FOUND", "길드가 없습니다.")
+    except service.NotGuildMember:
+        raise AppError(403, "FORBIDDEN", "길드 소속원만 이용할 수 있습니다.")
+
+
+@router.get(
+    "/guilds/{guild_id}/chat/messages",
+    summary="[API-072] 길드 채팅 메시지 목록",
+    description=(
+        "권한: GUILD_MEMBER. items는 오래된 것 → 최근 순. 아무 값도 없으면 최근 limit개. "
+        "cursor(앞 응답의 nextCursor)는 더 이전 메시지, after(messageId)는 그 메시지 뒤에 온 메시지 "
+        "(재연결 뒤 빠진 메시지 채우기, nextCursor는 null). cursor와 after는 함께 쓸 수 없다. "
+        "숨긴 메시지는 deleted: true이고 body·payload가 null. limit 기본 20, 최대 50."
+    ),
+    response_model=MessageList,
+    response_model_by_alias=True,
+    responses={
+        400: {"model": ErrorResponse, "description": "VALIDATION_FAILED cursor와 after는 함께 쓸 수 없습니다. (cursor 형식, after 메시지, limit 범위)"},
+        401: _UNAUTHENTICATED,
+        403: _NOT_MEMBER,
+        404: _NO_GUILD,
+    },
+)
+def list_messages(
+    guild_id: uuid.UUID,
+    cursor: str | None = Query(default=None, description="더 이전 메시지 페이지 커서 (앞 응답의 nextCursor)"),
+    after: uuid.UUID | None = Query(default=None, description="이 messageId 뒤에 온 메시지만"),
+    limit: int = Query(default=20, ge=1, le=50, description="기본 20, 최대 50"),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if cursor is not None and after is not None:
+        raise AppError(400, "VALIDATION_FAILED", "cursor와 after는 함께 쓸 수 없습니다.")
+    try:
+        page = _membership_errors(lambda: service.list_messages(db, user.id, guild_id, cursor, after, limit))
+    except service.InvalidCursor:
+        raise AppError(400, "VALIDATION_FAILED", "입력값이 올바르지 않습니다.", {"cursor": "형식이 올바르지 않습니다."})
+    except service.AfterMessageNotFound:
+        raise AppError(400, "VALIDATION_FAILED", "입력값이 올바르지 않습니다.", {"after": "이 길드의 메시지가 아닙니다."})
+    return MessageList(
+        items=[_read(v) for v in page.items],
+        next_cursor=page.next_cursor,
+        has_more_after=page.has_more_after,
+    )
+
+
+@router.post(
+    "/guilds/{guild_id}/chat/messages",
+    summary="[API-073] 길드 채팅 메시지 보내기",
+    description=(
+        "권한: GUILD_MEMBER. body는 앞뒤 공백을 지운 뒤 1~300자 [제안]. 텍스트만 보낼 수 있다. "
+        "같은 clientMessageId로 다시 보내면 새로 만들지 않고 처음 메시지를 200으로 돌려준다 (새로 저장하면 201). "
+        "보내기 간격 제한(도배 방지)은 미정."
+    ),
+    status_code=201,
+    response_model=MessageRead,
+    response_model_by_alias=True,
+    responses={
+        200: {"model": MessageRead, "description": "같은 clientMessageId로 이미 저장된 메시지"},
+        400: {"model": ErrorResponse, "description": "VALIDATION_FAILED 메시지는 1~300자여야 합니다."},
+        401: _UNAUTHENTICATED,
+        403: _NOT_MEMBER,
+        404: _NO_GUILD,
+    },
+)
+def send_message(
+    guild_id: uuid.UUID,
+    body: MessageCreate,
+    response: Response,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    view, created = _membership_errors(
+        lambda: service.send_message(db, user.id, guild_id, body.client_message_id, body.body)
+    )
+    if not created:
+        response.status_code = 200
+    return _read(view)
+
+
+@router.delete(
+    "/guilds/{guild_id}/chat/messages/{message_id}",
+    summary="[API-074] 길드 채팅 메시지 삭제",
+    description=(
+        "권한: GUILD_MEMBER. 지우지 않고 숨긴다. 본인은 자기 TEXT만, 길드장은 그 길드의 모든 메시지(알림 포함)를 숨길 수 있다. "
+        "이미 숨긴 메시지를 다시 요청하면 같은 결과를 돌려준다. deletedBy는 AUTHOR | LEADER "
+        "(길드장이 자기 메시지를 숨기면 AUTHOR)."
+    ),
+    response_model=MessageDeleted,
+    response_model_by_alias=True,
+    responses={
+        401: _UNAUTHENTICATED,
+        403: {"model": ErrorResponse, "description": "FORBIDDEN 본인 메시지나 길드장만 삭제할 수 있습니다. (길드 소속원이 아니어도 403)"},
+        404: {"model": ErrorResponse, "description": "NOT_FOUND 메시지가 없습니다."},
+    },
+)
+def delete_message(
+    guild_id: uuid.UUID,
+    message_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        result = service.delete_message(db, user.id, guild_id, message_id)
+    except service.NotGuildMember:
+        raise AppError(403, "FORBIDDEN", "길드 소속원만 이용할 수 있습니다.")
+    except service.CannotDelete:
+        raise AppError(403, "FORBIDDEN", "본인 메시지나 길드장만 삭제할 수 있습니다.")
+    except service.MessageNotFound:
+        raise AppError(404, "NOT_FOUND", "메시지가 없습니다.")
+    return MessageDeleted(message_id=result.message_id, deleted_by=result.deleted_by)
+
+
+# ---- 실시간 연결 (노션 API-075) ----
+
+# 연결 뒤 첫 메시지 AUTH를 기다리는 시간, PING 간격 [제안] (테스트에서 바꿀 수 있게 모듈 값으로 둠)
+AUTH_TIMEOUT_SECONDS = 5.0
+PING_INTERVAL_SECONDS = 30.0
+
+
+async def _close(websocket: WebSocket, code: int) -> None:
+    try:
+        await websocket.close(code)
+    except Exception:
+        pass  # 이미 끊긴 연결
+
+
+async def _authenticate(websocket: WebSocket) -> tuple[uuid.UUID, datetime] | None:
+    """첫 메시지 { type: "AUTH", accessToken }을 검사한다. 실패하면 4401로 닫고 None.
+
+    토큰이 주소·로그에 남지 않게 쿼리 대신 첫 메시지로 받는다 [제안].
+    """
+    try:
+        message = await asyncio.wait_for(websocket.receive_json(), timeout=AUTH_TIMEOUT_SECONDS)
+        if not isinstance(message, dict) or message.get("type") != "AUTH":
+            raise ValueError("AUTH가 아님")
+        token = message.get("accessToken")
+        if not isinstance(token, str):
+            raise ValueError("accessToken 없음")
+        return read_access_token(token)
+    except Exception:
+        await _close(websocket, service.CLOSE_UNAUTHENTICATED)
+        return None
+
+
+def _is_member(user_id: uuid.UUID, guild_id: uuid.UUID) -> bool:
+    with SessionLocal() as db:
+        return service.is_member(db, user_id, guild_id)
+
+
+async def _read_until_disconnect(websocket: WebSocket) -> None:
+    """앱이 보내는 메시지(PONG 등)는 읽고 버린다. 연결이 끊기면 끝난다."""
+    while True:
+        message = await websocket.receive()
+        if message["type"] == "websocket.disconnect":
+            return
+
+
+async def _ping(conn: Connection) -> None:
+    while True:
+        await asyncio.sleep(PING_INTERVAL_SECONDS)
+        conn.put({"type": "PING"})
+
+
+async def _write(websocket: WebSocket, conn: Connection, reader: asyncio.Task, expires_at: datetime) -> None:
+    """큐에 들어온 이벤트를 순서대로 보낸다. 앱이 끊거나, 닫으라는 표시가 오거나, 토큰이 만료되면 끝난다."""
+    while True:
+        remaining = (expires_at - datetime.now(UTC)).total_seconds()
+        if remaining <= 0:
+            await _close(websocket, service.CLOSE_UNAUTHENTICATED)
+            return
+        getter = asyncio.create_task(conn.queue.get())
+        done, _ = await asyncio.wait({getter, reader}, timeout=remaining, return_when=asyncio.FIRST_COMPLETED)
+        if getter not in done:
+            getter.cancel()
+            if reader in done:
+                return  # 앱이 연결을 끊음
+            await _close(websocket, service.CLOSE_UNAUTHENTICATED)  # 토큰 만료
+            return
+        item = getter.result()
+        if isinstance(item, tuple) and item[0] == CLOSE:
+            await _close(websocket, item[1])
+            return
+        try:
+            await websocket.send_json(item)
+        except Exception:
+            return
+
+
+@router.websocket("/guilds/{guild_id}/chat/ws")
+async def chat_websocket(websocket: WebSocket, guild_id: uuid.UUID):
+    """[API-075] 길드 채팅 실시간 연결. 권한: GUILD_MEMBER. 받기 전용 (보내기·삭제는 API-073·074).
+
+    1. 연결 뒤 5초 안에 { type: "AUTH", accessToken }을 보낸다. 없거나 틀리면 4401로 닫는다.
+    2. 길드 소속원이 아니면 4403으로 닫는다. 맞으면 { type: "READY", guildId }를 보낸다.
+    3. 이후 MESSAGE_CREATED / MESSAGE_DELETED / PING(30초마다)을 보낸다. 앱은 PING에 PONG으로 답한다.
+    4. 토큰이 만료되면 4401, 연결 중 탈퇴·내보내기되면 4403으로 닫는다.
+    서버 인스턴스 1개 기준 (hub.py).
+    """
+    await websocket.accept()
+    auth = await _authenticate(websocket)
+    if auth is None:
+        return
+    user_id, expires_at = auth
+
+    # 소속 확인 전에 등록한다: 확인과 등록 사이에 탈퇴해도 닫기 요청을 놓치지 않게
+    conn = Connection(guild_id=guild_id, user_id=user_id, loop=asyncio.get_running_loop())
+    hub.register(conn)
+    try:
+        if not await run_in_threadpool(_is_member, user_id, guild_id):
+            await _close(websocket, service.CLOSE_FORBIDDEN)
+            return
+        await websocket.send_json({"type": "READY", "guildId": str(guild_id)})
+        reader = asyncio.create_task(_read_until_disconnect(websocket))
+        pinger = asyncio.create_task(_ping(conn))
+        try:
+            await _write(websocket, conn, reader, expires_at)
+        finally:
+            reader.cancel()
+            pinger.cancel()
+    finally:
+        hub.unregister(conn)
